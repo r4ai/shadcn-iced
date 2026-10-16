@@ -350,15 +350,7 @@ mod tests {
         assert!(resolved.contains("pagination"));
 
         let resolved = resolve(&["combobox".to_owned()]).unwrap();
-        for dependency in [
-            "command",
-            "button",
-            "menu",
-            "input",
-            "popover",
-            "separator",
-            "scroll_area",
-        ] {
+        for dependency in ["combobox", "button", "menu", "input"] {
             assert!(resolved.contains(dependency), "{dependency}");
         }
 

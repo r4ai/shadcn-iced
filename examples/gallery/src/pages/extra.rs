@@ -81,7 +81,6 @@ pub const CALENDAR: Page = Page {
                             .transparent(true)
                     )
                     .footer(presets)
-                    .footer_border(true)
                     .width(7.0 * 38.0 + 48.0)
             ),
             example(
@@ -102,7 +101,6 @@ pub const CALENDAR: Page = Page {
                         .spacing(16)
                         .width(Fill)
                     )
-                    .footer_border(true)
                     .width(7.0 * 28.0 + 48.0)
             ),
             example(
