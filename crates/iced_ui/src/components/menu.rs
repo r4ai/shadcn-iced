@@ -30,7 +30,12 @@ use iced::{Alignment, Background, Color, Padding, Theme, border};
 /// function, so menu color variants (inverted, translucent...) only need to
 /// change it.
 pub fn menu_tokens(theme: &Theme) -> Tokens {
-    tokens(theme)
+    tokens(theme).menu()
+}
+
+/// Whether menus are translucent (`cn-menu-translucent`).
+fn translucent(theme: &Theme) -> bool {
+    tokens(theme).menu.translucent
 }
 
 /// The flavor of a [`Menu`]: dropdown menus, context menus and menubar
@@ -316,7 +321,15 @@ fn item_color(theme: &Theme, disabled: bool, destructive: bool) -> Option<Color>
     let p = menu_tokens(theme).palette;
 
     if destructive {
-        Some(alpha(p.destructive, opacity(disabled)))
+        // `**:data-[variant=destructive]:text-accent-foreground!` when
+        // translucent.
+        let color = if translucent(theme) {
+            p.accent_foreground
+        } else {
+            p.destructive
+        };
+
+        Some(alpha(color, opacity(disabled)))
     } else if disabled {
         Some(alpha(p.popover_foreground, opacity(disabled)))
     } else {
@@ -376,7 +389,12 @@ pub fn highlight(theme: &Theme) -> listbox::Style {
     let t = menu_tokens(theme);
 
     listbox::Style {
-        background: Background::Color(t.palette.accent),
+        background: Background::Color(if translucent(theme) {
+            // `**:data-[slot$=-item]:focus:bg-foreground/10`
+            alpha(t.palette.foreground, 0.1)
+        } else {
+            t.palette.accent
+        }),
         border: border::rounded(t.radius_md()),
         text_color: t.palette.accent_foreground,
     }
@@ -386,6 +404,10 @@ pub fn highlight(theme: &Theme) -> listbox::Style {
 /// `/20` in dark mode).
 pub fn destructive_highlight(theme: &Theme) -> listbox::Style {
     let t = menu_tokens(theme);
+
+    if translucent(theme) {
+        return highlight(theme);
+    }
 
     listbox::Style {
         background: Background::Color(alpha(
@@ -398,12 +420,18 @@ pub fn destructive_highlight(theme: &Theme) -> listbox::Style {
 }
 
 /// The style of the menu panel (`rounded-lg bg-popover p-1 shadow-md ring-1
-/// ring-foreground/10`).
+/// ring-foreground/10`), `bg-popover/70` when translucent (iced cannot blur
+/// what is behind it).
 pub fn panel(theme: &Theme) -> container::Style {
     let t = menu_tokens(theme);
+    let background = if translucent(theme) {
+        alpha(t.palette.popover, 0.7)
+    } else {
+        t.palette.popover
+    };
 
     container::Style {
-        background: Some(Background::Color(t.palette.popover)),
+        background: Some(Background::Color(background)),
         text_color: Some(t.palette.popover_foreground),
         border: style::ring_border(&t, t.radius_lg()),
         shadow: style::shadow_md(),
@@ -441,7 +469,12 @@ pub fn separator<'a, Message: 'a>() -> Element<'a, Message> {
     container(
         container(space().width(iced::Length::Fill).height(1)).style(|theme: &Theme| {
             container::Style {
-                background: Some(Background::Color(menu_tokens(theme).palette.border)),
+                background: Some(Background::Color(if translucent(theme) {
+                    // `**:data-[slot$=-separator]:bg-foreground/5`
+                    alpha(menu_tokens(theme).palette.foreground, 0.05)
+                } else {
+                    menu_tokens(theme).palette.border
+                })),
                 ..container::Style::default()
             }
         }),
