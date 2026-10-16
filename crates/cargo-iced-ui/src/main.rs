@@ -336,7 +336,7 @@ mod tests {
 
     #[test]
     fn registry_is_complete() {
-        assert!(registry::COMPONENTS.len() >= 60);
+        assert!(registry::COMPONENTS.len() >= 66);
         assert!(source("button").is_ok());
     }
 
@@ -360,6 +360,20 @@ mod tests {
             "scroll_area",
         ] {
             assert!(resolved.contains(dependency), "{dependency}");
+        }
+
+        let resolved = resolve(&["code_block".to_owned()]).unwrap();
+        for dependency in ["code_block", "button", "scroll_area"] {
+            assert!(resolved.contains(dependency), "{dependency}");
+        }
+
+        let resolved = resolve(&["questionnaire".to_owned()]).unwrap();
+        for dependency in ["questionnaire", "button", "input"] {
+            assert!(resolved.contains(dependency), "{dependency}");
+        }
+
+        for name in ["toast", "trace"] {
+            assert!(resolve(&[name.to_owned()]).unwrap().contains(name));
         }
     }
 
