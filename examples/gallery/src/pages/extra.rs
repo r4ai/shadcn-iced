@@ -2,12 +2,15 @@
 use super::{DemoMessage, Page};
 use crate::{Message, example};
 
+use iced_ui::button::{Size as ButtonSize, Variant as ButtonVariant};
+use iced_ui::calendar::Date;
 use iced_ui::chart::{self, Series};
+use iced_ui::date_picker::date_range_picker;
 use iced_ui::prelude::*;
 use iced_ui::sidebar::{group, item};
 
 use iced::widget::{column, container, row, text};
-use iced::{Center, Fill};
+use iced::{Center, Fill, Length};
 
 fn demo(message: DemoMessage) -> Message {
     Message::Demo(message)
@@ -16,30 +19,128 @@ fn demo(message: DemoMessage) -> Message {
 pub const CALENDAR: Page = Page {
     id: "calendar",
     title: "Calendar",
-    description: "A date field component that allows users to enter and edit date.",
+    description: "A calendar component that allows users to select a date or a range of dates.",
     view: |gallery| {
         let d = &gallery.demo;
+        let month = |m| demo(DemoMessage::Month(m));
+        let select = |date| demo(DemoMessage::Date(date));
+
+        let presets = row![
+            preset("Today", 0),
+            preset("Tomorrow", 1),
+            preset("In 3 days", 3),
+            preset("In a week", 7),
+            preset("In 2 weeks", 14),
+        ]
+        .spacing(8)
+        .wrap();
+
+        let booked = |date: Date| {
+            date.year == d.month.year
+                && date.month == d.month.month
+                && (17..=31).contains(&date.day)
+        };
 
         column![
             example(
-                "Single",
-                calendar(d.month, |m| demo(DemoMessage::Month(m)))
+                "Demo",
+                calendar(d.month, month)
                     .selected(d.date)
-                    .on_select(|date| demo(DemoMessage::Date(date)))
+                    .on_select(select)
+                    .dropdowns(2016, 2036)
                     .bordered(true)
             ),
+            example("Basic", calendar(d.month, month).bordered(true).today(None)),
             example(
-                "Range",
-                calendar(d.month, |m| demo(DemoMessage::Month(m)))
+                "Range Calendar",
+                calendar(d.month, month)
                     .range(d.range.0, d.range.1)
                     .on_select(|date| demo(DemoMessage::Range(date)))
                     .months(2)
                     .bordered(true)
             ),
+            example(
+                "Month and Year Selector",
+                calendar(d.month, month)
+                    .dropdowns(2016, 2036)
+                    .on_select(select)
+                    .bordered(true)
+                    .today(None)
+            ),
+            example(
+                "Presets",
+                card()
+                    .content(
+                        calendar(d.month, month)
+                            .selected(d.date)
+                            .on_select(select)
+                            .fixed_weeks(true)
+                            .cell_size(38.0)
+                            .padding(0.0)
+                            .transparent(true)
+                    )
+                    .footer(presets)
+                    .footer_border(true)
+                    .width(7.0 * 38.0 + 48.0)
+            ),
+            example(
+                "Date and Time Picker",
+                card()
+                    .content(
+                        calendar(d.month, month)
+                            .selected(d.date)
+                            .on_select(select)
+                            .padding(0.0)
+                            .transparent(true)
+                    )
+                    .footer(
+                        column![
+                            field("Start Time", input("", "10:30:00").icon(lucide::CLOCK_2)),
+                            field("End Time", input("", "12:30:00").icon(lucide::CLOCK_2)),
+                        ]
+                        .spacing(16)
+                        .width(Fill)
+                    )
+                    .footer_border(true)
+                    .width(7.0 * 28.0 + 48.0)
+            ),
+            example(
+                "Booked dates",
+                card()
+                    .content(
+                        calendar(d.month, month)
+                            .selected(d.date)
+                            .on_select(select)
+                            .disabled(booked)
+                            .struck(booked)
+                            .transparent(true)
+                    )
+                    .width(Length::Shrink)
+            ),
+            example(
+                "Week Numbers",
+                card()
+                    .content(
+                        calendar(d.month, month)
+                            .selected(d.date)
+                            .on_select(select)
+                            .week_numbers(true)
+                            .transparent(true)
+                    )
+                    .width(Length::Shrink)
+            ),
         ]
         .into()
     },
 };
+
+fn preset<'a>(label: &'a str, days: i64) -> iced::Element<'a, Message> {
+    button(label)
+        .variant(ButtonVariant::Outline)
+        .size(ButtonSize::Sm)
+        .on_press(demo(DemoMessage::Preset(days)))
+        .into()
+}
 
 pub const DATE_PICKER: Page = Page {
     id: "date-picker",
@@ -47,17 +148,51 @@ pub const DATE_PICKER: Page = Page {
     description: "A date picker component with range and presets.",
     view: |gallery| {
         let d = &gallery.demo;
+        let month = |m| demo(DemoMessage::Month(m));
+        let select = |date| demo(DemoMessage::Date(date));
 
-        example(
-            "Default",
-            container(date_picker(
-                d.date,
-                |date| demo(DemoMessage::Date(date)),
-                d.month,
-                |m| demo(DemoMessage::Month(m)),
-            ))
-            .padding(iced::Padding::ZERO.bottom(320)),
-        )
+        column![
+            example("Demo", date_picker(d.date, select, d.month, month)),
+            example(
+                "Basic",
+                container(field(
+                    "Date",
+                    date_picker(d.date, select, d.month, month)
+                        .chevron(false)
+                        .width(Fill)
+                ))
+                .width(176)
+            ),
+            example(
+                "Range Picker",
+                container(field(
+                    "Date Picker Range",
+                    date_range_picker(
+                        d.range,
+                        |date| demo(DemoMessage::Range(date)),
+                        d.month,
+                        month
+                    )
+                ))
+                .width(240)
+            ),
+            example(
+                "Date of Birth",
+                container(field(
+                    "Date of birth",
+                    date_picker(d.dob, |date| demo(DemoMessage::Dob(date)), d.month, month)
+                        .placeholder("Select date")
+                        .format(iced_ui::date_picker::numeric_date)
+                        .chevron(false)
+                        .dropdowns(1940, 2026)
+                        .open(d.dob_open, demo(DemoMessage::DobOpen(false)))
+                        .on_open(demo(DemoMessage::DobOpen(true)))
+                        .width(Fill)
+                ))
+                .width(176)
+            ),
+        ]
+        .into()
     },
 };
 

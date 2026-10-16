@@ -126,6 +126,9 @@ pub struct Demo {
     ),
     pub slide: usize,
     pub sidebar_collapsed: bool,
+    pub scroller_at_end: bool,
+    pub dob: Option<iced_ui::calendar::Date>,
+    pub dob_open: bool,
 }
 
 pub const FRUITS: [&str; 5] = ["Apple", "Banana", "Blueberry", "Grapes", "Pineapple"];
@@ -177,6 +180,9 @@ impl Default for Demo {
             ),
             slide: 0,
             sidebar_collapsed: false,
+            scroller_at_end: true,
+            dob: None,
+            dob_open: false,
         }
     }
 }
@@ -221,6 +227,11 @@ pub enum DemoMessage {
     Range(iced_ui::calendar::Date),
     Slide(usize),
     SidebarCollapsed(bool),
+    ScrollerAtEnd(bool),
+    ScrollToEnd,
+    Preset(i64),
+    Dob(iced_ui::calendar::Date),
+    DobOpen(bool),
 }
 
 impl Demo {
@@ -298,6 +309,21 @@ impl Demo {
             }
             DemoMessage::Slide(index) => self.slide = index,
             DemoMessage::SidebarCollapsed(collapsed) => self.sidebar_collapsed = collapsed,
+            DemoMessage::ScrollerAtEnd(at_end) => self.scroller_at_end = at_end,
+            DemoMessage::Preset(days) => {
+                let date = iced_ui::calendar::Date::today().add_days(days);
+                self.date = Some(date);
+                self.month = date.month_of();
+            }
+            DemoMessage::Dob(date) => {
+                self.dob = Some(date);
+                self.dob_open = false;
+            }
+            DemoMessage::DobOpen(open) => self.dob_open = open,
+            DemoMessage::ScrollToEnd => {
+                self.scroller_at_end = true;
+                return iced_ui::message_scroller::scroll_to_end(chat::SCROLLER_ID);
+            }
         }
 
         Task::none()
