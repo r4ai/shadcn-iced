@@ -19,7 +19,10 @@ use iced::advanced::{Clipboard, Shell, overlay};
 
 use iced::keyboard::{self, key};
 use iced::time::{Duration, Instant};
-use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch, window};
+use iced::{
+    Background, Border, Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch,
+    window,
+};
 
 use std::sync::atomic::{self, AtomicU64};
 
@@ -97,6 +100,8 @@ pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<Box<dyn Fn(bool) -> Message + 'a>>,
+    open_highlight: Option<Box<dyn Fn(&Theme) -> (Background, Border) + 'a>>,
+    animate: bool,
 }
 
 impl<'a, Message, Theme, Renderer> Anchored<'a, Message, Theme, Renderer>
@@ -122,6 +127,8 @@ where
             close_on_select: false,
             modal: false,
             on_open_change: None,
+            open_highlight: None,
+            animate: true,
         }
     }
 
@@ -222,6 +229,20 @@ where
     /// Blocks interactions with the rest of the interface while open.
     pub fn modal(mut self, modal: bool) -> Self {
         self.modal = modal;
+        self
+    }
+
+    /// Sets whether the content fades and zooms in and out
+    /// (`animate-in fade-in-0 zoom-in-95 duration-100`). Defaults to `true`.
+    pub fn animate(mut self, animate: bool) -> Self {
+        self.animate = animate;
+        self
+    }
+
+    /// Draws a background behind the anchor while the content is open,
+    /// like `aria-expanded:bg-muted` on a trigger.
+    pub fn open_highlight(mut self, f: impl Fn(&Theme) -> (Background, Border) + 'a) -> Self {
+        self.open_highlight = Some(Box::new(f));
         self
     }
 
@@ -458,6 +479,21 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
+        if let Some(highlight) = &self.open_highlight
+            && tree.state.downcast_ref::<State>().is_open(&self.trigger)
+        {
+            let (background, border) = highlight(theme);
+
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: layout.bounds(),
+                    border,
+                    ..renderer::Quad::default()
+                },
+                background,
+            );
+        }
+
         self.anchor.as_widget().draw(
             &tree.children[0],
             renderer,
@@ -513,7 +549,12 @@ where
 
         state.presence.go(
             if open { 1.0 } else { 0.0 },
-            animation::FAST,
+            // `duration-100`
+            if self.animate {
+                Duration::from_millis(100)
+            } else {
+                Duration::ZERO
+            },
             animation::ease_out,
             now,
         );

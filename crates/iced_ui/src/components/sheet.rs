@@ -16,9 +16,9 @@
 //! ```
 use iced_ui_core::primitive::Layer;
 use iced_ui_core::primitive::layer::{Animation, Edge};
-use iced_ui_core::{Element, font, style, tokens};
+use iced_ui_core::{Element, style, tokens};
 
-use iced::widget::{Column, Stack, container, space, text};
+use iced::widget::{Column, Row, Stack, container, space};
 use iced::{Background, Length, Theme};
 
 /// The edge of the window a [`Sheet`] slides from.
@@ -45,6 +45,7 @@ pub struct Sheet<'a, Message> {
     content: Vec<Element<'a, Message>>,
     footer: Option<Element<'a, Message>>,
     on_close: Option<Message>,
+    close_button: bool,
     size: f32,
 }
 
@@ -62,6 +63,7 @@ pub fn sheet<'a, Message: Clone + 'a>(
         content: Vec::new(),
         footer: None,
         on_close: None,
+        close_button: true,
         size: 384.0,
     }
 }
@@ -73,25 +75,25 @@ impl<'a, Message: Clone + 'a> Sheet<'a, Message> {
         self
     }
 
-    /// Sets the title.
+    /// Sets the title (`text-base font-medium`).
     pub fn title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
     }
 
-    /// Sets the description.
+    /// Sets the description (`text-sm text-muted-foreground`).
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
-    /// Appends content.
+    /// Appends content, padded with `px-4`.
     pub fn content(mut self, content: impl Into<Element<'a, Message>>) -> Self {
         self.content.push(content.into());
         self
     }
 
-    /// Sets the footer, pushed to the bottom.
+    /// Sets the footer (`mt-auto p-4`), pushed to the bottom.
     pub fn footer(mut self, footer: impl Into<Element<'a, Message>>) -> Self {
         self.footer = Some(footer.into());
         self
@@ -100,6 +102,12 @@ impl<'a, Message: Clone + 'a> Sheet<'a, Message> {
     /// Sets the message produced when the user closes the sheet.
     pub fn on_close(mut self, message: Message) -> Self {
         self.on_close = Some(message);
+        self
+    }
+
+    /// Shows or hides the close button in the top-right corner.
+    pub fn close_button(mut self, show: bool) -> Self {
+        self.close_button = show;
         self
     }
 
@@ -114,36 +122,35 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
     fn from(sheet: Sheet<'a, Message>) -> Self {
         let vertical = matches!(sheet.side, Side::Left | Side::Right);
 
+        // `gap-0.5 p-4`
         let header = (sheet.title.is_some() || sheet.description.is_some()).then(|| {
             Column::new()
+                .push(sheet.title.map(super::dialog::title_text))
                 .push(
                     sheet
-                        .title
-                        .map(|title| text(title).size(style::text::BASE).font(font::SEMIBOLD)),
+                        .description
+                        .map(|description| super::dialog::description_text(description, false)),
                 )
-                .push(sheet.description.map(|description| {
-                    text(description)
-                        .size(style::text::SM)
-                        .style(|theme: &Theme| text::Style {
-                            color: Some(tokens(theme).palette.muted_foreground),
-                        })
-                }))
-                .spacing(6)
+                .spacing(2)
                 .padding(16)
+                .width(Length::Fill)
         });
 
-        let content = Column::with_children(sheet.content.into_iter().map(|element| {
-            container(element)
-                .padding([0, 16])
-                .width(Length::Fill)
-                .into()
-        }))
-        .spacing(16);
+        let content = (!sheet.content.is_empty()).then(|| {
+            Column::with_children(sheet.content.into_iter().map(|element| {
+                container(element)
+                    .padding([0, 16])
+                    .width(Length::Fill)
+                    .into()
+            }))
+            .spacing(16)
+        });
 
         let footer = sheet
             .footer
             .map(|footer| container(footer).padding(16).width(Length::Fill));
 
+        // `flex flex-col gap-4`
         let body = Column::new()
             .push(header)
             .push(content)
@@ -157,15 +164,48 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
                 Length::Shrink
             });
 
-        let layers = Stack::new().push(body).push(
-            container(super::dialog::close_button(sheet.on_close.clone()))
-                .padding(16)
-                .align_right(Length::Fill),
-        );
+        let mut layers = Stack::new().push(body);
+
+        if sheet.close_button {
+            // `absolute top-3 right-3`
+            layers = layers.push(
+                container(super::dialog::close_button(sheet.on_close.clone()))
+                    .padding(12)
+                    .align_right(Length::Fill),
+            );
+        }
 
         let side = sheet.side;
 
-        let panel = container(layers)
+        // `border-l` (or the border of the inner edge).
+        let edge = || {
+            container(
+                space()
+                    .width(if vertical {
+                        Length::Fixed(1.0)
+                    } else {
+                        Length::Fill
+                    })
+                    .height(if vertical {
+                        Length::Fill
+                    } else {
+                        Length::Fixed(1.0)
+                    }),
+            )
+            .style(|theme: &Theme| container::Style {
+                background: Some(Background::Color(tokens(theme).palette.border)),
+                ..container::Style::default()
+            })
+        };
+
+        let framed: Element<'a, Message> = match side {
+            Side::Right => Row::new().push(edge()).push(layers).into(),
+            Side::Left => Row::new().push(layers).push(edge()).into(),
+            Side::Bottom => Column::new().push(edge()).push(layers).into(),
+            Side::Top => Column::new().push(layers).push(edge()).into(),
+        };
+
+        let panel = container(framed)
             .width(if vertical {
                 Length::Fixed(sheet.size)
             } else {
@@ -179,10 +219,10 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
             .style(move |theme: &Theme| {
                 let t = tokens(theme);
 
+                // `bg-popover text-popover-foreground shadow-lg`
                 container::Style {
-                    background: Some(Background::Color(t.palette.background)),
-                    text_color: Some(t.palette.foreground),
-                    border: style::border(t.palette.border, 0.0),
+                    background: Some(Background::Color(t.palette.popover)),
+                    text_color: Some(t.palette.popover_foreground),
                     shadow: style::shadow_lg(),
                     ..container::Style::default()
                 }
@@ -215,9 +255,10 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
         };
 
         Layer::new(sheet.base, panel, sheet.open)
-            .animation(Animation::Slide(edge))
+            .animation(Animation::SlideFade(edge))
             .align_x(align_x)
             .align_y(align_y)
+            .backdrop_with(super::dialog::backdrop)
             .on_dismiss_maybe(sheet.on_close)
             .into()
     }

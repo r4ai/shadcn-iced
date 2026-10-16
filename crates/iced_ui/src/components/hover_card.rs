@@ -15,8 +15,9 @@ use iced_ui_core::primitive::{Anchored, Side};
 use iced::Length;
 use iced::time::Duration;
 
-/// Shows `content` (in a `w-64 p-4` panel) below `trigger` after hovering
-/// it for a moment.
+/// Shows `content` (in a `w-64 p-2.5` panel) below `trigger` after hovering
+/// it for 600ms; it closes 300ms after the cursor leaves (Base UI's
+/// preview card delays).
 pub fn hover_card<'a, Message: Clone + 'a>(
     trigger: impl Into<Element<'a, Message>>,
     content: impl Into<Element<'a, Message>>,
@@ -25,7 +26,7 @@ pub fn hover_card<'a, Message: Clone + 'a>(
         trigger,
         super::popover::panel(content, Length::Fixed(256.0)),
     )
-    .hover(Duration::from_millis(700), Duration::from_millis(300))
+    .hover(Duration::from_millis(600), Duration::from_millis(300))
     .side(Side::Bottom)
     .offset(4.0)
 }

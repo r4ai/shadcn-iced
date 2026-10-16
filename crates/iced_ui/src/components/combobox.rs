@@ -1,29 +1,30 @@
-//! Autocomplete input and command palette with a list of suggestions.
+//! Autocomplete input with a list of suggestions.
 //!
-//! Port of <https://ui.shadcn.com/docs/components/combobox>: a
-//! [`popover`](super::popover) whose content is a [`command`](super::command).
+//! Port of <https://ui.shadcn.com/docs/components/combobox> (Base UI
+//! combobox): an input with a trigger button, opening a list of the items
+//! matching what has been typed. The query lives in your state.
 //!
 //! ```no_run
 //! # use iced_ui::combobox::combobox;
 //! # #[derive(Clone)] enum Message { Query(String), Framework(&'static str) }
 //! # fn view<'a>(query: &'a str, framework: Option<&'static str>) -> iced::Element<'a, Message> {
 //! combobox(framework, Message::Framework, query, Message::Query)
-//!     .placeholder("Select framework...")
+//!     .placeholder("Select a framework")
 //!     .option("next", "Next.js")
 //!     .option("svelte", "SvelteKit")
 //!     .into()
 //! # }
 //! ```
-use super::button::{Button, Variant};
-use super::command::{self, item};
+use super::button::{Size, Variant, icon_button};
+use super::menu::{self, menu_tokens};
 
 use iced_ui_core::icon::lucide;
-use iced_ui_core::primitive::{Align, Anchored, Side};
+use iced_ui_core::primitive::{Align, Anchored, Side, listbox};
 use iced_ui_core::theme::alpha;
 use iced_ui_core::{Element, style, tokens};
 
-use iced::widget::{Row, container, text};
-use iced::{Alignment, Length, Theme};
+use iced::widget::{Row, container, scrollable, text};
+use iced::{Alignment, Background, Color, Length, Padding, Theme};
 
 /// A combobox. See the [module documentation](self).
 pub struct Combobox<'a, T, Message> {
@@ -33,9 +34,10 @@ pub struct Combobox<'a, T, Message> {
     on_query: Box<dyn Fn(String) -> Message + 'a>,
     options: Vec<(T, String)>,
     placeholder: String,
-    search_placeholder: String,
     empty: String,
     width: f32,
+    disabled: bool,
+    invalid: bool,
 }
 
 /// Creates a [`Combobox`]. The search query is kept in your state.
@@ -51,10 +53,11 @@ pub fn combobox<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a>(
         query: query.to_owned(),
         on_query: Box::new(on_query),
         options: Vec::new(),
-        placeholder: "Select...".to_owned(),
-        search_placeholder: "Search...".to_owned(),
-        empty: "No results found.".to_owned(),
+        placeholder: String::new(),
+        empty: "No items found.".to_owned(),
         width: 200.0,
+        disabled: false,
+        invalid: false,
     }
 }
 
@@ -65,27 +68,39 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> Combobox<'a, T, Message
         self
     }
 
-    /// Sets the text of the trigger when nothing is selected.
+    /// Sets the placeholder of the input.
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = placeholder.into();
         self
     }
 
-    /// Sets the placeholder of the search input.
-    pub fn search_placeholder(mut self, placeholder: impl Into<String>) -> Self {
-        self.search_placeholder = placeholder.into();
-        self
+    /// Sets the placeholder of the input. The Base UI combobox has no
+    /// separate search field, so this is the same as [`Self::placeholder`].
+    pub fn search_placeholder(self, placeholder: impl Into<String>) -> Self {
+        self.placeholder(placeholder)
     }
 
-    /// Sets the text shown when nothing matches.
+    /// Sets the text shown when nothing matches (`ComboboxEmpty`).
     pub fn empty(mut self, empty: impl Into<String>) -> Self {
         self.empty = empty.into();
         self
     }
 
-    /// Sets the width of the trigger and of the popover.
+    /// Sets the width of the input. The list is at least as wide.
     pub fn width(mut self, width: f32) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Disables the combobox.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+
+    /// Marks the combobox as invalid (`aria-invalid`).
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
         self
     }
 }
@@ -100,60 +115,150 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
             .find(|(value, _)| Some(value) == combobox.selected.as_ref())
             .map(|(_, label)| label.clone());
 
-        let has_value = selected_label.is_some();
+        // The input shows the query while typing, the selection otherwise.
+        let value = if combobox.query.is_empty() {
+            selected_label.clone().unwrap_or_default()
+        } else {
+            combobox.query.clone()
+        };
 
-        let trigger = Button::new(
+        let filter = (!combobox.query.is_empty()
+            && Some(&combobox.query) != selected_label.as_ref())
+        .then(|| combobox.query.trim().to_lowercase());
+
+        let disabled = combobox.disabled;
+        let invalid = combobox.invalid;
+
+        let mut input = super::input::input(&combobox.placeholder, &value)
+            .chromeless(true)
+            // `px-2.5`, `pr-1.5` before the addon; less the 1px border.
+            .padding(Padding {
+                top: 5.0,
+                right: 6.0,
+                bottom: 5.0,
+                left: 9.0,
+            });
+
+        if !disabled {
+            input = input.on_input(combobox.on_query);
+        }
+
+        // `InputGroupButton size="icon-xs" variant="ghost"` at `pr-2
+        // mr-[-0.3rem]`.
+        let trigger = icon_button(lucide::CHEVRON_DOWN)
+            .variant(Variant::Ghost)
+            .size(Size::IconXs)
+            .disabled(disabled);
+
+        // `InputGroup`: `h-8 rounded-lg border border-input dark:bg-input/30`.
+        let field = container(
             Row::new()
-                .push(
-                    text(selected_label.unwrap_or(combobox.placeholder))
-                        .size(style::text::SM)
-                        .width(Length::Fill)
-                        .wrapping(text::Wrapping::None)
-                        .style(move |theme: &Theme| text::Style {
-                            color: (!has_value).then(|| tokens(theme).palette.muted_foreground),
-                        }),
-                )
-                .push(
-                    lucide::CHEVRONS_UP_DOWN
-                        .sized(16)
-                        .style(|theme: &Theme| text::Style {
-                            color: Some(alpha(tokens(theme).palette.foreground, 0.5)),
-                        }),
-                )
-                .spacing(8)
+                .push(input)
+                .push(container(trigger).padding(Padding::ZERO.right(3)))
                 .align_y(Alignment::Center),
         )
-        .variant(Variant::Outline)
-        .width(combobox.width);
+        .width(combobox.width)
+        .height(32)
+        .center_y(32)
+        .style(move |theme: &Theme| {
+            let t = tokens(theme);
+            let p = &t.palette;
+
+            container::Style {
+                background: Some(Background::Color(if t.is_dark() {
+                    alpha(p.input, 0.3)
+                } else {
+                    Color::TRANSPARENT
+                })),
+                text_color: Some(alpha(
+                    p.foreground,
+                    if disabled {
+                        style::DISABLED_OPACITY
+                    } else {
+                        1.0
+                    },
+                )),
+                border: style::border(if invalid { p.destructive } else { p.input }, t.radius_lg()),
+                ..container::Style::default()
+            }
+        });
 
         let on_select = &combobox.on_select;
         let selected = combobox.selected.clone();
 
-        let items = combobox.options.into_iter().map(|(value, label)| {
-            let is_selected = selected.as_ref() == Some(&value);
-            let mut item = item(label).on_select(on_select(value));
+        let mut list = listbox::Listbox::new(menu::highlight).highlight_first(filter.is_some());
+        let mut count = 0;
 
-            if is_selected {
-                item = item.icon(lucide::CHECK);
+        for (value, label) in combobox.options {
+            if let Some(filter) = &filter
+                && !label.to_lowercase().contains(filter)
+            {
+                continue;
             }
 
-            item
-        });
+            count += 1;
 
-        let content = command::command(&combobox.query, combobox.on_query)
-            .placeholder(combobox.search_placeholder)
-            .empty(combobox.empty)
-            .bordered(false)
-            .items(items);
+            let is_selected = selected.as_ref() == Some(&value);
 
-        let panel = container(content)
-            .width(combobox.width)
-            .style(super::popover::style);
+            // `absolute right-2 size-4`
+            let check = container(is_selected.then(|| lucide::CHECK.sized(16)))
+                .width(16)
+                .into();
 
-        Anchored::new(trigger, panel)
+            // `gap-2 rounded-md py-1 pr-8 pl-1.5 text-sm`
+            list = list.item(
+                listbox::row(
+                    text(label)
+                        .size(style::text::SM)
+                        .line_height(iced::Pixels(20.0))
+                        .wrapping(text::Wrapping::None),
+                    Some(check),
+                )
+                .spacing(8.0)
+                .padding(menu::ITEM_PADDING.right(8)),
+                Some(on_select(value)),
+            );
+        }
+
+        let body: Element<'a, Message> = if count == 0 {
+            // `py-2 text-center text-sm text-muted-foreground`
+            container(
+                text(combobox.empty)
+                    .size(style::text::SM)
+                    .line_height(iced::Pixels(20.0))
+                    .style(|theme: &Theme| text::Style {
+                        color: Some(menu_tokens(theme).palette.muted_foreground),
+                    }),
+            )
+            .padding([8, 0])
+            .center_x(Length::Fill)
+            .into()
+        } else {
+            // `max-h-72 p-1`, no scrollbar.
+            scrollable(list.padding(4).width(Length::Fill))
+                .direction(scrollable::Direction::Vertical(
+                    scrollable::Scrollbar::new().width(0).scroller_width(0),
+                ))
+                .into()
+        };
+
+        // `min-w-[calc(var(--anchor-width)+--spacing(7))] rounded-lg
+        // shadow-md ring-1`
+        let popup = container(body)
+            .padding(1)
+            .width(combobox.width + 28.0)
+            .max_height(288)
+            .style(menu::panel);
+
+        if disabled {
+            return field.into();
+        }
+
+        // `side="bottom" align="start" sideOffset={6}`
+        Anchored::new(field, popup)
             .side(Side::Bottom)
             .align(Align::Start)
-            .offset(4.0)
+            .offset(6.0)
             .close_on_select(true)
             .into()
     }

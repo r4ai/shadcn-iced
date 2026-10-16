@@ -14,15 +14,13 @@
 //!     .into()
 //! # }
 //! ```
-use super::menu;
-
 use iced_ui_core::icon::{Icon, lucide};
 use iced_ui_core::primitive::listbox;
 use iced_ui_core::theme::alpha;
 use iced_ui_core::{Element, font, style, tokens};
 
-use iced::widget::{Column, Row, container, scrollable, text};
-use iced::{Alignment, Background, Length, Padding, Theme};
+use iced::widget::{Column, Row, container, scrollable, space, text};
+use iced::{Alignment, Background, Length, Padding, Theme, border};
 
 /// An item of a [`Command`].
 pub struct Item<Message> {
@@ -108,7 +106,7 @@ pub fn command<'a, Message: Clone + 'a>(
         empty: "No results found.".to_owned(),
         bordered: true,
         width: Length::Fill,
-        input_height: 36.0,
+        input_height: 32.0,
     }
 }
 
@@ -142,8 +140,8 @@ impl<'a, Message: Clone + 'a> Command<'a, Message> {
         self
     }
 
-    /// Draws a border and a shadow around the command (`rounded-lg border
-    /// shadow-md`). Defaults to `true`.
+    /// Draws a border around the command (`border`, as in the shadcn/ui
+    /// examples). Defaults to `true`.
     pub fn bordered(mut self, bordered: bool) -> Self {
         self.bordered = bordered;
         self
@@ -155,38 +153,95 @@ impl<'a, Message: Clone + 'a> Command<'a, Message> {
         self
     }
 
-    /// Sets the height of the search row (`h-12` in a command dialog).
+    /// Sets the minimum height of the search field. Defaults to `h-8`.
     pub fn input_height(mut self, height: f32) -> Self {
         self.input_height = height;
         self
     }
 }
 
-impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message> {
-    fn from(command: Command<'a, Message>) -> Self {
-        let query = command.query.clone();
+/// The style of the highlighted item of a command (`data-selected:bg-muted
+/// data-selected:text-foreground rounded-sm`).
+pub fn highlight(theme: &Theme) -> listbox::Style {
+    let t = tokens(theme);
 
-        let input = Row::new()
+    listbox::Style {
+        background: Background::Color(t.palette.muted),
+        border: border::rounded(t.radius_sm()),
+        text_color: t.palette.foreground,
+    }
+}
+
+/// The search field of a command: an input group with a search icon
+/// (`bg-input/30 border-input/30 h-8 rounded-lg`).
+pub fn search_field<'a, Message: Clone + 'a>(
+    placeholder: &str,
+    query: &str,
+    on_query: impl Fn(String) -> Message + 'a,
+) -> Element<'a, Message> {
+    container(
+        Row::new()
             .push(lucide::SEARCH.sized(16).style(|theme: &Theme| text::Style {
                 color: Some(alpha(tokens(theme).palette.foreground, 0.5)),
             }))
             .push(
-                super::input::input(&command.placeholder, &command.query)
-                    .on_input(command.on_query)
+                super::input::input(placeholder, query)
+                    .on_input(on_query)
                     .chromeless(true)
-                    .padding(Padding::ZERO.top(10).bottom(10)),
+                    .padding(Padding::ZERO.top(6).bottom(6)),
             )
-            .spacing(8)
-            .padding([0, 12])
-            .height(command.input_height)
-            .align_y(Alignment::Center);
+            .spacing(6)
+            .align_y(Alignment::Center),
+    )
+    // The 1px border, `pl-2` before the icon.
+    .padding(Padding::ZERO.left(9).right(1))
+    .height(32)
+    .center_y(32)
+    .width(Length::Fill)
+    .style(|theme: &Theme| {
+        let t = tokens(theme);
 
-        let mut list = listbox::Listbox::new(menu::highlight)
+        container::Style {
+            background: Some(Background::Color(alpha(t.palette.input, 0.3))),
+            border: style::border(alpha(t.palette.input, 0.3), t.radius_lg()),
+            ..container::Style::default()
+        }
+    })
+    .into()
+}
+
+impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message> {
+    fn from(command: Command<'a, Message>) -> Self {
+        let query = command.query.clone();
+
+        // `p-1 pb-0`
+        let input = container(search_field(
+            &command.placeholder,
+            &command.query,
+            command.on_query,
+        ))
+        .padding(Padding::new(4.0).bottom(0))
+        .height(command.input_height.max(32.0) + 4.0)
+        .center_y(command.input_height.max(32.0) + 4.0);
+
+        let mut list = listbox::Listbox::new(highlight)
             .width(Length::Fill)
             .highlight_first(true)
             .clear_on_leave(false);
 
         let mut visible_groups = 0;
+
+        let separator =
+            || {
+                container(container(space().width(Length::Fill).height(1)).style(
+                    |theme: &Theme| container::Style {
+                        background: Some(Background::Color(tokens(theme).palette.border)),
+                        ..container::Style::default()
+                    },
+                ))
+                // `-mx-1`, through the padding of the list.
+                .padding(Padding::ZERO.left(-8.0).right(-8.0))
+            };
 
         for (heading, items) in command.groups {
             let items: Vec<_> = items
@@ -199,16 +254,21 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
             }
 
             if visible_groups > 0 {
-                list = list.push(container(super::separator::separator()).padding([4, 0]));
+                list = list.push(separator());
             }
 
             visible_groups += 1;
 
+            // `p-1`
+            list = list.push(space().height(4));
+
             if let Some(heading) = heading {
+                // `px-2 py-1.5 text-xs font-medium text-muted-foreground`
                 list = list.push(
                     container(
                         text(heading)
                             .size(style::text::XS)
+                            .line_height(iced::Pixels(16.0))
                             .font(font::MEDIUM)
                             .style(|theme: &Theme| text::Style {
                                 color: Some(tokens(theme).palette.muted_foreground),
@@ -220,11 +280,19 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
 
             for item in items {
                 let disabled = item.on_select.is_none();
+                let color = move |theme: &Theme| {
+                    disabled.then(|| {
+                        alpha(
+                            tokens(theme).palette.popover_foreground,
+                            style::DISABLED_OPACITY,
+                        )
+                    })
+                };
 
                 let row = Row::new()
                     .push(item.icon.map(|icon| {
-                        icon.sized(16).style(|theme: &Theme| text::Style {
-                            color: Some(tokens(theme).palette.muted_foreground),
+                        icon.sized(16).style(move |theme: &Theme| text::Style {
+                            color: color(theme),
                         })
                     }))
                     .push(
@@ -232,12 +300,7 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                             .size(style::text::SM)
                             .line_height(iced::Pixels(20.0))
                             .style(move |theme: &Theme| text::Style {
-                                color: disabled.then(|| {
-                                    alpha(
-                                        tokens(theme).palette.popover_foreground,
-                                        style::DISABLED_OPACITY,
-                                    )
-                                }),
+                                color: color(theme),
                             }),
                     )
                     .spacing(8)
@@ -246,62 +309,67 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                 let shortcut = item.shortcut.map(|shortcut| {
                     text(shortcut)
                         .size(style::text::XS)
+                        .line_height(iced::Pixels(16.0))
                         .style(|theme: &Theme| text::Style {
                             color: Some(tokens(theme).palette.muted_foreground),
                         })
                         .into()
                 });
 
-                list = list.item(listbox::row(row, shortcut).padding([6, 8]), item.on_select);
+                // `gap-2 px-2 py-1.5`
+                list = list.item(
+                    listbox::row(row, shortcut).spacing(16.0).padding([6, 8]),
+                    item.on_select,
+                );
             }
+
+            list = list.push(space().height(4));
         }
 
         let body: Element<'a, Message> = if visible_groups == 0 {
-            container(text(command.empty).size(style::text::SM))
-                .padding([24, 0])
-                .center_x(Length::Fill)
-                .into()
-        } else {
+            // `py-6 text-center text-sm`
             container(
-                scrollable(list.padding(4))
+                text(command.empty)
+                    .size(style::text::SM)
+                    .line_height(iced::Pixels(20.0)),
+            )
+            .padding([24, 0])
+            .center_x(Length::Fill)
+            .into()
+        } else {
+            // `max-h-72`
+            container(
+                scrollable(list.padding([0, 4]))
                     .direction(scrollable::Direction::Vertical(
-                        super::scroll_area::scrollbar(),
+                        // `no-scrollbar`
+                        scrollable::Scrollbar::new().width(0).scroller_width(0),
                     ))
                     .style(super::scroll_area::style),
             )
-            .max_height(300)
+            .max_height(288)
             .into()
         };
 
         let bordered = command.bordered;
 
-        container(
-            Column::new()
-                .push(input)
-                .push(super::separator::separator())
-                .push(body)
-                .width(Length::Fill),
-        )
-        .width(command.width)
-        .style(move |theme: &Theme| {
-            let t = tokens(theme);
+        // `rounded-xl bg-popover p-1`
+        container(Column::new().push(input).push(body).width(Length::Fill))
+            .padding(4)
+            .width(command.width)
+            .style(move |theme: &Theme| {
+                let t = tokens(theme);
 
-            container::Style {
-                background: Some(Background::Color(t.palette.popover)),
-                text_color: Some(t.palette.popover_foreground),
-                border: if bordered {
-                    style::border(t.palette.border, t.radius_lg())
-                } else {
-                    style::rounded(t.radius_md())
-                },
-                shadow: if bordered {
-                    style::shadow_md()
-                } else {
-                    iced::Shadow::default()
-                },
-                ..container::Style::default()
-            }
-        })
-        .into()
+                container::Style {
+                    background: Some(Background::Color(t.palette.popover)),
+                    text_color: Some(t.palette.popover_foreground),
+                    border: if bordered {
+                        style::border(t.palette.border, t.radius_xl())
+                    } else {
+                        style::rounded(t.radius_xl())
+                    },
+                    ..container::Style::default()
+                }
+            })
+            .into()
     }
 }

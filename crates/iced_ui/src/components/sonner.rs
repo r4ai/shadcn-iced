@@ -178,15 +178,13 @@ fn view<'a, Message: Clone + 'a>(
     toast: &Toast<Message>,
     dismiss: Option<Message>,
 ) -> Element<'a, Message> {
+    // `[data-icon]`: 16x16, `margin: 0 4px 0 -3px`, in the toast's color
+    // (shadcn/ui does not enable sonner's rich colors).
     let icon = toast.kind.icon().map(|icon| {
-        let kind = toast.kind;
-        container(icon.sized(16).style(move |theme: &Theme| text::Style {
-            color: Some(match kind {
-                Kind::Error => tokens(theme).palette.destructive,
-                _ => tokens(theme).palette.popover_foreground,
-            }),
+        container(icon.sized(16).style(|theme: &Theme| text::Style {
+            color: Some(tokens(theme).palette.popover_foreground),
         }))
-        .padding(Padding::ZERO.top(2))
+        .padding(Padding::ZERO.left(-3.0).right(4))
     });
 
     let body = Column::new()
@@ -226,7 +224,7 @@ fn view<'a, Message: Clone + 'a>(
             .push(action)
             .push(close)
             .spacing(6)
-            .align_y(Alignment::Start),
+            .align_y(Alignment::Center),
     )
     .padding(16)
     .width(356)
@@ -235,8 +233,14 @@ fn view<'a, Message: Clone + 'a>(
         container::Style {
             background: Some(Background::Color(t.palette.popover)),
             text_color: Some(t.palette.popover_foreground),
-            border: style::border(t.palette.border, t.radius_lg()),
-            shadow: style::shadow_lg(),
+            // `--normal-border: var(--border)`, `cn-toast: rounded-2xl`
+            border: style::border(t.palette.border, t.radius_2xl()),
+            // sonner's `0px 4px 12px rgba(0, 0, 0, 0.1)`
+            shadow: iced::Shadow {
+                color: iced::Color::from_rgba(0.0, 0.0, 0.0, 0.1),
+                offset: iced::Vector::new(0.0, 4.0),
+                blur_radius: 12.0,
+            },
             ..container::Style::default()
         }
     })
@@ -310,7 +314,8 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
             .animation(iced_ui_core::primitive::layer::Animation::None)
             .align_x(align_x)
             .align_y(align_y)
-            .padding(32)
+            // sonner's `--offset: 24px`
+            .padding(24)
             .into()
     }
 }
