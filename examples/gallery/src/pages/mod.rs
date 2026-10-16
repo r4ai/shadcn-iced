@@ -1,4 +1,5 @@
 //! One page per component.
+pub mod agent;
 mod basics;
 mod button;
 pub mod chat;
@@ -34,6 +35,7 @@ pub const PAGES: &[Page] = &[
     basics::CARD,
     extra::CAROUSEL,
     extra::CHART,
+    agent::CODE_BLOCK,
     interactive::CHECKBOX,
     interactive::COLLAPSIBLE,
     overlays::COMBOBOX,
@@ -61,6 +63,7 @@ pub const PAGES: &[Page] = &[
     basics::PAGINATION,
     overlays::POPOVER,
     basics::PROGRESS,
+    agent::QUESTIONNAIRE,
     interactive::RADIO_GROUP,
     interactive::RESIZABLE,
     basics::SCROLL_AREA,
@@ -76,9 +79,11 @@ pub const PAGES: &[Page] = &[
     basics::TABLE,
     interactive::TABS,
     basics::TEXTAREA,
+    agent::TOAST,
     interactive::TOGGLE,
     interactive::TOGGLE_GROUP,
     overlays::TOOLTIP,
+    agent::TRACE,
     basics::TYPOGRAPHY,
 ];
 
@@ -126,6 +131,15 @@ pub struct Demo {
     ),
     pub slide: usize,
     pub sidebar_collapsed: bool,
+    pub scroller_at_end: bool,
+    pub dob: Option<iced_ui::calendar::Date>,
+    pub dob_open: bool,
+    pub copied: Option<String>,
+    pub code_wrap: bool,
+    pub code_expanded: bool,
+    pub questions: Vec<iced_ui::questionnaire::Question>,
+    pub questionnaire: iced_ui::questionnaire::State,
+    pub base_toasts: Vec<iced_ui::toast::Toast<Message>>,
 }
 
 pub const FRUITS: [&str; 5] = ["Apple", "Banana", "Blueberry", "Grapes", "Pineapple"];
@@ -177,6 +191,15 @@ impl Default for Demo {
             ),
             slide: 0,
             sidebar_collapsed: false,
+            scroller_at_end: true,
+            dob: None,
+            dob_open: false,
+            copied: None,
+            code_wrap: false,
+            code_expanded: false,
+            questions: agent::questions(),
+            questionnaire: iced_ui::questionnaire::State::new(),
+            base_toasts: Vec::new(),
         }
     }
 }
@@ -221,6 +244,17 @@ pub enum DemoMessage {
     Range(iced_ui::calendar::Date),
     Slide(usize),
     SidebarCollapsed(bool),
+    ScrollerAtEnd(bool),
+    ScrollToEnd,
+    Preset(i64),
+    Dob(iced_ui::calendar::Date),
+    DobOpen(bool),
+    CopyCode(String),
+    CodeWrap(bool),
+    CodeExpanded(bool),
+    Questionnaire(iced_ui::questionnaire::Event),
+    BaseToast(Option<iced_ui::toast::Kind>),
+    CloseBaseToast(u64),
 }
 
 impl Demo {
@@ -298,6 +332,71 @@ impl Demo {
             }
             DemoMessage::Slide(index) => self.slide = index,
             DemoMessage::SidebarCollapsed(collapsed) => self.sidebar_collapsed = collapsed,
+            DemoMessage::ScrollerAtEnd(at_end) => self.scroller_at_end = at_end,
+            DemoMessage::Preset(days) => {
+                let date = iced_ui::calendar::Date::today().add_days(days);
+                self.date = Some(date);
+                self.month = date.month_of();
+            }
+            DemoMessage::Dob(date) => {
+                self.dob = Some(date);
+                self.dob_open = false;
+            }
+            DemoMessage::DobOpen(open) => self.dob_open = open,
+            DemoMessage::CopyCode(code) => {
+                self.copied = Some(code.clone());
+                return iced::clipboard::write(code);
+            }
+            DemoMessage::CodeWrap(wrap) => self.code_wrap = wrap,
+            DemoMessage::CodeExpanded(expanded) => self.code_expanded = expanded,
+            DemoMessage::Questionnaire(event) => {
+                if self.questionnaire.update(&self.questions, event) {
+                    let answers = self.questionnaire.answers(&self.questions);
+                    let id = self.next_toast;
+                    self.next_toast += 1;
+                    self.toasts.push(
+                        iced_ui::sonner::Toast::new(id, "Agent plan saved").description(format!(
+                            "Direction: {} · Progress signals: {} · Timing: {}",
+                            answers[0].join(", "),
+                            if answers[1].is_empty() {
+                                "None".to_owned()
+                            } else {
+                                answers[1].join(", ")
+                            },
+                            answers[2].join(", ")
+                        )),
+                    );
+                    self.questionnaire = iced_ui::questionnaire::State::new();
+                }
+            }
+            DemoMessage::BaseToast(kind) => {
+                use iced_ui::toast::{Kind, Toast};
+
+                let id = self.next_toast;
+                self.next_toast += 1;
+
+                let toast = match kind {
+                    None => Toast::new(id, "Event created")
+                        .description("Sunday, December 3 at 9:00 AM")
+                        .action("Undo", Message::Demo(DemoMessage::CloseBaseToast(id))),
+                    Some(kind) => Toast::new(id, "")
+                        .description(match kind {
+                            Kind::Default | Kind::Success => "Event has been created.",
+                            Kind::Info => "Arrive 10 minutes before the event.",
+                            Kind::Warning => "The event cannot start before 8:00 AM.",
+                            Kind::Error => "The event could not be created.",
+                            Kind::Loading => "Creating the event…",
+                        })
+                        .kind(kind),
+                };
+
+                self.base_toasts.push(toast);
+            }
+            DemoMessage::CloseBaseToast(id) => self.base_toasts.retain(|toast| toast.id != id),
+            DemoMessage::ScrollToEnd => {
+                self.scroller_at_end = true;
+                return iced_ui::message_scroller::scroll_to_end(chat::SCROLLER_ID);
+            }
         }
 
         Task::none()

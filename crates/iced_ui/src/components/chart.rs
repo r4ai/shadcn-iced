@@ -625,12 +625,16 @@ impl Chart {
             .iter()
             .map(|(_, value, _)| text_width(value, 12.0))
             .fold(0.0, f32::max);
-        let width = (10.0 + 8.0 + label_width + 24.0 + value_width + 20.0)
+        // `cn-chart-tooltip`: `min-w-32 px-2.5 py-1.5 gap-1.5 text-xs`, rows
+        // of a `h-2.5 w-2.5` indicator, `gap-2`, a label and a value.
+        let width = (10.0 + 10.0 + 8.0 + label_width + 16.0 + value_width + 10.0)
             .max(text_width(&title, 12.0) + 20.0)
             .max(128.0);
-        let row_height = 18.0;
-        let height =
-            12.0 + if show_title { row_height + 6.0 } else { 0.0 } + rows.len() as f32 * row_height;
+        let row_height = 16.0;
+        let gap = 6.0;
+        let lines = rows.len() as f32 + if show_title { 1.0 } else { 0.0 };
+        let height = 12.0 + lines * row_height + (lines - 1.0).max(0.0) * gap;
+        let radius = t.radius_lg();
 
         let mut origin = cursor + Vector::new(12.0, 12.0);
         if origin.x + width > size.width {
@@ -640,15 +644,21 @@ impl Chart {
             origin.y = (size.height - height).max(0.0);
         }
 
-        let panel = Path::rounded_rectangle(origin, Size::new(width, height), 8.0.into());
-        frame.fill(
-            &Path::rounded_rectangle(
-                origin + Vector::new(0.0, 4.0),
-                Size::new(width, height),
-                8.0.into(),
-            ),
-            Color::from_rgba(0.0, 0.0, 0.0, 0.08),
-        );
+        let panel = Path::rounded_rectangle(origin, Size::new(width, height), radius.into());
+
+        // `shadow-xl`, approximated with stacked translucent layers since
+        // canvas paths cannot be blurred.
+        for (offset, spread, opacity) in [(8.0, 2.0, 0.03), (12.0, 5.0, 0.03), (16.0, 8.0, 0.02)] {
+            frame.fill(
+                &Path::rounded_rectangle(
+                    origin + Vector::new(-spread / 2.0, offset - spread),
+                    Size::new(width + spread, height + spread / 2.0),
+                    (radius + spread / 2.0).into(),
+                ),
+                Color::from_rgba(0.0, 0.0, 0.0, opacity),
+            );
+        }
+
         frame.fill(&panel, p.background);
         frame.stroke(
             &panel,
@@ -669,7 +679,7 @@ impl Chart {
                 align_y: alignment::Vertical::Center,
                 ..Text::default()
             });
-            y += row_height + 6.0;
+            y += row_height + gap;
         }
 
         for (label, value, color) in rows {
@@ -685,7 +695,7 @@ impl Chart {
             );
             frame.fill_text(Text {
                 content: label,
-                position: Point::new(origin.x + 26.0, center),
+                position: Point::new(origin.x + 28.0, center),
                 color: p.muted_foreground,
                 size: Pixels(12.0),
                 font: font::SANS,
@@ -705,7 +715,7 @@ impl Chart {
                 align_y: alignment::Vertical::Center,
                 ..Text::default()
             });
-            y += row_height;
+            y += row_height + gap;
         }
     }
 

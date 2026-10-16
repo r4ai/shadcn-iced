@@ -77,7 +77,7 @@ impl<'a, Message: Clone + 'a> Carousel<'a, Message> {
         self
     }
 
-    /// Sets the space between visible items.
+    /// Sets the space between visible items (`pl-4` by default).
     pub fn spacing(mut self, spacing: f32) -> Self {
         self.spacing = spacing;
         self
@@ -119,6 +119,7 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
             None
         };
 
+        // `variant="outline" size="icon-sm" rounded-full`
         let nav = |icon, target: Option<usize>| {
             icon_button(icon)
                 .variant(Variant::Outline)
@@ -137,22 +138,25 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
 
         if horizontal {
             Row::new()
-                .push(round(nav(lucide::ARROW_LEFT, previous)))
+                .push(round(nav(lucide::CHEVRON_LEFT, previous)))
                 .push(
                     Row::with_children(visible)
                         .spacing(carousel.spacing)
                         .width(Length::Fill),
                 )
-                .push(round(nav(lucide::ARROW_RIGHT, next)))
-                .spacing(16)
+                .push(round(nav(lucide::CHEVRON_RIGHT, next)))
+                // `-left-12` / `-right-12`: 48px from the slides, minus
+                // the 28px button.
+                .spacing(20)
                 .align_y(Alignment::Center)
                 .into()
         } else {
             Column::new()
-                .push(round(nav(lucide::ARROW_UP, previous)))
+                .push(round(nav(lucide::CHEVRON_UP, previous)))
                 .push(Column::with_children(visible).spacing(carousel.spacing))
-                .push(round(nav(lucide::ARROW_DOWN, next)))
-                .spacing(16)
+                .push(round(nav(lucide::CHEVRON_DOWN, next)))
+                // `-top-12` / `-bottom-12`
+                .spacing(20)
                 .align_x(Alignment::Center)
                 .into()
         }

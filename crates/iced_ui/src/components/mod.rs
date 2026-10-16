@@ -19,6 +19,7 @@ pub mod card;
 pub mod carousel;
 pub mod chart;
 pub mod checkbox;
+pub mod code_block;
 pub mod collapsible;
 pub mod combobox;
 pub mod command;
@@ -46,6 +47,7 @@ pub mod navigation_menu;
 pub mod pagination;
 pub mod popover;
 pub mod progress;
+pub mod questionnaire;
 pub mod radio_group;
 pub mod resizable;
 pub mod scroll_area;
@@ -61,9 +63,11 @@ pub mod switch;
 pub mod table;
 pub mod tabs;
 pub mod textarea;
+pub mod toast;
 pub mod toggle;
 pub mod toggle_group;
 pub mod tooltip;
+pub mod trace;
 pub mod typography;
 
 /// The constructors of every component.
@@ -83,6 +87,7 @@ pub mod prelude {
     pub use super::card::card;
     pub use super::carousel::carousel;
     pub use super::checkbox::checkbox;
+    pub use super::code_block::code_block;
     pub use super::collapsible::collapsible;
     pub use super::combobox::combobox;
     pub use super::command::command;
@@ -110,6 +115,7 @@ pub mod prelude {
     pub use super::pagination::pagination;
     pub use super::popover::popover;
     pub use super::progress::progress;
+    pub use super::questionnaire::questionnaire;
     pub use super::radio_group::radio_group;
     pub use super::resizable::resizable;
     pub use super::scroll_area::scroll_area;
@@ -128,4 +134,5 @@ pub mod prelude {
     pub use super::toggle::toggle;
     pub use super::toggle_group::toggle_group;
     pub use super::tooltip::tooltip;
+    pub use super::trace::{trace, trace_line};
 }
