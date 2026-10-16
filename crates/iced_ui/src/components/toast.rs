@@ -174,7 +174,7 @@ fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, close: Message) -> Elem
         .push((!toast.title.is_empty()).then(|| {
             text(toast.title.clone())
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
         }))
         .push(
             toast

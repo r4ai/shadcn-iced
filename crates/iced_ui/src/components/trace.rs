@@ -155,7 +155,7 @@ fn view<'a, Message: Clone + 'a>(line: &TraceLine<Message>) -> Row<'a, Message> 
         .push(line.description.clone().map(|description| {
             text(description)
                 .size(style::text::SM)
-                .font(if mono { font::MONO } else { font::SANS })
+                .font(if mono { font::mono() } else { font::sans() })
                 .style(move |theme: &Theme| text::Style {
                     color: Some(alpha(
                         tokens(theme).palette.muted_foreground,

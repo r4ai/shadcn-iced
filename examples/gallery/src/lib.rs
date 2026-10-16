@@ -122,7 +122,7 @@ impl Gallery {
                                 }
                             }),
                         column![
-                            text("iced-ui").size(style::text::SM).font(font::SEMIBOLD),
+                            text("iced-ui").size(style::text::SM).font(font::semibold()),
                             text(format!("{} components", PAGES.len())).size(style::text::XS),
                         ],
                     ]
@@ -167,7 +167,7 @@ impl Gallery {
         .label(16, "1.0");
 
         let header = row![
-            text(page.title).size(style::text::SM).font(font::MEDIUM),
+            text(page.title).size(style::text::SM).font(font::medium()),
             space::horizontal(),
             base,
             accent,
@@ -187,7 +187,7 @@ impl Gallery {
 
         let content = scrollable(
             column![
-                text(page.title).size(style::text::XL3).font(font::BOLD),
+                text(page.title).size(style::text::XL3).font(font::bold()),
                 text(page.description).size(style::text::BASE).style(muted),
                 space().height(16),
                 (page.view)(self),
@@ -231,7 +231,7 @@ pub fn example<'a>(
     content: impl Into<Element<'a, Message>>,
 ) -> Element<'a, Message> {
     column![
-        text(title).size(style::text::LG).font(font::SEMIBOLD),
+        text(title).size(style::text::LG).font(font::semibold()),
         container(content.into())
             .padding(32)
             .center_x(Fill)
@@ -254,7 +254,7 @@ pub fn example<'a>(
 pub fn settings() -> iced::Settings {
     iced::Settings {
         fonts: iced_ui::font::all(),
-        default_font: iced_ui::font::SANS,
+        default_font: iced_ui::font::sans(),
         ..Default::default()
     }
 }

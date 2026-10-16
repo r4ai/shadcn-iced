@@ -105,7 +105,7 @@ fn step<'a, Message: Clone + 'a>(
     let icon = icon.sized(size.icon_size());
     let label = text(label)
         .size(size.text_size())
-        .font(font::MEDIUM)
+        .font(font::medium())
         .wrapping(text::Wrapping::None);
 
     let content = if previous {
@@ -163,7 +163,7 @@ impl<'a, Message: Clone + 'a> From<Pagination<'a, Message>> for Element<'a, Mess
                         Button::new(
                             text(page.to_string())
                                 .size(14)
-                                .font(font::MEDIUM)
+                                .font(font::medium())
                                 .wrapping(text::Wrapping::None),
                         )
                         .variant(if page == current {

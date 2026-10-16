@@ -16,7 +16,7 @@ fn muted(theme: &Theme) -> text::Style {
 pub fn h1<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
     text(content)
         .size(style::text::XL4)
-        .font(font::BOLD)
+        .font(font::bold())
         .line_height(1.11)
 }
 
@@ -24,7 +24,7 @@ pub fn h1<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
 pub fn h2<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
     text(content)
         .size(style::text::XL3)
-        .font(font::SEMIBOLD)
+        .font(font::semibold())
         .line_height(1.2)
 }
 
@@ -32,7 +32,7 @@ pub fn h2<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
 pub fn h3<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
     text(content)
         .size(style::text::XL2)
-        .font(font::SEMIBOLD)
+        .font(font::semibold())
         .line_height(1.33)
 }
 
@@ -40,7 +40,7 @@ pub fn h3<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
 pub fn h4<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
     text(content)
         .size(style::text::XL)
-        .font(font::SEMIBOLD)
+        .font(font::semibold())
         .line_height(1.4)
 }
 
@@ -61,14 +61,14 @@ pub fn lead<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
 
 /// `text-lg font-semibold`
 pub fn large<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content).size(style::text::LG).font(font::SEMIBOLD)
+    text(content).size(style::text::LG).font(font::semibold())
 }
 
 /// `text-sm leading-none font-medium`
 pub fn small<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
     text(content)
         .size(style::text::SM)
-        .font(font::MEDIUM)
+        .font(font::medium())
         .line_height(iced::Pixels(14.0))
 }
 
@@ -81,7 +81,7 @@ pub fn muted_text<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
 pub fn inline_code<'a, Message: 'a>(content: impl text::IntoFragment<'a>) -> Element<'a, Message> {
     container(text(content).size(style::text::SM).font(Font {
         weight: iced::font::Weight::Semibold,
-        ..iced_ui_core::font::MONO
+        ..iced_ui_core::font::mono()
     }))
     .padding([3, 5])
     .style(|theme: &Theme| container::Style {

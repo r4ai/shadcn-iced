@@ -300,7 +300,7 @@ fn trigger_label<'a, Message: 'a>(
         .push({
             let label = text(label)
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .line_height(iced::Pixels(20.0))
                 .wrapping(text::Wrapping::None);
 

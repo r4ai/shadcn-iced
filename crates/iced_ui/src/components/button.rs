@@ -263,7 +263,7 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         let label = match button.content {
             Content::Label(label) => text(label)
                 .size(size.text_size())
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .wrapping(text::Wrapping::None)
                 .into(),
             Content::Icon(icon) => icon.sized(icon_size).into(),

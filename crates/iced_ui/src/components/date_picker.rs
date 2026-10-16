@@ -204,7 +204,7 @@ impl<'a, Message: Clone + 'a> From<DatePicker<'a, Message>> for Element<'a, Mess
         let mut trigger = Button::new(
             text(label.unwrap_or_else(|| picker.placeholder.clone()))
                 .size(style::text::SM)
-                .font(font::SANS)
+                .font(font::sans())
                 .width(Length::Fill)
                 .wrapping(text::Wrapping::None)
                 .style(move |theme: &Theme| text::Style {

@@ -145,8 +145,8 @@ pub fn header<'a, Message: 'a>(
 pub fn title_text<'a>(title: String) -> text::Text<'a> {
     text(title)
         .size(style::text::BASE)
-        // font-heading
-        .font(font::MEDIUM)
+        // `cn-font-heading`
+        .font(font::heading(iced::font::Weight::Medium))
         .line_height(iced::Pixels(24.0))
         .style(|theme: &Theme| text::Style {
             color: Some(tokens(theme).palette.foreground),

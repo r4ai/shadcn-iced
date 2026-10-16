@@ -38,7 +38,7 @@ pub fn checkbox<'a, Message: Clone + 'a>(checked: bool) -> Checkbox<'a, Message>
         on_toggle: None,
         disabled: false,
         invalid: false,
-        font: font::MEDIUM,
+        font: font::medium(),
     }
 }
 
@@ -75,7 +75,7 @@ impl<'a, Message: Clone + 'a> Checkbox<'a, Message> {
     }
 
     /// Sets the font of the label. Defaults to `font-medium`; use
-    /// [`font::SANS`] for `font-normal`.
+    /// [`font::sans()`] for `font-normal`.
     pub fn font(mut self, font: Font) -> Self {
         self.font = font;
         self

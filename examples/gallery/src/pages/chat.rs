@@ -503,7 +503,7 @@ pub const MESSAGE_SCROLLER: Page = Page {
             .button((!at_end).then_some(Message::Demo(DemoMessage::ScrollToEnd)));
 
         let header = column![
-            text("New Chat").size(16).font(iced_ui::font::MEDIUM),
+            text("New Chat").size(16).font(iced_ui::font::medium()),
             text("How can I help you today?")
                 .size(14)
                 .style(crate::muted),

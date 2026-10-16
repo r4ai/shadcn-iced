@@ -34,7 +34,7 @@ pub fn textarea<'a, Message: Clone + 'a>(content: &'a Content) -> Textarea<'a, M
             .line_height(Pixels(20.0))
             // `min-h-16 px-2.5 py-2 md:text-sm`, plus the 1px border.
             .padding([9, 11])
-            .font(font::SANS)
+            .font(font::sans())
             .min_height(64),
         invalid: false,
         disabled: true,

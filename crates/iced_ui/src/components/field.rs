@@ -60,7 +60,7 @@ pub fn field<'a, Message: 'a>(
         orientation: Orientation::Vertical,
         disabled: false,
         invalid: false,
-        font: font::MEDIUM,
+        font: font::medium(),
     }
 }
 
@@ -111,7 +111,7 @@ impl<'a, Message: 'a> Field<'a, Message> {
     }
 
     /// Sets the font of the label. Defaults to `font-medium`; use
-    /// [`font::SANS`] for `font-normal`.
+    /// [`font::sans()`] for `font-normal`.
     pub fn font(mut self, font: Font) -> Self {
         self.font = font;
         self
@@ -300,7 +300,7 @@ impl<'a, Message: 'a> From<FieldSet<'a, Message>> for Element<'a, Message> {
                         LegendVariant::Legend => style::text::BASE,
                         LegendVariant::Label => style::text::SM,
                     })
-                    .font(font::MEDIUM)
+                    .font(font::medium())
             }))
             .push(set.description.map(description))
             .spacing(match variant {

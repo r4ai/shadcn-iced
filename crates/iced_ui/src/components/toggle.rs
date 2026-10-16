@@ -195,7 +195,7 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
             .push(toggle.label.map(|label| {
                 text(label)
                     .size(size.text_size())
-                    .font(font::MEDIUM)
+                    .font(font::medium())
                     .wrapping(text::Wrapping::None)
             }))
             .spacing(4)

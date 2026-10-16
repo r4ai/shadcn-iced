@@ -31,7 +31,7 @@ pub fn collapsible<'a, Message: Clone + 'a>(
             .push(
                 text(title)
                     .size(style::text::SM)
-                    .font(font::SEMIBOLD)
+                    .font(font::semibold())
                     .width(Length::Fill),
             )
             .push(

@@ -560,7 +560,7 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
                 // `text-sm font-normal leading-none`
                 let label = text(date.day.to_string())
                     .size(style::text::SM)
-                    .font(font::SANS)
+                    .font(font::sans())
                     .line_height(1.0);
 
                 let label: Element<'a, Message> = if struck {
@@ -622,7 +622,7 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
             // `text-sm font-medium`
             return text(month.to_string())
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .into();
         };
 

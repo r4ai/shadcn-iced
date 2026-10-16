@@ -98,7 +98,7 @@ pub fn link<'a, Message: Clone + 'a>(
             .push(
                 text(title.into())
                     .size(style::text::SM)
-                    .font(font::MEDIUM)
+                    .font(font::medium())
                     .line_height(1.0),
             )
             .push(
@@ -162,7 +162,7 @@ impl<'a, Message: Clone + 'a> From<NavigationMenu<'a, Message>> for Element<'a, 
         let label = |label: String| {
             text(label)
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .line_height(iced::Pixels(20.0))
         };
 

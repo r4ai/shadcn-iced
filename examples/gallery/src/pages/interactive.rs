@@ -101,25 +101,25 @@ pub const CHECKBOX: Page = Page {
                         .push(
                             checkbox(true)
                                 .label("Hard disks")
-                                .font(font::SANS)
+                                .font(font::sans())
                                 .on_toggle(noop)
                         )
                         .push(
                             checkbox(true)
                                 .label("External disks")
-                                .font(font::SANS)
+                                .font(font::sans())
                                 .on_toggle(noop)
                         )
                         .push(
                             checkbox(false)
                                 .label("CDs, DVDs, and iPods")
-                                .font(font::SANS)
+                                .font(font::sans())
                                 .on_toggle(noop)
                         )
                         .push(
                             checkbox(false)
                                 .label("Connected servers")
-                                .font(font::SANS)
+                                .font(font::sans())
                                 .on_toggle(noop)
                         ),
                 )
@@ -286,7 +286,7 @@ pub const RADIO_GROUP: Page = Page {
                             radio_group(Some(gallery.demo.position), |v| demo(
                                 DemoMessage::Position(v)
                             ))
-                            .font(font::SANS)
+                            .font(font::sans())
                             .option(0, "Monthly ($9.99/month)")
                             .option(1, "Yearly ($99.99/year)")
                             .option(2, "Lifetime ($299.99)")
@@ -311,7 +311,7 @@ pub const RADIO_GROUP: Page = Page {
                         .spacing(12.0)
                         .push(
                             radio_group(Some(0), noop)
-                                .font(font::SANS)
+                                .font(font::sans())
                                 .invalid(true)
                                 .option(0, "Email only")
                                 .option(1, "SMS only")
@@ -375,7 +375,7 @@ pub const SLIDER: Page = Page {
                 narrow(
                     column![
                         row![
-                            text("Temperature").size(14).font(font::MEDIUM),
+                            text("Temperature").size(14).font(font::medium()),
                             iced::widget::space().width(Fill),
                             muted("0.3, 0.7"),
                         ]
@@ -710,7 +710,7 @@ pub const COLLAPSIBLE: Page = Page {
         let detail = |title: &'static str, value: &'static str| {
             bordered(
                 column![
-                    text(title).size(14).font(font::MEDIUM),
+                    text(title).size(14).font(font::medium()),
                     muted(value).line_height(1.43),
                 ]
                 .spacing(0),
@@ -721,7 +721,7 @@ pub const COLLAPSIBLE: Page = Page {
         let trigger = || -> Element<'static, Message> {
             column![
                 row![
-                    text("Order #4189").size(14).font(font::SEMIBOLD),
+                    text("Order #4189").size(14).font(font::semibold()),
                     iced::widget::space().width(Fill),
                     button::icon_button::<Message>(lucide::CHEVRONS_UP_DOWN)
                         .variant(button::Variant::Ghost)
@@ -734,7 +734,7 @@ pub const COLLAPSIBLE: Page = Page {
                     row![
                         muted("Status"),
                         iced::widget::space().width(Fill),
-                        text("Shipped").size(14).font(font::MEDIUM),
+                        text("Shipped").size(14).font(font::medium()),
                     ]
                     .align_y(Center)
                 ),
@@ -765,8 +765,8 @@ pub const COLLAPSIBLE: Page = Page {
                 container(collapsible(
                     "@peduarte starred 3 repositories",
                     column![
-                        bordered(text("@radix-ui/colors").size(14).font(font::MONO)),
-                        bordered(text("@stitches/react").size(14).font(font::MONO)),
+                        bordered(text("@radix-ui/colors").size(14).font(font::mono())),
+                        bordered(text("@stitches/react").size(14).font(font::mono())),
                     ]
                     .spacing(8)
                 ))
@@ -1046,7 +1046,7 @@ pub const FIELD: Page = Page {
                         .push(
                             checkbox(d.terms)
                                 .label("Same as shipping address")
-                                .font(font::SANS)
+                                .font(font::sans())
                                 .on_toggle(|v| demo(DemoMessage::Terms(v)))
                         )
                         .into(),
@@ -1194,7 +1194,7 @@ pub const RESIZABLE: Page = Page {
     description: "Accessible resizable panel groups and layouts with keyboard support.",
     view: |_| {
         // `flex items-center justify-center p-6`, `font-semibold`
-        let panel = |label: &'static str| container(text(label).font(font::SEMIBOLD)).center(Fill);
+        let panel = |label: &'static str| container(text(label).font(font::semibold())).center(Fill);
 
         column![
             example(

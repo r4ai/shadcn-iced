@@ -56,7 +56,7 @@ pub fn badge<'a, Message: 'a>(label: impl text::IntoFragment<'a>) -> Badge<'a, M
     Badge::new(
         text(label)
             .size(style::text::XS)
-            .font(font::MEDIUM)
+            .font(font::medium())
             .line_height(iced::Pixels(16.0))
             .wrapping(text::Wrapping::None),
     )

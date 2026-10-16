@@ -402,7 +402,7 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
                         bounds: bounds.size(),
                         size: Pixels(style::text::SM),
                         line_height: advanced_text::LineHeight::Absolute(Pixels(20.0)),
-                        font: font::SANS,
+                        font: font::sans(),
                         align_x: advanced_text::Alignment::Center,
                         align_y: alignment::Vertical::Center,
                         shaping: advanced_text::Shaping::Basic,

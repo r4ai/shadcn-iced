@@ -64,7 +64,7 @@ pub fn header<'a, Message: 'a>(
             text(title.into())
                 .size(style::text::SM)
                 .line_height(iced::Pixels(20.0))
-                .font(font::MEDIUM),
+                .font(font::medium()),
         )
         .push(
             text(description.into())

@@ -201,8 +201,8 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
 
                         text(fragment)
                             .size(text_size)
-                            // font-heading
-                            .font(font::MEDIUM)
+                            // `cn-font-heading`
+                            .font(font::heading(iced::font::Weight::Medium))
                             .line_height(1.375)
                             .into()
                     }

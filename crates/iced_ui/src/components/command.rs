@@ -269,7 +269,7 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                         text(heading)
                             .size(style::text::XS)
                             .line_height(iced::Pixels(16.0))
-                            .font(font::MEDIUM)
+                            .font(font::medium())
                             .style(|theme: &Theme| text::Style {
                                 color: Some(tokens(theme).palette.muted_foreground),
                             }),

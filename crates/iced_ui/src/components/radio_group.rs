@@ -55,7 +55,7 @@ pub fn radio_group<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a>(
         orientation: Orientation::Vertical,
         disabled: false,
         invalid: false,
-        font: font::MEDIUM,
+        font: font::medium(),
     }
 }
 
@@ -104,7 +104,7 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> RadioGroup<'a, T, Messag
     }
 
     /// Sets the font of the labels. Defaults to `font-medium`; use
-    /// [`font::SANS`] for `font-normal`.
+    /// [`font::sans()`] for `font-normal`.
     pub fn font(mut self, font: Font) -> Self {
         self.font = font;
         self
@@ -117,7 +117,7 @@ pub fn radio_item<'a, Message: Clone + 'a>(
     label: impl Into<String>,
     on_select: Option<Message>,
 ) -> Element<'a, Message> {
-    item(selected, label.into(), None, on_select, false, font::MEDIUM)
+    item(selected, label.into(), None, on_select, false, font::medium())
 }
 
 fn item<'a, Message: Clone + 'a>(

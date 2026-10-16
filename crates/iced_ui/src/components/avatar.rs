@@ -165,7 +165,7 @@ impl<'a, Message: 'a> From<Avatar> for Element<'a, Message> {
                 } else {
                     style::text::SM
                 })
-                .font(font::SANS)
+                .font(font::sans())
                 .wrapping(text::Wrapping::None)
                 .into(),
             // `[&>svg]:size-4`, `size-5` / `size-3` in large / small groups

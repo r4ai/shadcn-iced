@@ -424,7 +424,7 @@ fn shortcut<'a, Message: 'a>(index: usize) -> Element<'a, Message> {
             .size(10)
             .font(iced::Font {
                 weight: iced::font::Weight::Medium,
-                ..font::MONO
+                ..font::mono()
             })
             .line_height(1.0),
     )
@@ -462,7 +462,7 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
         let progress = questionnaire.progress.then(|| {
             text(format!("Question {} of {total}", index + 1))
                 .size(style::text::XS)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .style(|theme: &Theme| text::Style {
                     color: Some(tokens(theme).palette.muted_foreground),
                 })
@@ -470,10 +470,10 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
 
         // The title is a `legend`, outside of the `gap-4` of the item;
         // `mb-4` without description.
-        // font-heading
         let title = text(question.title.clone())
             .size(style::text::BASE)
-            .font(font::MEDIUM)
+            // `cn-font-heading`
+            .font(font::heading(iced::font::Weight::Medium))
             .line_height(1.375);
 
         let heading = Column::new()
@@ -498,7 +498,7 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
                 .push(
                     text(item.label.clone())
                         .size(style::text::SM)
-                        .font(font::MEDIUM)
+                        .font(font::medium())
                         .line_height(1.375),
                 )
                 .push(item.description.clone().map(|description| {

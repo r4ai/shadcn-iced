@@ -76,7 +76,7 @@ pub fn input_group<'a, Message: Clone + 'a>(input: Input<'a, Message>) -> InputG
 fn muted_text<'a, Message: 'a>(content: String) -> Element<'a, Message> {
     text(content)
         .size(style::text::SM)
-        .font(font::MEDIUM)
+        .font(font::medium())
         .style(|theme: &Theme| text::Style {
             color: Some(tokens(theme).palette.muted_foreground),
         })

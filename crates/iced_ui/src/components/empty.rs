@@ -120,8 +120,8 @@ impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
                 // `text-sm font-medium tracking-tight`
                 text(title)
                     .size(style::text::SM)
-                    // font-heading
-                    .font(font::MEDIUM)
+                    // `cn-font-heading`
+                    .font(font::heading(iced::font::Weight::Medium))
                     .line_height(iced::Pixels(20.0))
                     .align_x(iced::alignment::Horizontal::Center)
             }))

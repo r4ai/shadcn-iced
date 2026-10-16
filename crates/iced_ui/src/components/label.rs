@@ -9,6 +9,6 @@ use iced::widget::{Text, text};
 pub fn label<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
     text(content)
         .size(style::text::SM)
-        .font(font::MEDIUM)
+        .font(font::medium())
         .line_height(iced::Pixels(14.0))
 }

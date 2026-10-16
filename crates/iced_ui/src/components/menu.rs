@@ -493,7 +493,7 @@ pub fn group_label<'a, Message: 'a>(label: impl Into<String>, inset: bool) -> El
     container(
         text(label.into())
             .size(style::text::XS)
-            .font(font::MEDIUM)
+            .font(font::medium())
             .line_height(iced::Pixels(16.0))
             .style(|theme: &Theme| text::Style {
                 color: Some(menu_tokens(theme).palette.muted_foreground),
@@ -600,7 +600,7 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                             container(
                                 text(label)
                                     .size(style::text::SM)
-                                    .font(font::MEDIUM)
+                                    .font(font::medium())
                                     .line_height(iced::Pixels(20.0)),
                             )
                             .padding(if inset {

@@ -60,7 +60,7 @@ impl<'a, Message: Clone + 'a> From<Menubar<'a, Message>> for Element<'a, Message
             let trigger = Pressable::new(
                 text(label)
                     .size(style::text::SM)
-                    .font(font::MEDIUM)
+                    .font(font::medium())
                     .line_height(iced::Pixels(20.0)),
             )
             .padding([2, 6])

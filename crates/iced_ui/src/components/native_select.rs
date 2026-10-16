@@ -40,7 +40,7 @@ where
         .text_line_height(text::LineHeight::Absolute(Pixels(20.0)))
         // `h-8 pl-2.5 pr-8 py-1`
         .padding([6, 10])
-        .font(font::SANS)
+        .font(font::sans())
         .handle(Handle::Static(Icon {
             font: font::ICONS,
             code_point: lucide::CHEVRON_DOWN.codepoint(),

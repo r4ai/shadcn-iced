@@ -39,7 +39,7 @@ pub fn alert<'a, Message: 'a>(title: impl text::IntoFragment<'a>) -> Alert<'a, M
         title: Some(
             text(title)
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .line_height(iced::Pixels(20.0))
                 .into(),
         ),

@@ -306,7 +306,7 @@ fn badge<'a, Message: 'a>(badge: String, highlighted: bool) -> Element<'a, Messa
     let narrow = badge.chars().count() < 2;
     let label = text(badge)
         .size(style::text::XS)
-        .font(font::MEDIUM)
+        .font(font::medium())
         .style(move |theme: &Theme| {
             let p = tokens(theme).palette;
             text::Style {
@@ -380,9 +380,9 @@ fn menu_button<'a, Message: Clone + 'a>(
                     size.text_size()
                 })
                 .font(if active && !sub {
-                    font::MEDIUM
+                    font::medium()
                 } else {
-                    font::SANS
+                    font::sans()
                 })
                 .wrapping(text::Wrapping::None)
                 .width(Length::Fill)
@@ -475,7 +475,7 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
 
         let groups = sidebar.groups.into_iter().map(|group| {
             let label = group.label.filter(|_| !collapsed).map(|label| {
-                container(text(label).size(style::text::XS).font(font::MEDIUM).style(
+                container(text(label).size(style::text::XS).font(font::medium()).style(
                     |theme: &Theme| text::Style {
                         color: Some(alpha(tokens(theme).palette.sidebar_foreground, 0.7)),
                     },

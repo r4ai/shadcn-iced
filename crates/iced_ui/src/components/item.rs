@@ -99,7 +99,7 @@ pub fn item<'a, Message: Clone + 'a>(title: impl text::IntoFragment<'a>) -> Item
         title: Some(
             text(title)
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .line_height(1.375)
                 .into(),
         ),

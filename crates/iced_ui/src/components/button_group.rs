@@ -135,7 +135,7 @@ fn segment<'a, Message: 'a>(
     position: style::Position,
     vertical: bool,
 ) -> Element<'a, Message> {
-    container(text(label).size(style::text::SM).font(font::MEDIUM))
+    container(text(label).size(style::text::SM).font(font::medium()))
         .padding([0, 10])
         .center_y(Length::Fixed(32.0))
         .style(move |theme: &Theme| {

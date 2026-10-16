@@ -131,7 +131,7 @@ fn trigger<'a, Message: 'a>(title: &str, open: bool, disabled: bool) -> Element<
         .push(
             text(title.to_owned())
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .line_height(iced::Pixels(20.0))
                 .style(move |theme: &Theme| text::Style {
                     color: Some(alpha(tokens(theme).palette.foreground, opacity)),

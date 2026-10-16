@@ -48,7 +48,7 @@ pub fn message<'a, M: 'a>() -> Message<'a, M> {
 fn caption<'a, M: 'a>(content: String) -> Element<'a, M> {
     text(content)
         .size(style::text::XS)
-        .font(font::MEDIUM)
+        .font(font::medium())
         .style(muted)
         .into()
 }

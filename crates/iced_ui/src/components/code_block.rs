@@ -271,7 +271,7 @@ fn marker<'a, Message: 'a>(line: Line, size: Size) -> Option<Element<'a, Message
         container(
             text(symbol)
                 .size(size.text_size())
-                .font(font::MONO)
+                .font(font::mono())
                 .line_height(Pixels(size.line_height()))
                 .style(move |theme: &Theme| {
                     let p = tokens(theme).palette;
@@ -305,7 +305,7 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
             container(
                 text((block.start_line + index).to_string())
                     .size(size.text_size())
-                    .font(font::MONO)
+                    .font(font::mono())
                     .line_height(Pixels(line_height))
                     .style(|theme: &Theme| text::Style {
                         color: Some(tokens(theme).palette.muted_foreground),
@@ -323,7 +323,7 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
                 content
             })
             .size(size.text_size())
-            .font(font::MONO)
+            .font(font::mono())
             .line_height(Pixels(line_height))
         };
 
@@ -436,7 +436,7 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
                 .push(
                     text(title)
                         .size(size.text_size())
-                        .font(font::MEDIUM)
+                        .font(font::medium())
                         .wrapping(text::Wrapping::None),
                 )
                 .spacing(6)

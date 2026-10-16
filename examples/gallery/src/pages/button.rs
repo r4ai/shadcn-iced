@@ -23,7 +23,7 @@ fn loading<'a>(
     color: fn(&Theme) -> Color,
 ) -> Button<'a, Message> {
     let spinner = spinner().style(color);
-    let label = text(label).size(14).font(iced_ui::font::MEDIUM);
+    let label = text(label).size(14).font(iced_ui::font::medium());
 
     let content = if trailing {
         row![label, spinner]

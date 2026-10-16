@@ -28,7 +28,7 @@ pub fn progress_with_label<'a, Message: 'a>(
         .push(
             Row::new()
                 // `text-sm font-medium`
-                .push(text(label).size(style::text::SM).font(font::MEDIUM))
+                .push(text(label).size(style::text::SM).font(font::medium()))
                 .push(space::horizontal())
                 // `text-muted-foreground ml-auto text-sm tabular-nums`
                 .push(

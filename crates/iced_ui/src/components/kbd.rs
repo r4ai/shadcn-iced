@@ -13,7 +13,7 @@ pub fn kbd<'a, Message: 'a>(label: impl text::IntoFragment<'a>) -> Element<'a, M
     frame(
         text(label)
             .size(style::text::XS)
-            .font(font::MEDIUM)
+            .font(font::medium())
             .line_height(iced::Pixels(16.0))
             .wrapping(text::Wrapping::None),
     )

@@ -107,7 +107,7 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
         let label = switch.label.map(|label| {
             text(label)
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .line_height(iced::Pixels(14.0))
                 .style(move |theme: &Theme| text::Style {
                     color: Some(alpha(

@@ -253,7 +253,7 @@ impl<'a, Message: Clone + 'a> From<Attachment<'a, Message>> for Element<'a, Mess
                 .push(attachment.title.map(|title| {
                     text(title)
                         .size(size.text_size())
-                        .font(font::MEDIUM)
+                        .font(font::medium())
                         .wrapping(text::Wrapping::None)
                         .line_height(1.25)
                 }))

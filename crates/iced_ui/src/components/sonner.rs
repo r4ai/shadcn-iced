@@ -191,7 +191,7 @@ fn view<'a, Message: Clone + 'a>(
         .push(
             text(toast.title.clone())
                 .size(13)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .line_height(1.5),
         )
         .push(toast.description.clone().map(|description| {

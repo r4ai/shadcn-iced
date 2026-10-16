@@ -515,7 +515,7 @@ impl<Message> canvas::Program<Message> for Chart {
                     ),
                     color: p.muted_foreground,
                     size: Pixels(12.0),
-                    font: font::SANS,
+                    font: font::sans(),
                     align_x: TextAlignment::Center,
                     align_y: alignment::Vertical::Top,
                     ..Text::default()
@@ -577,7 +577,7 @@ impl Chart {
                 position: Point::new(x + 14.0, y),
                 color: t.palette.foreground,
                 size: Pixels(12.0),
-                font: font::SANS,
+                font: font::sans(),
                 align_y: alignment::Vertical::Center,
                 ..Text::default()
             });
@@ -675,7 +675,7 @@ impl Chart {
                 position: Point::new(origin.x + 10.0, y + row_height / 2.0),
                 color: p.foreground,
                 size: Pixels(12.0),
-                font: font::MEDIUM,
+                font: font::medium(),
                 align_y: alignment::Vertical::Center,
                 ..Text::default()
             });
@@ -698,7 +698,7 @@ impl Chart {
                 position: Point::new(origin.x + 28.0, center),
                 color: p.muted_foreground,
                 size: Pixels(12.0),
-                font: font::SANS,
+                font: font::sans(),
                 align_y: alignment::Vertical::Center,
                 ..Text::default()
             });
@@ -709,7 +709,7 @@ impl Chart {
                 size: Pixels(12.0),
                 font: iced::Font {
                     weight: iced::font::Weight::Medium,
-                    ..font::MONO
+                    ..font::mono()
                 },
                 align_x: TextAlignment::Right,
                 align_y: alignment::Vertical::Center,

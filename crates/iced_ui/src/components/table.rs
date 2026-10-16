@@ -39,7 +39,7 @@ pub fn table<'a, Message: Clone + 'a, T: Into<Cell<'a, Message>>>(
         .map(|header| match header.into() {
             Cell::Text(label) => text(label)
                 .size(style::text::SM)
-                .font(font::MEDIUM)
+                .font(font::medium())
                 .wrapping(text::Wrapping::None)
                 .into(),
             Cell::Element(element) => element,
@@ -131,7 +131,7 @@ impl<'a, Message: Clone + 'a> Table<'a, Message> {
                 .map(|c| match c.into() {
                     Cell::Text(value) => text(value)
                         .size(style::text::SM)
-                        .font(font::MEDIUM)
+                        .font(font::medium())
                         .line_height(iced::Pixels(20.0))
                         .into(),
                     Cell::Element(element) => element,

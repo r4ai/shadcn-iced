@@ -203,7 +203,7 @@ const DELIVERY_TIMES: [(&str, &str, Option<&str>); 5] = [
 fn delivery_time<'a>(index: u8, selected: bool) -> iced::Element<'a, Message> {
     let (label, description, badge_label) = DELIVERY_TIMES[index as usize];
 
-    let title = row![text(label).size(14).font(iced_ui::font::MEDIUM)]
+    let title = row![text(label).size(14).font(iced_ui::font::medium())]
         .push(badge_label.map(|label| badge(label).variant(iced_ui::badge::Variant::Secondary)))
         .spacing(8)
         .align_y(Center);
@@ -304,7 +304,7 @@ pub const POPOVER: Page = Page {
         // `grid grid-cols-3 items-center gap-4`, inputs `col-span-2 h-8`.
         let dimension = |label: &'static str, value: &str| {
             row![
-                text(label).size(14).font(iced_ui::font::MEDIUM).width(Fill),
+                text(label).size(14).font(iced_ui::font::medium()).width(Fill),
                 container(input("", value).on_input(|_| Message::Noop))
                     .width(iced::Length::FillPortion(2)),
             ]
@@ -330,7 +330,7 @@ pub const POPOVER: Page = Page {
                         column![
                             text("Dimensions")
                                 .size(14)
-                                .font(iced_ui::font::MEDIUM)
+                                .font(iced_ui::font::medium())
                                 .line_height(1.0),
                             text("Set the dimensions for the layer.")
                                 .size(14)
@@ -403,7 +403,7 @@ pub const HOVER_CARD: Page = Page {
                 button("Hover Here").variant(Variant::Link),
                 // `flex flex-col gap-0.5`
                 column![
-                    text("@nextjs").size(14).font(iced_ui::font::SEMIBOLD),
+                    text("@nextjs").size(14).font(iced_ui::font::semibold()),
                     text("The React Framework – created and maintained by @vercel.").size(14),
                     container(text("Joined December 2021").size(12).style(crate::muted))
                         .padding(iced::Padding::ZERO.top(4)),

@@ -410,7 +410,7 @@ pub const SEPARATOR: Page = Page {
                         text("shadcn/ui")
                             .size(14)
                             .line_height(iced::Pixels(14.0))
-                            .font(iced_ui::font::MEDIUM),
+                            .font(iced_ui::font::medium()),
                         sm_muted("The Foundation for your Design System"),
                     ]
                     .spacing(6),
@@ -533,7 +533,7 @@ pub const SPINNER: Page =
                 button::Button::new(
                     row![
                         spinner().size(14.0).style(style),
-                        text(label).size(12.8).font(iced_ui::font::MEDIUM)
+                        text(label).size(12.8).font(iced_ui::font::medium())
                     ]
                     .spacing(4)
                     .align_y(Center),
@@ -636,7 +636,7 @@ pub const KBD: Page = Page {
                 "Button",
                 button::Button::new(
                     row![
-                        text("Accept").size(14).font(iced_ui::font::MEDIUM),
+                        text("Accept").size(14).font(iced_ui::font::medium()),
                         container(kbd("⏎")).padding(iced::Padding::ZERO.left(2)),
                     ]
                     .spacing(6)
@@ -803,7 +803,7 @@ pub const TABLE: Page = Page {
         ];
 
         let medium = |value: &'static str| -> iced::Element<'static, Message> {
-            text(value).size(14).font(iced_ui::font::MEDIUM).into()
+            text(value).size(14).font(iced_ui::font::medium()).into()
         };
 
         let invoices_table = invoices.iter().fold(
@@ -953,7 +953,7 @@ pub const EMPTY: Page = Page {
                     .extra(
                         button::Button::new(
                             row![
-                                text("Learn More").size(12.8).font(iced_ui::font::MEDIUM).style(crate::muted),
+                                text("Learn More").size(12.8).font(iced_ui::font::medium()).style(crate::muted),
                                 lucide::ARROW_UP_RIGHT.sized(14).style(crate::muted),
                             ]
                             .spacing(4)
@@ -1207,7 +1207,7 @@ pub const SCROLL_AREA: Page = Page {
                     container(placeholder("3 : 4")).width(150).height(200),
                     row![
                         text("Photo by").size(12).style(crate::muted),
-                        text(artist).size(12).font(iced_ui::font::SEMIBOLD),
+                        text(artist).size(12).font(iced_ui::font::semibold()),
                     ]
                     .spacing(4),
                 ]
@@ -1227,7 +1227,7 @@ pub const SCROLL_AREA: Page = Page {
                             text("Tags")
                                 .size(14)
                                 .line_height(iced::Pixels(14.0))
-                                .font(iced_ui::font::MEDIUM),
+                                .font(iced_ui::font::medium()),
                             tags
                         ]
                         .spacing(16)

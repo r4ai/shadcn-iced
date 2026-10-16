@@ -37,7 +37,7 @@ pub fn input<'a, Message: Clone + 'a>(placeholder: &str, value: &str) -> Input<'
             .line_height(Pixels(20.0))
             // `h-8 px-2.5 py-1 md:text-sm`, plus the 1px border.
             .padding([6, 11])
-            .font(font::SANS),
+            .font(font::sans()),
         invalid: false,
         icon: None,
         chromeless: false,
