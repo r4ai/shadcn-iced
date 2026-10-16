@@ -182,3 +182,13 @@ impl<P: iced::Program> ApplicationExt for iced::Application<P> {
         app.default_font(sans())
     }
 }
+
+impl<P: iced::Program> ApplicationExt for iced::Daemon<P> {
+    fn iced_ui(self) -> Self {
+        let daemon = all()
+            .into_iter()
+            .fold(self, |daemon, font| daemon.font(font));
+
+        daemon.default_font(sans())
+    }
+}

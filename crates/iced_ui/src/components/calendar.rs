@@ -45,8 +45,11 @@ impl Date {
 
     /// Today, in UTC.
     pub fn today() -> Self {
-        let seconds = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
+        use iced::time::SystemTime;
+
+        // `iced::time` also works on the web, unlike `std::time`.
+        let seconds = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
             .map(|duration| duration.as_secs() as i64)
             .unwrap_or_default();
 

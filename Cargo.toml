@@ -17,3 +17,9 @@ iced_test = "0.14"
 type_complexity = "allow"
 too_many_arguments = "allow"
 large_enum_variant = "allow"
+
+# The live previews of the website (`site/scripts/build-wasm.mjs`).
+[profile.wasm]
+inherits = "release"
+lto = true
+codegen-units = 1

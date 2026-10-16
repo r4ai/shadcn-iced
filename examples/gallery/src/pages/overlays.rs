@@ -77,55 +77,67 @@ pub const ALERT_DIALOG: Page = Page {
     view: |gallery| {
         let d = &gallery.demo;
 
-        // One alert dialog layer for the page: the small variant is opened
-        // by setting `position` to 3, the default one with `alert_dialog`.
-        let small = d.position == 3;
-        let open = d.alert_dialog || small;
-        let close = || {
-            demo(if small {
-                DemoMessage::Position(0)
-            } else {
-                DemoMessage::AlertDialog(false)
-            })
-        };
-
-        let dialog = alert_dialog(
-            row![
-                button("Show Dialog")
-                    .variant(Variant::Outline)
-                    .on_press(demo(DemoMessage::AlertDialog(true))),
-            ],
-            open,
-        );
-
-        let dialog = if small {
-            dialog
+        column![
+            example(
+                "Default",
+                alert_dialog(
+                    button("Show Dialog")
+                        .variant(Variant::Outline)
+                        .on_press(demo(DemoMessage::AlertDialog(true))),
+                    d.alert_dialog,
+                )
+                .title("Are you absolutely sure?")
+                .description("This action cannot be undone. This will permanently delete your account from our servers.")
+                .cancel("Cancel", demo(DemoMessage::AlertDialog(false)))
+                .action("Continue", demo(DemoMessage::AlertDialog(false)))
+            ),
+            example(
+                "Small with media",
+                alert_dialog(
+                    button("Show Small Dialog")
+                        .variant(Variant::Outline)
+                        .on_press(demo(DemoMessage::SmallAlertDialog(true))),
+                    d.small_alert_dialog,
+                )
                 .size(ad::Size::Sm)
                 .media(lucide::BLUETOOTH)
                 .title("Allow accessory to connect?")
                 .description("Do you want to allow the USB accessory to connect to this device?")
-                .cancel("Don't allow", close())
-                .action("Allow", close())
-        } else {
-            dialog
-                .title("Are you absolutely sure?")
-                .description("This action cannot be undone. This will permanently delete your account from our servers.")
-                .cancel("Cancel", close())
-                .action("Continue", close())
-        };
-
-        column![
-            example("Default", dialog),
-            example(
-                "Small with media",
-                button("Show Small Dialog")
-                    .variant(Variant::Outline)
-                    .on_press(demo(DemoMessage::Position(3))),
+                .cancel("Don't allow", demo(DemoMessage::SmallAlertDialog(false)))
+                .action("Allow", demo(DemoMessage::SmallAlertDialog(false)))
             ),
         ]
         .into()
     },
 };
+
+/// The "Edit profile" sheet of the Sheet page, around its `trigger`.
+fn profile_sheet<'a>(
+    gallery: &'a crate::Gallery,
+    trigger: impl Into<iced::Element<'a, Message>>,
+    open: bool,
+    side: sh::Side,
+    close: Message,
+) -> iced::Element<'a, Message> {
+    sheet(trigger, open)
+        .side(side)
+        .title("Edit profile")
+        .description("Make changes to your profile here. Click save when you're done.")
+        // `grid gap-6 px-4`
+        .content(profile_fields(gallery, 24))
+        .footer(
+            column![
+                button("Save changes").width(Fill).on_press(close.clone()),
+                button("Close")
+                    .variant(Variant::Outline)
+                    .width(Fill)
+                    .on_press(close.clone()),
+            ]
+            .spacing(8),
+        )
+        .on_close(close)
+        .into()
+}
 
 pub const SHEET: Page = Page {
     id: "sheet",
@@ -135,52 +147,43 @@ pub const SHEET: Page = Page {
         let d = &gallery.demo;
         let open = |side| demo(DemoMessage::Sheet(Some(side)));
 
-        // A single sheet layer serves every trigger of the page.
-        let sheet = sheet(
-            row![
-                button("top")
-                    .variant(Variant::Outline)
-                    .on_press(open(sh::Side::Top)),
-                button("right")
-                    .variant(Variant::Outline)
-                    .on_press(open(sh::Side::Right)),
-                button("bottom")
-                    .variant(Variant::Outline)
-                    .on_press(open(sh::Side::Bottom)),
-                button("left")
-                    .variant(Variant::Outline)
-                    .on_press(open(sh::Side::Left)),
-            ]
-            .spacing(8),
-            d.sheet.is_some(),
-        )
-        .side(d.sheet.unwrap_or_default())
-        .title("Edit profile")
-        .description("Make changes to your profile here. Click save when you're done.")
-        // `grid gap-6 px-4`
-        .content(profile_fields(gallery, 24))
-        .footer(
-            column![
-                button("Save changes")
-                    .width(Fill)
-                    .on_press(demo(DemoMessage::Sheet(None))),
-                button("Close")
-                    .variant(Variant::Outline)
-                    .width(Fill)
-                    .on_press(demo(DemoMessage::Sheet(None))),
-            ]
-            .spacing(8),
-        )
-        .on_close(demo(DemoMessage::Sheet(None)));
-
         column![
             example(
                 "Default",
-                button("Open")
-                    .variant(Variant::Outline)
-                    .on_press(open(sh::Side::Right)),
+                profile_sheet(
+                    gallery,
+                    button("Open")
+                        .variant(Variant::Outline)
+                        .on_press(demo(DemoMessage::DefaultSheet(true))),
+                    d.default_sheet,
+                    sh::Side::Right,
+                    demo(DemoMessage::DefaultSheet(false)),
+                )
             ),
-            example("Side", sheet),
+            example(
+                "Side",
+                profile_sheet(
+                    gallery,
+                    row![
+                        button("top")
+                            .variant(Variant::Outline)
+                            .on_press(open(sh::Side::Top)),
+                        button("right")
+                            .variant(Variant::Outline)
+                            .on_press(open(sh::Side::Right)),
+                        button("bottom")
+                            .variant(Variant::Outline)
+                            .on_press(open(sh::Side::Bottom)),
+                        button("left")
+                            .variant(Variant::Outline)
+                            .on_press(open(sh::Side::Left)),
+                    ]
+                    .spacing(8),
+                    d.sheet.is_some(),
+                    d.sheet.unwrap_or_default(),
+                    demo(DemoMessage::Sheet(None)),
+                )
+            ),
         ]
         .into()
     },

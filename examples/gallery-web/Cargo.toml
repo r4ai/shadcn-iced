@@ -1,0 +1,22 @@
+[package]
+name = "gallery-web"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+description = "The live previews of the website: the gallery examples, compiled to WebAssembly"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+gallery = { path = "../gallery" }
+iced.workspace = true
+iced_ui = { path = "../../crates/iced_ui" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Document", "Window", "console"] }
+
+[lints]
+workspace = true

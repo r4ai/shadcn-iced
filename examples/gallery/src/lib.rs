@@ -243,11 +243,32 @@ impl Gallery {
         .content(scrollable(customizer::view(self)).height(Fill))
         .on_close(Message::Customize(false));
 
-        iced_ui::sonner::toaster(
-            iced_ui::sidebar::layout(nav, main),
-            &self.demo.toasts,
-            |id| Message::Demo(pages::DemoMessage::DismissToast(id)),
-        )
+        self.toasters(iced_ui::sidebar::layout(nav, main), true)
+    }
+
+    /// Shows the toasts of the Sonner and Toast pages on top of `content`,
+    /// or none of them (without changing the widget tree) when `show` is
+    /// `false`.
+    pub fn toasters<'a>(
+        &'a self,
+        content: impl Into<Element<'a, Message>>,
+        show: bool,
+    ) -> Element<'a, Message> {
+        use pages::DemoMessage;
+
+        let (toasts, base_toasts) = if show {
+            (&self.demo.toasts[..], &self.demo.base_toasts[..])
+        } else {
+            (&[][..], &[][..])
+        };
+
+        let content = iced_ui::toast::toaster(content, base_toasts, |id| {
+            Message::Demo(DemoMessage::CloseBaseToast(id))
+        });
+
+        iced_ui::sonner::toaster(content, toasts, |id| {
+            Message::Demo(DemoMessage::DismissToast(id))
+        })
         .into()
     }
 }
@@ -267,11 +288,67 @@ fn separator(theme: &Theme) -> rule::Style {
     }
 }
 
+thread_local! {
+    /// The example that [`view_example`] is rendering, if any.
+    static FOCUS: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    /// The number of examples built since the page view started.
+    static BUILT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The examples built while [`examples`] runs.
+    static RECORDED: std::cell::RefCell<Option<Vec<ExampleInfo>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Renders only the `index`-th example of a page, without its title and
+/// frame (the website draws those around each preview).
+pub fn view_example(gallery: &Gallery, page: usize, index: usize) -> Element<'_, Message> {
+    FOCUS.set(Some(index));
+    BUILT.set(0);
+    let view = (PAGES[page].view)(gallery);
+    FOCUS.set(None);
+    view
+}
+
+/// An example of a page, as built by its view.
+#[derive(Debug, Clone)]
+pub struct ExampleInfo {
+    pub title: String,
+    /// Where [`example`] is called, to find the source of the example.
+    pub location: &'static std::panic::Location<'static>,
+}
+
+/// The examples of a page, in the order they are built.
+pub fn examples(gallery: &Gallery, page: usize) -> Vec<ExampleInfo> {
+    RECORDED.set(Some(Vec::new()));
+    let _ = (PAGES[page].view)(gallery);
+    RECORDED.take().unwrap_or_default()
+}
+
 /// A documentation-like example: a title and a bordered preview area.
+#[track_caller]
 pub fn example<'a>(
     title: &'a str,
     content: impl Into<Element<'a, Message>>,
 ) -> Element<'a, Message> {
+    if let Some(focus) = FOCUS.get() {
+        let index = BUILT.get();
+        BUILT.set(index + 1);
+
+        return if index == focus {
+            content.into()
+        } else {
+            space().width(0).height(0).into()
+        };
+    }
+
+    let location = std::panic::Location::caller();
+    RECORDED.with_borrow_mut(|recorded| {
+        if let Some(recorded) = recorded {
+            recorded.push(ExampleInfo {
+                title: title.to_owned(),
+                location,
+            });
+        }
+    });
+
     column![
         text(title).size(style::text::LG).font(font::semibold()),
         container(content.into())

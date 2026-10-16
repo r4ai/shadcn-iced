@@ -289,7 +289,7 @@ pub const TOAST: Page = Page {
     id: "toast",
     title: "Toast",
     description: "A succinct message that is displayed temporarily.",
-    view: |gallery| {
+    view: |_gallery| {
         use iced_ui::toast::Kind;
 
         let kind = |label: &'static str, kind: Kind| {
@@ -298,7 +298,7 @@ pub const TOAST: Page = Page {
                 .on_press(demo(DemoMessage::BaseToast(Some(kind))))
         };
 
-        let page = column![
+        column![
             example(
                 "Demo",
                 button("Show Toast")
@@ -318,11 +318,7 @@ pub const TOAST: Page = Page {
                 .spacing(8)
                 .wrap()
             ),
-        ];
-
-        iced_ui::toast::toaster(page, &gallery.demo.base_toasts, |id| {
-            demo(DemoMessage::CloseBaseToast(id))
-        })
+        ]
         .into()
     },
 };
