@@ -15,6 +15,7 @@
 //! # }
 //! ```
 use iced_ui_core::primitive::Layer;
+use iced_ui_core::primitive::layer::{Animation, Edge};
 use iced_ui_core::{Element, font, style, tokens};
 
 use iced::widget::{Column, Stack, container, space, text};
@@ -206,7 +207,15 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
             ),
         };
 
+        let edge = match side {
+            Side::Top => Edge::Top,
+            Side::Right => Edge::Right,
+            Side::Bottom => Edge::Bottom,
+            Side::Left => Edge::Left,
+        };
+
         Layer::new(sheet.base, panel, sheet.open)
+            .animation(Animation::Slide(edge))
             .align_x(align_x)
             .align_y(align_y)
             .on_dismiss_maybe(sheet.on_close)

@@ -6,11 +6,14 @@
 //!
 //! Since triggers usually look different when open (e.g. a rotated chevron),
 //! it takes one trigger element per state.
+use crate::animation::{self, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
-use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch};
+
+use iced::time::Instant;
+use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch, window};
 
 /// A trigger that shows and hides some content.
 pub struct Disclosure<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
@@ -91,6 +94,7 @@ where
 struct State {
     open: bool,
     pressed: bool,
+    presence: Transition,
 }
 
 impl<'a, Message, Theme, Renderer> Disclosure<'a, Message, Theme, Renderer> {
@@ -109,9 +113,12 @@ where
     }
 
     fn state(&self) -> tree::State {
+        let open = self.open.unwrap_or(self.default_open);
+
         tree::State::new(State {
             open: self.default_open,
             pressed: false,
+            presence: Transition::new(if open { 1.0 } else { 0.0 }),
         })
     }
 
@@ -143,6 +150,24 @@ where
     ) -> layout::Node {
         let open = self.is_open(tree.state.downcast_ref::<State>());
         let limits = limits.width(self.width).height(Length::Shrink);
+        let now = Instant::now();
+
+        let (visible, progress) = {
+            let state = tree.state.downcast_mut::<State>();
+
+            // `animate-accordion-down` / `animate-accordion-up`
+            state.presence.go(
+                if open { 1.0 } else { 0.0 },
+                animation::NORMAL,
+                animation::ease_out,
+                now,
+            );
+
+            (
+                open || state.presence.is_animating(now),
+                state.presence.value(now),
+            )
+        };
 
         let trigger = if open {
             self.opened
@@ -159,7 +184,7 @@ where
         let mut children = vec![trigger];
         let mut height = trigger_height;
 
-        if open {
+        if visible {
             let content = self
                 .content
                 .as_widget_mut()
@@ -167,7 +192,7 @@ where
                 .move_to(Point::new(0.0, trigger_height + self.spacing));
 
             width = width.max(content.size().width);
-            height += self.spacing + content.size().height;
+            height += (self.spacing + content.size().height) * progress;
             children.push(content);
         }
 
@@ -228,6 +253,17 @@ where
         viewport: &Rectangle,
     ) {
         let open = self.is_open(tree.state.downcast_ref::<State>());
+
+        if let Event::Window(window::Event::RedrawRequested(now)) = event
+            && tree
+                .state
+                .downcast_ref::<State>()
+                .presence
+                .is_animating(*now)
+        {
+            shell.invalidate_layout();
+            shell.request_redraw();
+        }
         let mut children = layout.children();
         let trigger = children.next().unwrap();
 
@@ -319,7 +355,9 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        let open = self.is_open(tree.state.downcast_ref::<State>());
+        let state = tree.state.downcast_ref::<State>();
+        let open = self.is_open(state);
+        let animating = state.presence.is_animating(Instant::now());
         let mut children = layout.children();
         let trigger = children.next().unwrap();
 
@@ -333,18 +371,6 @@ where
                 cursor,
                 viewport,
             );
-
-            if let Some(content) = children.next() {
-                self.content.as_widget().draw(
-                    &tree.children[2],
-                    renderer,
-                    theme,
-                    style,
-                    content,
-                    cursor,
-                    viewport,
-                );
-            }
         } else {
             self.closed.as_widget().draw(
                 &tree.children[0],
@@ -355,6 +381,37 @@ where
                 cursor,
                 viewport,
             );
+        }
+
+        if let Some(content) = children.next() {
+            let draw = |renderer: &mut Renderer| {
+                self.content.as_widget().draw(
+                    &tree.children[2],
+                    renderer,
+                    theme,
+                    style,
+                    content,
+                    cursor,
+                    viewport,
+                );
+            };
+
+            if animating {
+                // The content slides out of a growing (or shrinking) box.
+                let bounds = layout.bounds();
+                let clip = Rectangle {
+                    y: trigger.bounds().y + trigger.bounds().height,
+                    height: (bounds.y + bounds.height
+                        - trigger.bounds().y
+                        - trigger.bounds().height)
+                        .max(0.0),
+                    ..bounds
+                };
+
+                renderer.with_layer(clip, draw);
+            } else {
+                draw(renderer);
+            }
         }
     }
 

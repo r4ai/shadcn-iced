@@ -11,10 +11,12 @@
 //!   ([`Anchored::hover`]) or on right click ([`Anchored::context_menu`]),
 //! - dismissing it on <kbd>Escape</kbd>, on a click outside, and (for menus)
 //!   once an item has been activated.
+use crate::animation::{self, Appearance, Fade, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{self, Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
+
 use iced::keyboard::{self, key};
 use iced::time::{Duration, Instant};
 use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch, window};
@@ -242,6 +244,7 @@ enum Hover {
 
 #[derive(Debug, Default)]
 struct State {
+    presence: Transition,
     open: bool,
     epoch: u64,
     point: Option<Point>,
@@ -322,7 +325,7 @@ impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for Anchored<'a, Message, Theme, Renderer>
 where
     Message: Clone + 'a,
-    Theme: 'a,
+    Theme: Fade + 'a,
     Renderer: iced::advanced::Renderer + 'a,
 {
     fn tag(&self) -> tree::Tag {
@@ -505,7 +508,18 @@ where
             translation,
         );
 
-        let floating = if state.is_open(&self.trigger) {
+        let now = Instant::now();
+        let open = state.is_open(&self.trigger);
+
+        state.presence.go(
+            if open { 1.0 } else { 0.0 },
+            animation::FAST,
+            animation::ease_out,
+            now,
+        );
+
+        // Closed content stays mounted while it fades out.
+        let floating = if open || state.presence.is_animating(now) {
             let anchor_bounds = layout.bounds() + translation;
             let point = match self.trigger {
                 Trigger::ContextMenu => state.point.map(|point| point + translation),
@@ -528,6 +542,8 @@ where
                 close_on_select: self.close_on_select,
                 modal: self.modal,
                 on_open_change: self.on_open_change.as_deref(),
+                closing: !open,
+                resolved_side: self.side,
             })))
         } else {
             None
@@ -547,7 +563,7 @@ impl<'a, Message, Theme, Renderer> From<Anchored<'a, Message, Theme, Renderer>>
     for Element<'a, Message, Theme, Renderer>
 where
     Message: Clone + 'a,
-    Theme: 'a,
+    Theme: Fade + 'a,
     Renderer: iced::advanced::Renderer + 'a,
 {
     fn from(anchored: Anchored<'a, Message, Theme, Renderer>) -> Self {
@@ -582,6 +598,8 @@ struct Floating<'a, 'b, Message, Theme, Renderer> {
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<&'b (dyn Fn(bool) -> Message + 'a)>,
+    closing: bool,
+    resolved_side: Side,
 }
 
 impl<Message, Theme, Renderer> Floating<'_, '_, Message, Theme, Renderer>
@@ -692,6 +710,7 @@ pub fn position(
 impl<Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
     for Floating<'_, '_, Message, Theme, Renderer>
 where
+    Theme: Fade,
     Message: Clone,
     Renderer: iced::advanced::Renderer,
 {
@@ -719,7 +738,7 @@ where
             None => self.anchor_bounds,
         };
 
-        let (position, _side) = position(
+        let (position, side) = position(
             anchor,
             node.size(),
             bounds,
@@ -729,6 +748,8 @@ where
             self.align_offset,
             padding,
         );
+
+        self.resolved_side = side;
 
         node.move_to(position)
     }
@@ -742,10 +763,32 @@ where
         cursor: mouse::Cursor,
     ) {
         let bounds = layout.bounds();
+        let progress = self.state.presence.value(Instant::now());
 
-        self.content
-            .as_widget()
-            .draw(self.tree, renderer, theme, style, layout, cursor, &bounds);
+        // `fade-in-0 zoom-in-95 slide-in-from-{side}-2`
+        let distance = 8.0 * (1.0 - progress);
+        let offset = match self.resolved_side {
+            Side::Bottom => Vector::new(0.0, -distance),
+            Side::Top => Vector::new(0.0, distance),
+            Side::Right => Vector::new(-distance, 0.0),
+            Side::Left => Vector::new(distance, 0.0),
+        };
+
+        animation::draw(
+            self.content,
+            self.tree,
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            &bounds,
+            Appearance {
+                opacity: progress,
+                scale: 0.95 + 0.05 * progress,
+                offset,
+            },
+        );
     }
 
     fn operate(
@@ -770,6 +813,17 @@ where
     ) {
         let bounds = layout.bounds();
         let was_captured = shell.is_event_captured();
+
+        if let Event::Window(window::Event::RedrawRequested(now)) = event
+            && self.state.presence.is_animating(*now)
+        {
+            shell.request_redraw();
+        }
+
+        // Content fading out is only a picture of what it was.
+        if self.closing {
+            return;
+        }
 
         if self.close_on_select
             && !matches!(self.trigger, Trigger::Controlled { .. })
@@ -842,6 +896,10 @@ where
         cursor: mouse::Cursor,
         renderer: &Renderer,
     ) -> mouse::Interaction {
+        if self.closing {
+            return mouse::Interaction::None;
+        }
+
         let bounds = layout.bounds();
         let interaction = self
             .content

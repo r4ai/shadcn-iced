@@ -5,10 +5,12 @@
 //! (centered, against an edge or in a corner), optionally dims everything
 //! behind it with a backdrop and blocks interactions with the rest of the
 //! interface.
+use crate::animation::{self, Appearance, Fade, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{self, Operation, Tree, Widget};
 use iced::advanced::{Clipboard, Shell, overlay};
+
 use iced::keyboard::{self, key};
 use iced::{
     Background, Color, Element, Event, Length, Padding, Point, Rectangle, Size, Vector, alignment,
@@ -27,6 +29,86 @@ pub struct Layer<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     modal: bool,
     on_dismiss: Option<Message>,
     dismiss_on_backdrop: bool,
+    animation: Animation,
+}
+
+/// The edge of the window content slides from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Edge {
+    /// The top edge.
+    Top,
+    /// The right edge.
+    Right,
+    /// The bottom edge.
+    Bottom,
+    /// The left edge.
+    Left,
+}
+
+/// How the content of a [`Layer`] enters and leaves the window. The
+/// backdrop always fades.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Animation {
+    /// No animation.
+    None,
+    /// `fade-in-0`, 150ms.
+    Fade,
+    /// `fade-in-0 zoom-in-95`, 200ms, like dialogs.
+    #[default]
+    FadeZoom,
+    /// `slide-in-from-{edge}`: 500ms in, 300ms out, like sheets.
+    Slide(Edge),
+}
+
+impl Animation {
+    fn duration(self, opening: bool) -> iced::time::Duration {
+        match self {
+            Animation::None => iced::time::Duration::ZERO,
+            Animation::Fade => animation::FAST,
+            Animation::FadeZoom => animation::NORMAL,
+            Animation::Slide(_) if opening => animation::SLOWER,
+            Animation::Slide(_) => animation::SLOW,
+        }
+    }
+
+    fn easing(self) -> animation::Easing {
+        match self {
+            Animation::Slide(_) => animation::ease_in_out,
+            _ => animation::ease_out,
+        }
+    }
+
+    fn appearance(self, progress: f32, bounds: Rectangle) -> Appearance {
+        let hidden = 1.0 - progress;
+
+        match self {
+            Animation::None => Appearance::VISIBLE,
+            Animation::Fade => Appearance {
+                opacity: progress,
+                ..Appearance::VISIBLE
+            },
+            Animation::FadeZoom => Appearance {
+                opacity: progress,
+                scale: 0.95 + 0.05 * progress,
+                offset: Vector::ZERO,
+            },
+            Animation::Slide(edge) => Appearance {
+                opacity: 1.0,
+                scale: 1.0,
+                offset: match edge {
+                    Edge::Top => Vector::new(0.0, -(bounds.y + bounds.height) * hidden),
+                    Edge::Right => Vector::new(bounds.width * hidden, 0.0),
+                    Edge::Bottom => Vector::new(0.0, bounds.height * hidden),
+                    Edge::Left => Vector::new(-(bounds.x + bounds.width) * hidden, 0.0),
+                },
+            },
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct State {
+    presence: Transition,
 }
 
 impl<'a, Message, Theme, Renderer> Layer<'a, Message, Theme, Renderer>
@@ -53,7 +135,14 @@ where
             modal: true,
             on_dismiss: None,
             dismiss_on_backdrop: true,
+            animation: Animation::FadeZoom,
         }
+    }
+
+    /// Sets how the content enters and leaves the window.
+    pub fn animation(mut self, animation: Animation) -> Self {
+        self.animation = animation;
+        self
     }
 
     /// Sets the horizontal placement of the content in the window.
@@ -119,9 +208,17 @@ impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for Layer<'a, Message, Theme, Renderer>
 where
     Message: Clone + 'a,
-    Theme: 'a,
+    Theme: Fade + 'a,
     Renderer: iced::advanced::Renderer + 'a,
 {
+    fn tag(&self) -> iced::advanced::widget::tree::Tag {
+        iced::advanced::widget::tree::Tag::of::<State>()
+    }
+
+    fn state(&self) -> iced::advanced::widget::tree::State {
+        iced::advanced::widget::tree::State::new(State::default())
+    }
+
     fn children(&self) -> Vec<Tree> {
         vec![Tree::new(&self.base), Tree::new(&self.content)]
     }
@@ -230,7 +327,19 @@ where
         viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        let (base_tree, content_tree) = tree.children.split_at_mut(1);
+        let Tree {
+            state, children, ..
+        } = tree;
+        let state = state.downcast_mut::<State>();
+        let (base_tree, content_tree) = children.split_at_mut(1);
+        let now = iced::time::Instant::now();
+
+        state.presence.go(
+            if self.open { 1.0 } else { 0.0 },
+            self.animation.duration(self.open),
+            self.animation.easing(),
+            now,
+        );
 
         let base = self.base.as_widget_mut().overlay(
             &mut base_tree[0],
@@ -240,8 +349,14 @@ where
             translation,
         );
 
-        let layer = self.open.then(|| {
+        // Closed content stays mounted while it animates out.
+        let visible = self.open || state.presence.is_animating(now);
+
+        let layer = visible.then(|| {
             overlay::Element::new(Box::new(Overlay {
+                presence: &state.presence,
+                closing: !self.open,
+                animation: self.animation,
                 content: &mut self.content,
                 tree: &mut content_tree[0],
                 align_x: self.align_x,
@@ -268,7 +383,7 @@ impl<'a, Message, Theme, Renderer> From<Layer<'a, Message, Theme, Renderer>>
     for Element<'a, Message, Theme, Renderer>
 where
     Message: Clone + 'a,
-    Theme: 'a,
+    Theme: Fade + 'a,
     Renderer: iced::advanced::Renderer + 'a,
 {
     fn from(layer: Layer<'a, Message, Theme, Renderer>) -> Self {
@@ -289,6 +404,9 @@ where
 }
 
 struct Overlay<'a, 'b, Message, Theme, Renderer> {
+    presence: &'b Transition,
+    closing: bool,
+    animation: Animation,
     content: &'b mut Element<'a, Message, Theme, Renderer>,
     tree: &'b mut Tree,
     align_x: alignment::Horizontal,
@@ -303,6 +421,7 @@ struct Overlay<'a, 'b, Message, Theme, Renderer> {
 impl<Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
     for Overlay<'_, '_, Message, Theme, Renderer>
 where
+    Theme: Fade,
     Message: Clone,
     Renderer: iced::advanced::Renderer,
 {
@@ -346,23 +465,38 @@ where
         cursor: mouse::Cursor,
     ) {
         let bounds = layout.bounds();
+        let progress = self.presence.value(iced::time::Instant::now());
 
         if let Some(backdrop) = self.backdrop {
+            let color = backdrop(theme);
+
             renderer.fill_quad(
                 renderer::Quad {
                     bounds,
                     ..renderer::Quad::default()
                 },
-                Background::Color(backdrop(theme)),
+                Background::Color(Color {
+                    a: color.a * progress,
+                    ..color
+                }),
             );
         }
 
         let content = layout.children().next().unwrap();
+        let appearance = self.animation.appearance(progress, content.bounds());
 
         renderer.with_layer(bounds, |renderer| {
-            self.content
-                .as_widget()
-                .draw(self.tree, renderer, theme, style, content, cursor, &bounds);
+            animation::draw(
+                self.content,
+                self.tree,
+                renderer,
+                theme,
+                style,
+                content,
+                cursor,
+                &bounds,
+                appearance,
+            );
         });
     }
 
@@ -393,6 +527,17 @@ where
         let content = layout.children().next().unwrap();
         let content_bounds = content.bounds();
         let was_captured = shell.is_event_captured();
+
+        if let Event::Window(window::Event::RedrawRequested(now)) = event
+            && self.presence.is_animating(*now)
+        {
+            shell.request_redraw();
+        }
+
+        // A closing layer is only a picture of what it was.
+        if self.closing {
+            return;
+        }
 
         self.content.as_widget_mut().update(
             self.tree, event, content, cursor, renderer, clipboard, shell, &bounds,
@@ -439,6 +584,10 @@ where
         cursor: mouse::Cursor,
         renderer: &Renderer,
     ) -> mouse::Interaction {
+        if self.closing {
+            return mouse::Interaction::None;
+        }
+
         let bounds = layout.bounds();
         let content = layout.children().next().unwrap();
 

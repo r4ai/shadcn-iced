@@ -7,6 +7,8 @@ use iced_test::simulator::Simulator;
 
 #[test]
 fn every_page_renders() {
+    iced_ui::animation::set_enabled(false);
+
     for (index, page) in PAGES.iter().enumerate() {
         for mode in [Mode::Light, Mode::Dark] {
             let gallery = Gallery::new(index, mode);
@@ -34,6 +36,8 @@ fn toasts_expire_after_their_duration() {
     use gallery::pages::DemoMessage;
     use iced::time::{Duration, Instant};
     use iced::{Event, window};
+
+    iced_ui::animation::set_enabled(false);
 
     let mut gallery = Gallery::new(Gallery::page_by_id("sonner").unwrap(), Mode::Light);
     let _ = gallery.update(Message::Demo(DemoMessage::Toast(

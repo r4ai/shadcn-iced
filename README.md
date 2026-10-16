@@ -174,14 +174,22 @@ ICED_TEST_BACKEND=tiny-skia cargo run -p gallery --bin snapshot
 cargo run -p gallery --bin snapshot -- dropdown-menu:dark --live --click "Open" --hover 700,538
 cargo run -p gallery --bin snapshot -- dialog:light --click "Edit Profile"
 cargo run -p gallery --bin snapshot -- chart:light --accent blue
+
+# A frame in the middle of an animation (animations are off by default)
+cargo run -p gallery --bin snapshot -- dropdown-menu:light --animations --live --click "Open" --wait 70
 ```
+
+`GALLERY_PAGE=sonner cargo run -p gallery` opens the gallery on a given page.
 
 ## Differences with shadcn/ui
 
 iced is not a browser, so a few things differ:
 
-- No CSS animations: overlays open and close instantly (spinners, skeletons
-  and the OTP caret are animated).
+- Animations are reimplemented natively rather than with CSS: overlays fade
+  and zoom in and out (`animate-in`/`animate-out`), sheets and drawers slide
+  from their edge, accordions and collapsibles expand, toasts slide in, the
+  switch thumb slides and hover/press colors transition. Turn them off with
+  `iced_ui::animation::set_enabled(false)` (e.g. for reduced motion).
 - Keyboard focus: iced only focuses text inputs, so focus rings are shown on
   inputs, input groups and OTP fields; menus, selects and command palettes
   support <kbd>↑</kbd>/<kbd>↓</kbd>/<kbd>Enter</kbd>/<kbd>Esc</kbd>.
@@ -205,6 +213,6 @@ shadcn/ui のデザインを iced で再現した UI ライブラリです。
 `iced_ui` をライブラリとして使うことも、`cargo iced-ui add button` で
 コンポーネントのソースを自分のプロジェクトにコピーして自由に改変することも
 できます。テーマ（全ベースカラー・アクセントカラー、ライト/ダーク）、
-Geist フォント、Lucide アイコン、Radix UI に相当するヘッドレスな
+Geist フォント、Lucide アイコン、アニメーション、Radix UI に相当するヘッドレスな
 プリミティブ（ポップオーバーの配置、モーダル、キーボード操作できるリスト等）
 も同梱しています。`cargo run -p gallery` で全コンポーネントを確認できます。

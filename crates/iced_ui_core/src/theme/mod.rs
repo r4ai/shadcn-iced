@@ -105,6 +105,47 @@ pub struct PaletteOverrides {
 }
 
 impl Palette {
+    /// Applies a function to every color of the palette.
+    pub fn map(mut self, f: impl Fn(Color) -> Color) -> Self {
+        macro_rules! map {
+            ($($field:ident),*) => {
+                $(self.$field = f(self.$field);)*
+            };
+        }
+
+        map!(
+            background,
+            foreground,
+            card,
+            card_foreground,
+            popover,
+            popover_foreground,
+            primary,
+            primary_foreground,
+            secondary,
+            secondary_foreground,
+            muted,
+            muted_foreground,
+            accent,
+            accent_foreground,
+            destructive,
+            border,
+            input,
+            ring,
+            sidebar,
+            sidebar_foreground,
+            sidebar_primary,
+            sidebar_primary_foreground,
+            sidebar_accent,
+            sidebar_accent_foreground,
+            sidebar_border,
+            sidebar_ring
+        );
+
+        self.chart = self.chart.map(f);
+        self
+    }
+
     /// Applies the given overrides on top of this palette.
     pub fn apply(mut self, o: &PaletteOverrides) -> Self {
         macro_rules! apply {
@@ -495,6 +536,50 @@ static REGISTRY: LazyLock<RwLock<HashMap<String, Tokens>>> =
 thread_local! {
     static LAST: std::cell::RefCell<Option<(Arc<iced::theme::Custom>, Tokens)>> =
         const { std::cell::RefCell::new(None) };
+}
+
+thread_local! {
+    static FADED: std::cell::RefCell<HashMap<(String, u32), Theme>> =
+        std::cell::RefCell::new(HashMap::new());
+}
+
+/// The number of opacity levels faded themes are quantized to.
+const FADE_STEPS: f32 = 24.0;
+
+/// Returns a copy of the theme whose colors are multiplied by `opacity`, or
+/// `None` if the opacity is (almost) 1. Used to fade widgets in and out.
+///
+/// Faded themes are cached per opacity level.
+pub fn faded(theme: &Theme, opacity: f32) -> Option<Theme> {
+    let step = (opacity.clamp(0.0, 1.0) * FADE_STEPS).round() as u32;
+
+    if step as f32 >= FADE_STEPS {
+        return None;
+    }
+
+    let name = iced::theme::Base::name(theme).to_owned();
+    let key = (name.clone(), step);
+
+    if let Some(theme) = FADED.with_borrow(|cache| cache.get(&key).cloned()) {
+        return Some(theme);
+    }
+
+    let mut tokens = tokens(theme);
+    let opacity = step as f32 / FADE_STEPS;
+    tokens.palette = tokens.palette.map(|color| alpha(color, opacity));
+
+    let faded = Config::from_tokens(format!("{name} ~{step}"), tokens).build();
+
+    FADED.with_borrow_mut(|cache| {
+        // Themes are rebuilt when customized; keep the cache bounded.
+        if cache.len() > 512 {
+            cache.clear();
+        }
+
+        cache.insert(key, faded.clone());
+    });
+
+    Some(faded)
 }
 
 /// Returns the [`Tokens`] of the given theme.

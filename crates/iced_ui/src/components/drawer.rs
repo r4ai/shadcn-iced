@@ -15,6 +15,7 @@
 //! # }
 //! ```
 use iced_ui_core::primitive::Layer;
+use iced_ui_core::primitive::layer::{Animation, Edge};
 use iced_ui_core::{Element, font, style, tokens};
 
 use iced::widget::{Column, container, space, text};
@@ -159,6 +160,7 @@ impl<'a, Message: Clone + 'a> From<Drawer<'a, Message>> for Element<'a, Message>
         });
 
         Layer::new(drawer.base, panel, drawer.open)
+            .animation(Animation::Slide(Edge::Bottom))
             .align_y(iced::alignment::Vertical::Bottom)
             .padding(iced::Padding::ZERO.top(96))
             .on_dismiss_maybe(drawer.on_close)

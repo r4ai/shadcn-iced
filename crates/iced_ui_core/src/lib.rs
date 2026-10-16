@@ -4,6 +4,7 @@
 //!
 //! Components built on top of this crate only depend on `iced` and
 //! `iced_ui_core`, which is what makes them copy-pasteable.
+pub mod animation;
 pub mod font;
 pub mod icon;
 pub mod primitive;

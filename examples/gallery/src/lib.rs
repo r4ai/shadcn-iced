@@ -35,7 +35,10 @@ pub enum Message {
 
 impl Default for Gallery {
     fn default() -> Self {
-        Self::new(Self::page_by_id("button").unwrap_or(0), Mode::Light)
+        // `GALLERY_PAGE=sonner cargo run -p gallery` opens a given page.
+        let page = std::env::var("GALLERY_PAGE").unwrap_or_else(|_| "button".to_owned());
+
+        Self::new(Self::page_by_id(&page).unwrap_or(0), Mode::Light)
     }
 }
 

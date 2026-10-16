@@ -12,6 +12,9 @@
 //! - `--key escape|enter|tab|down|up`: taps a key,
 //! - `--wait MS`: lets time pass (for hover delays and timers).
 //!
+//! Animations are disabled unless `--animations` is passed, e.g. to capture
+//! a frame in the middle of one with `--animations --live --click Open --wait 75`.
+//!
 //! Actions before `--live` produce messages that update the gallery (the view
 //! is rebuilt after each one). Actions after `--live` are performed on the
 //! final interface right before the snapshot, so internal widget state (focus,
@@ -77,6 +80,11 @@ fn perform(ui: &mut Simulator<'_, Message>, action: &Action) {
             let _ = ui.tap_key(key.clone());
         }
         Action::Wait(ms) => {
+            // Overlays start animating when they are first laid out, which
+            // happens on the first event; render a frame before waiting.
+            let _ = ui.simulate([iced::Event::Window(iced::window::Event::RedrawRequested(
+                iced::time::Instant::now(),
+            ))]);
             std::thread::sleep(std::time::Duration::from_millis(*ms));
             let _ = ui.simulate([iced::Event::Window(iced::window::Event::RedrawRequested(
                 iced::time::Instant::now(),
@@ -93,6 +101,7 @@ fn main() {
     let mut size = (1100.0, 820.0);
     let mut suffix = String::new();
     let mut base = None;
+    let mut animations = false;
     let mut accent = None;
     let mut args = std::env::args().skip(1);
 
@@ -104,6 +113,10 @@ fn main() {
             "--type" => Some(Action::Type(args.next().expect("text"))),
             "--key" => Some(Action::Key(key(&args.next().expect("key")))),
             "--wait" => Some(Action::Wait(args.next().expect("ms").parse().expect("ms"))),
+            "--animations" => {
+                animations = true;
+                None
+            }
             "--live" => {
                 is_live = true;
                 None
@@ -148,6 +161,9 @@ fn main() {
             }
         }
     }
+
+    // Deterministic screenshots, unless asked to capture animation frames.
+    iced_ui::animation::set_enabled(animations);
 
     if pages.is_empty() {
         pages = PAGES.iter().map(|page| page.id.to_owned()).collect();

@@ -9,12 +9,18 @@
 //! switch(on).label("Airplane Mode").on_toggle(Message::Airplane).into()
 //! # }
 //! ```
+use iced_ui_core::animation::{self, Transition};
 use iced_ui_core::primitive::Pressable;
-use iced_ui_core::theme::alpha;
+use iced_ui_core::theme::{alpha, mix};
 use iced_ui_core::{Element, font, style, tokens};
 
-use iced::widget::{Row, container, space, text};
-use iced::{Alignment, Background, Color, Length, Theme, border, mouse};
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Tree, Widget, tree};
+use iced::advanced::{Clipboard, Shell};
+use iced::time::Instant;
+use iced::widget::{Row, container, text};
+use iced::{Alignment, Background, Color, Event, Length, Rectangle, Theme, border, mouse, window};
 
 /// The size of a [`Switch`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -82,20 +88,12 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
             Size::Sm => (24.0, 14.0, 12.0),
         };
 
-        let thumb = container(space().width(thumb).height(thumb))
-            .style(move |theme| self::thumb(theme, checked, disabled));
-
-        let track = container(thumb)
-            .width(width)
-            .height(height)
-            .padding(1)
-            .align_x(if checked {
-                Alignment::End
-            } else {
-                Alignment::Start
-            })
-            .align_y(Alignment::Center)
-            .style(move |theme| self::track(theme, checked, disabled));
+        let track = Track {
+            checked,
+            disabled,
+            size: iced::Size::new(width, height),
+            thumb,
+        };
 
         let label = switch.label.map(|label| {
             text(label)
@@ -187,5 +185,142 @@ pub fn thumb(theme: &Theme, checked: bool, disabled: bool) -> container::Style {
         ))),
         border: border::rounded(f32::MAX),
         ..container::Style::default()
+    }
+}
+
+/// The track and thumb of a switch, animating the thumb between both ends.
+struct Track {
+    checked: bool,
+    disabled: bool,
+    size: iced::Size,
+    thumb: f32,
+}
+
+#[derive(Debug)]
+struct TrackState {
+    position: Transition,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Track {
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<TrackState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(TrackState {
+            position: Transition::new(if self.checked { 1.0 } else { 0.0 }),
+        })
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        iced::Size::new(
+            Length::Fixed(self.size.width),
+            Length::Fixed(self.size.height),
+        )
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        let state = tree.state.downcast_mut::<TrackState>();
+
+        state.position.go(
+            if self.checked { 1.0 } else { 0.0 },
+            animation::FAST,
+            animation::ease_in_out,
+            Instant::now(),
+        );
+    }
+
+    fn layout(
+        &mut self,
+        _tree: &mut Tree,
+        _renderer: &iced::Renderer,
+        _limits: &layout::Limits,
+    ) -> layout::Node {
+        layout::Node::new(self.size)
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        _layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        _renderer: &iced::Renderer,
+        _clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        _viewport: &Rectangle,
+    ) {
+        if let Event::Window(window::Event::RedrawRequested(now)) = event
+            && tree
+                .state
+                .downcast_ref::<TrackState>()
+                .position
+                .is_animating(*now)
+        {
+            shell.request_redraw();
+        }
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        _style: &renderer::Style,
+        layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        _viewport: &Rectangle,
+    ) {
+        use iced::advanced::Renderer as _;
+
+        let position = tree
+            .state
+            .downcast_ref::<TrackState>()
+            .position
+            .value(Instant::now());
+        let bounds = layout.bounds();
+
+        let off = self::track(theme, false, self.disabled);
+        let on = self::track(theme, true, self.disabled);
+        let color = |style: &container::Style| match style.background {
+            Some(Background::Color(color)) => color,
+            _ => Color::TRANSPARENT,
+        };
+
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds,
+                border: border::rounded(f32::MAX),
+                shadow: style::shadow_xs(),
+                ..renderer::Quad::default()
+            },
+            Background::Color(mix(color(&off), color(&on), position)),
+        );
+
+        let travel = bounds.width - self.thumb - 2.0;
+
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds: Rectangle {
+                    x: bounds.x + 1.0 + travel * position,
+                    y: bounds.center_y() - self.thumb / 2.0,
+                    width: self.thumb,
+                    height: self.thumb,
+                },
+                border: border::rounded(f32::MAX),
+                ..renderer::Quad::default()
+            },
+            Background::Color(mix(
+                color(&self::thumb(theme, false, self.disabled)),
+                color(&self::thumb(theme, true, self.disabled)),
+                position,
+            )),
+        );
+    }
+}
+
+impl<'a, Message: 'a> From<Track> for Element<'a, Message> {
+    fn from(track: Track) -> Self {
+        Element::new(track)
     }
 }

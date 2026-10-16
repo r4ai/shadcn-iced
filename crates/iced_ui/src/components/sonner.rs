@@ -14,6 +14,7 @@
 //! ```
 use super::button::{Size, Variant, button};
 
+use iced_ui_core::animation::{self, Appearance, Transition};
 use iced_ui_core::icon::{Icon, lucide};
 use iced_ui_core::primitive::Layer;
 use iced_ui_core::{Element, font, style, tokens};
@@ -245,16 +246,6 @@ fn view<'a, Message: Clone + 'a>(
 impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message> {
     fn from(toaster: Toaster<'a, Message>) -> Self {
         let open = !toaster.toasts.is_empty();
-        let deadlines: Vec<_> = toaster
-            .toasts
-            .iter()
-            .map(|toast| {
-                (
-                    toast.id,
-                    (toast.kind != Kind::Loading).then_some(toast.duration),
-                )
-            })
-            .collect();
 
         let top = matches!(
             toaster.position,
@@ -264,9 +255,13 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
             .toasts
             .iter()
             .map(|toast| {
-                view(
-                    toast,
-                    toaster.close_button.then(|| (toaster.on_dismiss)(toast.id)),
+                (
+                    toast.id,
+                    (toast.kind != Kind::Loading).then_some(toast.duration),
+                    view(
+                        toast,
+                        toaster.close_button.then(|| (toaster.on_dismiss)(toast.id)),
+                    ),
                 )
             })
             .collect();
@@ -303,14 +298,16 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
         };
 
         let timer = Timer {
-            content: Column::with_children(items).spacing(14).into(),
-            deadlines,
+            toasts: items,
+            spacing: 14.0,
+            from_top: top,
             on_dismiss: toaster.on_dismiss,
         };
 
         Layer::new(toaster.base, Element::new(timer), open)
             .backdrop(None)
             .modal(false)
+            .animation(iced_ui_core::primitive::layer::Animation::None)
             .align_x(align_x)
             .align_y(align_y)
             .padding(32)
@@ -318,20 +315,30 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
     }
 }
 
-/// Dismisses toasts once their duration has elapsed. Timers pause while the
-/// cursor is over the toasts, like sonner.
+/// Lays toasts out, animates them in and out, and dismisses them once their
+/// duration has elapsed. Timers pause while the cursor is over the toasts,
+/// like sonner.
 struct Timer<'a, Message> {
-    content: Element<'a, Message>,
-    deadlines: Vec<(u64, Option<Duration>)>,
+    toasts: Vec<(u64, Option<Duration>, Element<'a, Message>)>,
+    spacing: f32,
+    from_top: bool,
     on_dismiss: Box<dyn Fn(u64) -> Message + 'a>,
 }
 
 #[derive(Default)]
 struct TimerState {
     elapsed: HashMap<u64, Duration>,
+    presence: HashMap<u64, Transition>,
+    exiting: Vec<u64>,
     dismissed: Vec<u64>,
     last: Option<Instant>,
 }
+
+/// How long a toast takes to slide in (sonner's `400ms`).
+const ENTER: Duration = Duration::from_millis(400);
+
+/// How long a toast takes to fade out.
+const EXIT: Duration = Duration::from_millis(200);
 
 impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'a, Message> {
     fn tag(&self) -> tree::Tag {
@@ -343,15 +350,24 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
     }
 
     fn children(&self) -> Vec<Tree> {
-        vec![Tree::new(&self.content)]
+        self.toasts
+            .iter()
+            .map(|(_, _, toast)| Tree::new(toast))
+            .collect()
     }
 
     fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(std::slice::from_ref(&self.content));
+        tree.diff_children(
+            &self
+                .toasts
+                .iter()
+                .map(|(_, _, toast)| toast)
+                .collect::<Vec<_>>(),
+        );
     }
 
     fn size(&self) -> Bounds<Length> {
-        self.content.as_widget().size()
+        Bounds::new(Length::Shrink, Length::Shrink)
     }
 
     fn layout(
@@ -360,9 +376,26 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         renderer: &iced::Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        self.content
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, limits)
+        let mut y = 0.0;
+        let mut width: f32 = 0.0;
+        let mut nodes = Vec::with_capacity(self.toasts.len());
+
+        for ((_, _, toast), tree) in self.toasts.iter_mut().zip(&mut tree.children) {
+            let node = toast
+                .as_widget_mut()
+                .layout(
+                    tree,
+                    renderer,
+                    &layout::Limits::new(iced::Size::ZERO, limits.max()),
+                )
+                .move_to(iced::Point::new(0.0, y));
+
+            y += node.size().height + self.spacing;
+            width = width.max(node.size().width);
+            nodes.push(node);
+        }
+
+        layout::Node::with_children(iced::Size::new(width, (y - self.spacing).max(0.0)), nodes)
     }
 
     fn operate(
@@ -372,9 +405,16 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         renderer: &iced::Renderer,
         operation: &mut dyn Operation,
     ) {
-        self.content
-            .as_widget_mut()
-            .operate(&mut tree.children[0], layout, renderer, operation);
+        for (((_, _, toast), tree), layout) in self
+            .toasts
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+        {
+            toast
+                .as_widget_mut()
+                .operate(tree, layout, renderer, operation);
+        }
     }
 
     fn update(
@@ -388,16 +428,20 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        self.content.as_widget_mut().update(
-            &mut tree.children[0],
-            event,
-            layout,
-            cursor,
-            renderer,
-            clipboard,
-            shell,
-            viewport,
-        );
+        let exiting = tree.state.downcast_ref::<TimerState>().exiting.clone();
+
+        for (((id, _, toast), child), layout) in self
+            .toasts
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+        {
+            if !exiting.contains(id) {
+                toast.as_widget_mut().update(
+                    child, event, layout, cursor, renderer, clipboard, shell, viewport,
+                );
+            }
+        }
 
         let Event::Window(window::Event::RedrawRequested(now)) = event else {
             return;
@@ -411,33 +455,56 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         state.last = Some(*now);
 
         let paused = cursor.is_over(layout.bounds());
-        let ids: Vec<u64> = self.deadlines.iter().map(|(id, _)| *id).collect();
+        let ids: Vec<u64> = self.toasts.iter().map(|(id, _, _)| *id).collect();
 
         state.elapsed.retain(|id, _| ids.contains(id));
+        state.presence.retain(|id, _| ids.contains(id));
+        state.exiting.retain(|id| ids.contains(id));
         state.dismissed.retain(|id| ids.contains(id));
 
         let mut next: Option<Duration> = None;
+        let mut animating = false;
 
-        for (id, duration) in &self.deadlines {
-            let Some(duration) = duration else { continue };
-            let elapsed = state.elapsed.entry(*id).or_default();
+        for (id, duration, _) in &self.toasts {
+            let presence = state.presence.entry(*id).or_insert_with(|| {
+                let mut presence = Transition::new(0.0);
+                presence.go(1.0, ENTER, animation::ease_out, *now);
+                presence
+            });
 
-            if !paused {
-                *elapsed += delta;
-            }
-
-            if *elapsed >= *duration {
-                if !state.dismissed.contains(id) {
+            if state.exiting.contains(id) {
+                // Dismissed once the fade-out is over.
+                if !presence.is_animating(*now) && !state.dismissed.contains(id) {
                     state.dismissed.push(*id);
                     shell.publish((self.on_dismiss)(*id));
                 }
-            } else {
-                let remaining = *duration - *elapsed;
-                next = Some(next.map_or(remaining, |next| next.min(remaining)));
+            } else if let Some(duration) = duration {
+                let elapsed = state.elapsed.entry(*id).or_default();
+
+                if !paused {
+                    *elapsed += delta;
+                }
+
+                if *elapsed >= *duration {
+                    state.exiting.push(*id);
+                    presence.go(0.0, EXIT, animation::ease_in, *now);
+
+                    if !animation::enabled() && !state.dismissed.contains(id) {
+                        state.dismissed.push(*id);
+                        shell.publish((self.on_dismiss)(*id));
+                    }
+                } else {
+                    let remaining = *duration - *elapsed;
+                    next = Some(next.map_or(remaining, |next| next.min(remaining)));
+                }
             }
+
+            animating |= presence.is_animating(*now);
         }
 
-        if let Some(next) = next {
+        if animating {
+            shell.request_redraw();
+        } else if let Some(next) = next {
             shell.request_redraw_at(*now + next.min(Duration::from_millis(250)));
         }
     }
@@ -452,15 +519,47 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        self.content.as_widget().draw(
-            &tree.children[0],
-            renderer,
-            theme,
-            style,
-            layout,
-            cursor,
-            viewport,
-        );
+        let state = tree.state.downcast_ref::<TimerState>();
+        let now = Instant::now();
+
+        for (((id, _, toast), child), layout) in self
+            .toasts
+            .iter()
+            .zip(&tree.children)
+            .zip(layout.children())
+        {
+            let progress = state
+                .presence
+                .get(id)
+                .map_or(1.0, |presence| presence.value(now));
+            let exiting = state.exiting.contains(id);
+            let height = layout.bounds().height + self.spacing;
+
+            // Enters by sliding from the edge; leaves by fading out.
+            let offset = if exiting {
+                0.0
+            } else if self.from_top {
+                -height * (1.0 - progress)
+            } else {
+                height * (1.0 - progress)
+            };
+
+            animation::draw(
+                toast,
+                child,
+                renderer,
+                theme,
+                style,
+                layout,
+                cursor,
+                viewport,
+                Appearance {
+                    opacity: progress,
+                    scale: 1.0,
+                    offset: iced::Vector::new(0.0, offset),
+                },
+            );
+        }
     }
 
     fn mouse_interaction(
@@ -471,13 +570,17 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         viewport: &Rectangle,
         renderer: &iced::Renderer,
     ) -> mouse::Interaction {
-        self.content.as_widget().mouse_interaction(
-            &tree.children[0],
-            layout,
-            cursor,
-            viewport,
-            renderer,
-        )
+        self.toasts
+            .iter()
+            .zip(&tree.children)
+            .zip(layout.children())
+            .map(|(((_, _, toast), tree), layout)| {
+                toast
+                    .as_widget()
+                    .mouse_interaction(tree, layout, cursor, viewport, renderer)
+            })
+            .max()
+            .unwrap_or_default()
     }
 
     fn overlay<'b>(
@@ -488,12 +591,18 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
-        self.content.as_widget_mut().overlay(
-            &mut tree.children[0],
-            layout,
-            renderer,
-            viewport,
-            translation,
-        )
+        let overlays: Vec<_> = self
+            .toasts
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+            .filter_map(|(((_, _, toast), tree), layout)| {
+                toast
+                    .as_widget_mut()
+                    .overlay(tree, layout, renderer, viewport, translation)
+            })
+            .collect();
+
+        (!overlays.is_empty()).then(|| overlay::Group::with_children(overlays).overlay())
     }
 }

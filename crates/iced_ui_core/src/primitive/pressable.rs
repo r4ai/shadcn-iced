@@ -10,13 +10,17 @@
 //!
 //! It reuses [`button::Style`] and [`button::Status`], so any iced button
 //! style function works with it.
+use crate::animation::{self, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
+
+use iced::time::Instant;
 use iced::widget::button::{Status, Style};
 use iced::{
     Background, Color, Element, Event, Length, Padding, Rectangle, Size, Vector, mouse, touch,
+    window,
 };
 
 /// A clickable surface.
@@ -138,6 +142,55 @@ where
 struct State {
     is_pressed: bool,
     is_hovered: bool,
+    status: Option<Status>,
+    previous: Option<Status>,
+    transition: Transition,
+}
+
+impl<'a, Message, Theme, Renderer> Pressable<'a, Message, Theme, Renderer> {
+    fn status(&self, state: &State, cursor: mouse::Cursor, bounds: Rectangle) -> Status {
+        if self.disabled {
+            Status::Disabled
+        } else if cursor.is_over(bounds) {
+            if state.is_pressed {
+                Status::Pressed
+            } else {
+                Status::Hovered
+            }
+        } else {
+            Status::Active
+        }
+    }
+}
+
+/// Linearly interpolates two button styles, for `transition-colors`.
+pub fn mix_styles(from: &Style, to: &Style, t: f32) -> Style {
+    let color = |a: Color, b: Color| crate::theme::mix(a, b, t);
+    let background = |background: Option<Background>| match background {
+        Some(Background::Color(color)) => Some(color),
+        _ => None,
+    };
+
+    let background = match (background(from.background), background(to.background)) {
+        (Some(a), Some(b)) => Some(Background::Color(color(a, b))),
+        (None, Some(b)) => Some(Background::Color(crate::theme::alpha(b, t))),
+        (Some(a), None) => Some(Background::Color(crate::theme::alpha(a, 1.0 - t))),
+        (None, None) => to.background,
+    };
+
+    Style {
+        background,
+        text_color: color(from.text_color, to.text_color),
+        border: iced::Border {
+            color: color(from.border.color, to.border.color),
+            ..to.border
+        },
+        shadow: iced::Shadow {
+            color: color(from.shadow.color, to.shadow.color),
+            ..to.shadow
+        },
+        snap: to.snap,
+    }
 }
 
 impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -219,9 +272,37 @@ where
             viewport,
         );
 
-        let state = tree.state.downcast_mut::<State>();
         let bounds = layout.bounds();
         let is_hovered = cursor.is_over(bounds);
+
+        {
+            let status = self.status(tree.state.downcast_ref::<State>(), cursor, bounds);
+            let state = tree.state.downcast_mut::<State>();
+            let now = Instant::now();
+
+            match state.status {
+                Some(current) if current != status => {
+                    state.previous = Some(current);
+                    state.transition.set(0.0);
+                    state
+                        .transition
+                        .go(1.0, animation::FAST, animation::ease_in_out, now);
+                    shell.request_redraw();
+                }
+                None => state.transition.set(1.0),
+                _ => {}
+            }
+
+            state.status = Some(status);
+
+            if let Event::Window(window::Event::RedrawRequested(_)) = event
+                && state.transition.is_animating(now)
+            {
+                shell.request_redraw();
+            }
+        }
+
+        let state = tree.state.downcast_mut::<State>();
 
         if state.is_hovered != is_hovered {
             state.is_hovered = is_hovered;
@@ -280,20 +361,21 @@ where
     ) {
         let state = tree.state.downcast_ref::<State>();
         let bounds = layout.bounds();
+        let status = self.status(state, cursor, bounds);
+        let now = Instant::now();
 
-        let status = if self.disabled {
-            Status::Disabled
-        } else if cursor.is_over(bounds) {
-            if state.is_pressed {
-                Status::Pressed
-            } else {
-                Status::Hovered
+        let style = match (state.previous, state.status) {
+            (Some(previous), Some(current))
+                if current == status && state.transition.is_animating(now) =>
+            {
+                mix_styles(
+                    &(self.style)(theme, previous),
+                    &(self.style)(theme, current),
+                    state.transition.value(now),
+                )
             }
-        } else {
-            Status::Active
+            _ => (self.style)(theme, status),
         };
-
-        let style = (self.style)(theme, status);
 
         if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0 {
             renderer.fill_quad(
