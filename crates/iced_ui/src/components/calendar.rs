@@ -224,6 +224,7 @@ pub struct Calendar<'a, Message> {
     months: usize,
     outside_days: bool,
     bordered: bool,
+    transparent: bool,
 }
 
 /// Creates a [`Calendar`] displaying `month`.
@@ -241,6 +242,7 @@ pub fn calendar<'a, Message: Clone + 'a>(
         months: 1,
         outside_days: true,
         bordered: false,
+        transparent: false,
     }
 }
 
@@ -284,6 +286,12 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
     /// Shows the days of the adjacent months. Defaults to `true`.
     pub fn outside_days(mut self, show: bool) -> Self {
         self.outside_days = show;
+        self
+    }
+
+    /// Removes the background, e.g. inside a popover or a card.
+    pub fn transparent(mut self, transparent: bool) -> Self {
+        self.transparent = transparent;
         self
     }
 
@@ -486,13 +494,14 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
         }
 
         let bordered = calendar.bordered;
+        let transparent = calendar.transparent;
 
         container(months)
             .padding(12)
             .style(move |theme: &Theme| {
                 let t = tokens(theme);
                 container::Style {
-                    background: Some(Background::Color(t.palette.background)),
+                    background: (!transparent).then_some(Background::Color(t.palette.background)),
                     border: if bordered {
                         style::border(t.palette.border, t.radius_md())
                     } else {

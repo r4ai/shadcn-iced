@@ -9,7 +9,8 @@
 //! - `--at X,Y`: clicks at a logical position,
 //! - `--hover X,Y`: moves the cursor to a logical position,
 //! - `--type "text"`: types some text,
-//! - `--key escape|enter|tab|down|up`: taps a key.
+//! - `--key escape|enter|tab|down|up`: taps a key,
+//! - `--wait MS`: lets time pass (for hover delays and timers).
 //!
 //! Actions before `--live` produce messages that update the gallery (the view
 //! is rebuilt after each one). Actions after `--live` are performed on the
@@ -32,6 +33,7 @@ enum Action {
     Hover(Point),
     Type(String),
     Key(Key),
+    Wait(u64),
 }
 
 fn point(value: &str) -> Point {
@@ -74,6 +76,12 @@ fn perform(ui: &mut Simulator<'_, Message>, action: &Action) {
         Action::Key(key) => {
             let _ = ui.tap_key(key.clone());
         }
+        Action::Wait(ms) => {
+            std::thread::sleep(std::time::Duration::from_millis(*ms));
+            let _ = ui.simulate([iced::Event::Window(iced::window::Event::RedrawRequested(
+                iced::time::Instant::now(),
+            ))]);
+        }
     }
 }
 
@@ -95,6 +103,7 @@ fn main() {
             "--hover" => Some(Action::Hover(point(&args.next().expect("X,Y")))),
             "--type" => Some(Action::Type(args.next().expect("text"))),
             "--key" => Some(Action::Key(key(&args.next().expect("key")))),
+            "--wait" => Some(Action::Wait(args.next().expect("ms").parse().expect("ms"))),
             "--live" => {
                 is_live = true;
                 None

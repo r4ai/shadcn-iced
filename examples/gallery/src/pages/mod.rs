@@ -51,6 +51,7 @@ pub const PAGES: &[Page] = &[
     interactive::INPUT_OTP,
     basics::ITEM,
     basics::KBD,
+    basics::LABEL,
     overlays::MENUBAR,
     chat::MARKER,
     chat::MESSAGE,

@@ -587,3 +587,31 @@ pub const SCROLL_AREA: Page = Page {
         )
     },
 };
+
+pub const LABEL: Page = Page {
+    id: "label",
+    title: "Label",
+    description: "Renders an accessible label associated with controls.",
+    view: |gallery| {
+        example(
+            "Default",
+            column![
+                row![
+                    checkbox(gallery.demo.terms).on_toggle(|v| demo(DemoMessage::Terms(v))),
+                    label("Accept terms and conditions"),
+                ]
+                .spacing(8)
+                .align_y(Center),
+                column![
+                    label("Email"),
+                    input("m@example.com", &gallery.demo.email)
+                        .on_input(|v| demo(DemoMessage::Email(v)))
+                ]
+                .spacing(8)
+                .width(280),
+            ]
+            .spacing(24)
+            .align_x(Center),
+        )
+    },
+};

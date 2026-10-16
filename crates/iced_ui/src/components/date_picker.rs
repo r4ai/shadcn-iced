@@ -101,7 +101,8 @@ impl<'a, Message: Clone + 'a> From<DatePicker<'a, Message>> for Element<'a, Mess
         let content = container(
             calendar(picker.month, picker.on_navigate)
                 .selected(picker.selected)
-                .on_select(picker.on_select),
+                .on_select(picker.on_select)
+                .transparent(true),
         )
         .style(super::popover::style);
 
