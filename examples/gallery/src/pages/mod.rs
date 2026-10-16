@@ -4,6 +4,7 @@ mod button;
 pub mod interactive;
 pub mod overlays;
 pub mod extra;
+pub mod chat;
 
 use crate::{Gallery, Message};
 
@@ -22,9 +23,11 @@ pub const PAGES: &[Page] = &[
     basics::ALERT,
     overlays::ALERT_DIALOG,
     basics::ASPECT_RATIO,
+    chat::ATTACHMENT,
     basics::AVATAR,
     basics::BADGE,
     basics::BREADCRUMB,
+    chat::BUBBLE,
     button::PAGE,
     interactive::BUTTON_GROUP,
     extra::CALENDAR,
@@ -49,6 +52,9 @@ pub const PAGES: &[Page] = &[
     basics::ITEM,
     basics::KBD,
     overlays::MENUBAR,
+    chat::MARKER,
+    chat::MESSAGE,
+    chat::MESSAGE_SCROLLER,
     overlays::NAVIGATION_MENU,
     interactive::NATIVE_SELECT,
     basics::PAGINATION,
