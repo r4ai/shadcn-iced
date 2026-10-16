@@ -16,7 +16,8 @@ use std::sync::LazyLock;
 
 static START: LazyLock<Instant> = LazyLock::new(Instant::now);
 
-/// A pulsing placeholder. See the [module documentation](self).
+/// A pulsing placeholder (`bg-muted rounded-md animate-pulse`). See the
+/// [module documentation](self).
 pub struct Skeleton {
     width: Length,
     height: Length,
@@ -99,7 +100,7 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Skeleton {
                 border: border::rounded(self.radius.unwrap_or(t.radius_md())),
                 ..renderer::Quad::default()
             },
-            Background::Color(alpha(t.palette.accent, opacity)),
+            Background::Color(alpha(t.palette.muted, opacity)),
         );
     }
 }

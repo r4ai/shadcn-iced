@@ -77,15 +77,18 @@ fn link_style(theme: &Theme, status: Status) -> Style {
 
 impl<'a, Message: Clone + 'a> From<Breadcrumb<'a, Message>> for Element<'a, Message> {
     fn from(breadcrumb: Breadcrumb<'a, Message>) -> Self {
-        let mut row = Row::new().spacing(10).align_y(Alignment::Center);
+        // `text-muted-foreground gap-1.5 text-sm`
+        let mut row = Row::new().spacing(6).align_y(Alignment::Center);
         let count = breadcrumb.items.len();
 
         for (index, item) in breadcrumb.items.into_iter().enumerate() {
             let element: Element<'a, Message> = match item {
+                // `hover:text-foreground transition-colors`
                 Item::Link(label, on_press) => Pressable::new(text(label).size(style::text::SM))
                     .on_press_maybe(on_press)
                     .style(link_style)
                     .into(),
+                // `text-foreground font-normal`
                 Item::Page(label) => text(label)
                     .size(style::text::SM)
                     .style(|theme: &Theme| text::Style {
@@ -93,7 +96,8 @@ impl<'a, Message: Clone + 'a> From<Breadcrumb<'a, Message>> for Element<'a, Mess
                     })
                     .into(),
                 Item::Ellipsis => iced::widget::container(lucide::ELLIPSIS.sized(16).style(muted))
-                    .center(36)
+                    // `size-5 [&>svg]:size-4`
+                    .center(20)
                     .into(),
                 Item::Custom(element) => element,
             };
@@ -101,6 +105,7 @@ impl<'a, Message: Clone + 'a> From<Breadcrumb<'a, Message>> for Element<'a, Mess
             row = row.push(element);
 
             if index + 1 < count {
+                // `[&>svg]:size-3.5`
                 row = row.push(breadcrumb.separator.sized(14).style(muted));
             }
         }

@@ -5,8 +5,8 @@ use iced_ui_core::icon::Icon;
 use iced_ui_core::theme::alpha;
 use iced_ui_core::{Element, font, style, tokens};
 
-use iced::widget::{Column, Row, container, text};
-use iced::{Background, Length, Theme};
+use iced::widget::{Column, Row, Stack, container, text};
+use iced::{Background, Length, Padding, Theme};
 
 /// The visual style of an [`Alert`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -23,6 +23,7 @@ pub struct Alert<'a, Message> {
     icon: Option<Icon>,
     title: Option<Element<'a, Message>>,
     description: Option<Description<'a, Message>>,
+    action: Option<Element<'a, Message>>,
     variant: Variant,
 }
 
@@ -43,6 +44,7 @@ pub fn alert<'a, Message: 'a>(title: impl text::IntoFragment<'a>) -> Alert<'a, M
                 .into(),
         ),
         description: None,
+        action: None,
         variant: Variant::Default,
     }
 }
@@ -63,6 +65,13 @@ impl<'a, Message: 'a> Alert<'a, Message> {
     /// Sets a custom description element.
     pub fn description_element(mut self, description: impl Into<Element<'a, Message>>) -> Self {
         self.description = Some(Description::Element(description.into()));
+        self
+    }
+
+    /// Sets an action displayed in the top-right corner (`AlertAction`,
+    /// `absolute top-2 right-2`), e.g. an extra small button.
+    pub fn action(mut self, action: impl Into<Element<'a, Message>>) -> Self {
+        self.action = Some(action.into());
         self
     }
 
@@ -91,18 +100,20 @@ impl<'a, Message: 'a> From<Alert<'a, Message>> for Element<'a, Message> {
         let description = alert.description.map(|description| match description {
             Description::Text(fragment) => text(fragment)
                 .size(style::text::SM)
-                .line_height(1.625)
+                .line_height(iced::Pixels(20.0))
                 .style(move |theme: &Theme| description_style(theme, variant))
                 .into(),
             Description::Element(element) => element,
         });
 
+        // `gap-0.5`
         let body = Column::new()
             .push(alert.title)
             .push(description)
             .spacing(2)
             .width(Length::Fill);
 
+        // `has-[>svg]:gap-x-2 *:[svg]:translate-y-0.5 *:[svg]:size-4`
         let content = Row::new()
             .push(
                 alert
@@ -110,17 +121,36 @@ impl<'a, Message: 'a> From<Alert<'a, Message>> for Element<'a, Message> {
                     .map(|icon| container(icon.sized(16)).padding([2, 0])),
             )
             .push(body)
-            .spacing(12);
+            .spacing(8);
 
-        container(content)
-            .padding([12, 16])
+        // `px-2.5 py-2`, `has-data-[slot=alert-action]:pr-18`, plus the
+        // 1px border.
+        let padding = Padding {
+            right: if alert.action.is_some() { 73.0 } else { 11.0 },
+            ..Padding::from([9.0, 11.0])
+        };
+
+        let alert_box = container(content)
+            .padding(padding)
             .width(Length::Fill)
-            .style(move |theme| self::style(theme, variant))
-            .into()
+            .style(move |theme| self::style(theme, variant));
+
+        match alert.action {
+            Some(action) => Stack::new()
+                .push(alert_box)
+                .push(
+                    container(action)
+                        .align_right(Length::Fill)
+                        .padding(Padding::ZERO.top(9).right(9)),
+                )
+                .width(Length::Fill)
+                .into(),
+            None => alert_box.into(),
+        }
     }
 }
 
-/// The style of an alert.
+/// The style of an alert (`rounded-lg border bg-card`).
 pub fn style(theme: &Theme, variant: Variant) -> container::Style {
     let t = tokens(theme);
     let p = &t.palette;

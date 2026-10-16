@@ -86,7 +86,12 @@ impl<'a, Message> From<Element<'a, Message>> for Cell<'a, Message> {
 
 fn cell<'a, Message: 'a>(cell: Cell<'a, Message>) -> Element<'a, Message> {
     match cell {
-        Cell::Text(value) => text(value).size(style::text::SM).into(),
+        // `p-2 align-middle whitespace-nowrap`
+        Cell::Text(value) => text(value)
+            .size(style::text::SM)
+            .line_height(iced::Pixels(20.0))
+            .wrapping(text::Wrapping::None)
+            .into(),
         Cell::Element(element) => element,
     }
 }
@@ -124,9 +129,11 @@ impl<'a, Message: Clone + 'a> Table<'a, Message> {
             cells
                 .into_iter()
                 .map(|c| match c.into() {
-                    Cell::Text(value) => {
-                        text(value).size(style::text::SM).font(font::MEDIUM).into()
-                    }
+                    Cell::Text(value) => text(value)
+                        .size(style::text::SM)
+                        .font(font::MEDIUM)
+                        .line_height(iced::Pixels(20.0))
+                        .into(),
                     Cell::Element(element) => element,
                 })
                 .collect(),

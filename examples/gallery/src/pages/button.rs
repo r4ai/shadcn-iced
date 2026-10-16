@@ -1,11 +1,12 @@
 use super::{DemoMessage, Page};
 use crate::{Gallery, Message, example};
 
-use iced_ui::button::{Size, Variant, button, icon_button};
-use iced_ui::prelude::lucide;
+use iced_ui::button::{Button, Size, Variant, button, icon_button};
+use iced_ui::prelude::{lucide, spinner};
+use iced_ui::theme::alpha;
 
-use iced::widget::{column, row};
-use iced::{Center, Element};
+use iced::widget::{column, row, text};
+use iced::{Center, Color, Element, Theme};
 
 pub const PAGE: Page = Page {
     id: "button",
@@ -14,25 +15,84 @@ pub const PAGE: Page = Page {
     view,
 };
 
+/// A disabled button with a spinner (`<Spinner data-icon="inline-start" />`).
+fn loading<'a>(
+    label: &'a str,
+    variant: Variant,
+    trailing: bool,
+    color: fn(&Theme) -> Color,
+) -> Button<'a, Message> {
+    let spinner = spinner().style(color);
+    let label = text(label).size(14).font(iced_ui::font::MEDIUM);
+
+    let content = if trailing {
+        row![label, spinner]
+    } else {
+        row![spinner, label]
+    };
+
+    Button::new(content.spacing(6).align_y(Center))
+        .variant(variant)
+        .disabled(true)
+}
+
 fn view(_gallery: &Gallery) -> Element<'_, Message> {
     let click = Message::Demo(DemoMessage::Clicked);
 
+    let pair = |label, size, icon_size| {
+        row![
+            button(label)
+                .size(size)
+                .variant(Variant::Outline)
+                .on_press(click.clone()),
+            icon_button(lucide::ARROW_UP_RIGHT)
+                .size(icon_size)
+                .variant(Variant::Outline)
+                .on_press(click.clone()),
+        ]
+        .spacing(8)
+    };
+
     column![
+        example(
+            "Demo",
+            row![
+                button("Button")
+                    .variant(Variant::Outline)
+                    .on_press(click.clone()),
+                icon_button(lucide::ARROW_UP)
+                    .variant(Variant::Outline)
+                    .on_press(click.clone()),
+            ]
+            .spacing(8)
+            .align_y(Center)
+        ),
+        example(
+            "Size",
+            row![
+                pair("Extra Small", Size::Xs, Size::IconXs),
+                pair("Small", Size::Sm, Size::IconSm),
+                pair("Default", Size::Default, Size::Icon),
+                pair("Large", Size::Lg, Size::IconLg),
+            ]
+            .spacing(32)
+            .wrap()
+        ),
         example(
             "Variants",
             row![
                 button("Button").on_press(click.clone()),
-                button("Secondary")
-                    .variant(Variant::Secondary)
-                    .on_press(click.clone()),
-                button("Destructive")
-                    .variant(Variant::Destructive)
-                    .on_press(click.clone()),
                 button("Outline")
                     .variant(Variant::Outline)
                     .on_press(click.clone()),
+                button("Secondary")
+                    .variant(Variant::Secondary)
+                    .on_press(click.clone()),
                 button("Ghost")
                     .variant(Variant::Ghost)
+                    .on_press(click.clone()),
+                button("Destructive")
+                    .variant(Variant::Destructive)
                     .on_press(click.clone()),
                 button("Link")
                     .variant(Variant::Link)
@@ -43,83 +103,50 @@ fn view(_gallery: &Gallery) -> Element<'_, Message> {
             .wrap()
         ),
         example(
-            "Sizes",
-            row![
-                button("Extra small")
-                    .size(Size::Xs)
-                    .variant(Variant::Outline)
-                    .on_press(click.clone()),
-                button("Small")
-                    .size(Size::Sm)
-                    .variant(Variant::Outline)
-                    .on_press(click.clone()),
-                button("Default")
-                    .variant(Variant::Outline)
-                    .on_press(click.clone()),
-                button("Large")
-                    .size(Size::Lg)
-                    .variant(Variant::Outline)
-                    .on_press(click.clone()),
-            ]
-            .spacing(8)
-            .align_y(Center)
+            "Icon",
+            icon_button(lucide::CIRCLE_FADING_ARROW_UP)
+                .variant(Variant::Outline)
+                .on_press(click.clone())
         ),
         example(
-            "With icon",
+            "With Icon",
             row![
-                button("New branch")
+                button("New Branch")
                     .icon(lucide::GIT_BRANCH)
                     .variant(Variant::Outline)
-                    .size(Size::Sm)
                     .on_press(click.clone()),
-                button("Login with Email")
-                    .icon(lucide::MAIL)
-                    .on_press(click.clone()),
-                button("Next")
-                    .trailing_icon(lucide::CHEVRON_RIGHT)
-                    .variant(Variant::Secondary)
-                    .on_press(click.clone()),
-                button("Please wait")
-                    .icon(lucide::LOADER_CIRCLE)
-                    .disabled(true),
-            ]
-            .spacing(8)
-            .align_y(Center)
-            .wrap()
-        ),
-        example(
-            "Icon",
-            row![
-                icon_button(lucide::CIRCLE_FADING_ARROW_UP)
+                button("Fork")
+                    .trailing_icon(lucide::GIT_FORK)
                     .variant(Variant::Outline)
-                    .size(Size::IconXs)
-                    .on_press(click.clone()),
-                icon_button(lucide::CIRCLE_FADING_ARROW_UP)
-                    .variant(Variant::Outline)
-                    .size(Size::IconSm)
-                    .on_press(click.clone()),
-                icon_button(lucide::CIRCLE_FADING_ARROW_UP)
-                    .variant(Variant::Outline)
-                    .on_press(click.clone()),
-                icon_button(lucide::CIRCLE_FADING_ARROW_UP)
-                    .variant(Variant::Outline)
-                    .size(Size::IconLg)
                     .on_press(click.clone()),
             ]
             .spacing(8)
-            .align_y(Center)
         ),
         example(
-            "Disabled",
+            "Rounded",
             row![
-                button("Disabled").disabled(true),
-                button("Disabled").variant(Variant::Outline).disabled(true),
-                button("Disabled")
-                    .variant(Variant::Secondary)
-                    .disabled(true),
+                button("Get Started").rounded(true).on_press(click.clone()),
+                icon_button(lucide::ARROW_UP)
+                    .variant(Variant::Outline)
+                    .rounded(true)
+                    .on_press(click.clone()),
+            ]
+            .spacing(8)
+        ),
+        example(
+            "Spinner",
+            row![
+                // `disabled:opacity-50`
+                loading("Generating", Variant::Outline, false, |theme| {
+                    alpha(iced_ui::tokens(theme).palette.foreground, 0.5)
+                }),
+                loading("Downloading", Variant::Secondary, true, |theme| {
+                    alpha(iced_ui::tokens(theme).palette.secondary_foreground, 0.5)
+                }),
             ]
             .spacing(8)
         ),
     ]
+    .spacing(24)
     .into()
 }
