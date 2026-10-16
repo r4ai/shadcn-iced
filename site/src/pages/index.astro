@@ -1,0 +1,87 @@
+---
+import CodeBlock from "../components/CodeBlock.astro";
+import Icon from "../components/Icon.astro";
+import PreviewFrame from "../components/PreviewFrame.astro";
+import Base from "../layouts/Base.astro";
+import { REPOSITORY, components, url } from "../lib/data";
+
+// The showcase: examples that read well side by side.
+const picks: { id: string; title: string; height: number; span?: boolean }[] = [
+  { id: "card", title: "Demo", height: 420 },
+  { id: "chart", title: "Area Chart - Stacked", height: 420 },
+  { id: "calendar", title: "Demo", height: 420 },
+  { id: "field", title: "Choice Card", height: 360 },
+  { id: "tabs", title: "Demo", height: 360 },
+  { id: "input-otp", title: "Demo", height: 360 },
+];
+
+const showcase = picks.flatMap((pick) => {
+  const component = components.find((c) => c.id === pick.id);
+  const example = component?.examples.find((e) => e.title === pick.title) ?? component?.examples[0];
+  return component && example ? [{ ...pick, component, example }] : [];
+});
+---
+
+<Base
+  title="iced-ui"
+  description="Beautifully designed components for iced, ported from shadcn/ui. Live previews compiled to WebAssembly."
+>
+  <main>
+    <section class="mx-auto flex max-w-3xl flex-col items-center gap-5 px-4 pb-10 pt-16 text-center sm:px-6 sm:pt-24">
+      <a
+        href={url("/docs/components")}
+        class="bg-muted hover:bg-accent inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-colors"
+      >
+        {components.length} components, the whole shadcn/ui registry
+        <Icon name="arrow-right" size={12} />
+      </a>
+      <h1 class="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+        Beautifully designed components for iced
+      </h1>
+      <p class="text-muted-foreground max-w-xl text-lg text-balance">
+        The components of shadcn/ui, ported to Rust. Use them as a library, or copy them into your project and own the
+        code. Every preview below is iced running in your browser.
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <a
+          href={url("/docs/installation")}
+          class="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center rounded-md px-4 text-sm font-medium shadow-xs transition-colors"
+        >
+          Get Started
+        </a>
+        <a
+          href={url("/docs/components")}
+          class="hover:bg-accent inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium shadow-xs transition-colors"
+        >
+          Browse Components
+        </a>
+      </div>
+      <CodeBlock class="mt-4 w-full max-w-md text-left" lang="sh" code="cargo iced-ui add button card dialog" />
+    </section>
+
+    <section class="mx-auto max-w-screen-xl px-4 pb-20 sm:px-6">
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {
+          showcase.map((item) => (
+            <figure class="group/item flex flex-col overflow-hidden rounded-xl border">
+              <PreviewFrame page={item.component.id} example={item.example.index} minHeight={item.height} />
+              <figcaption class="flex items-center justify-between gap-2 border-t px-4 py-2.5 text-sm">
+                <span class="font-medium">{item.component.title}</span>
+                <a
+                  href={url(`/docs/components/${item.component.id}`)}
+                  class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
+                >
+                  View code <Icon name="arrow-right" size={12} />
+                </a>
+              </figcaption>
+            </figure>
+          ))
+        }
+      </div>
+      <p class="text-muted-foreground mt-10 text-center text-sm">
+        Built with <a class="underline underline-offset-4" href="https://iced.rs">iced</a>. The source is on{" "}
+        <a class="underline underline-offset-4" href={REPOSITORY}>GitHub</a>.
+      </p>
+    </section>
+  </main>
+</Base>

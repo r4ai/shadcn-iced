@@ -48,7 +48,9 @@ Plus everything shadcn/ui gets from its environment:
   listboxes with keyboard navigation, disclosures, resizable splits and
   focus rings.
 
-Run the gallery to see them all:
+See them all on the website (`site/`), where every
+example runs live in the browser (iced compiled to WebAssembly) next to its
+code, or run the gallery:
 
 ```sh
 cargo run -p gallery     # every component, with a theme customizer
@@ -179,6 +181,8 @@ crates/
   cargo-iced-ui/  the copy-and-paste CLI (embeds the component sources)
 examples/
   gallery/        a documentation-like showcase of every component
+  gallery-web/    the gallery examples compiled to WebAssembly, for the website
+site/             the website (Astro), with live previews of every example
 ```
 
 Each file in `crates/iced_ui/src/components/` only depends on `iced`,
@@ -207,6 +211,31 @@ cargo run -p gallery --bin snapshot -- dropdown-menu:light --animations --live -
 ```
 
 `GALLERY_PAGE=sonner cargo run -p gallery` opens the gallery on a given page.
+
+### Website
+
+The website (`site/`) shows every example of the gallery with a Preview tab,
+where the example runs live, and a Code tab, with its source:
+
+- `cargo run -p gallery --bin site_data` lists the pages and where each
+  `example(…)` is called; `pnpm data` turns that into the Code tabs, with the
+  `use` declarations, helpers and bindings the example refers to.
+- `examples/gallery-web` runs the examples of a page in a single
+  `iced::daemon`, one window (canvas) per example, drawn with WebGPU or the
+  tiny-skia fallback; `pnpm wasm` builds it to `site/public/wasm/`.
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version <the version in Cargo.lock> --locked
+cd site
+pnpm install
+pnpm data && pnpm wasm   # after changing the examples or the components
+pnpm dev                 # http://localhost:4321
+```
+
+The `Site` workflow deploys it from `main` to Cloudflare Workers (static
+assets, `site/wrangler.jsonc`); it needs the `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` secrets of the repository.
 
 ## Differences with shadcn/ui
 
@@ -249,3 +278,5 @@ shadcn/ui のデザインを iced で再現した UI ライブラリです。
 最新のデフォルトスタイル（Base UI + Nova）、/create 相当のテーマ設定、Geist / Inter フォント、Lucide アイコン、アニメーション、Base UI に相当するヘッドレスな
 プリミティブ（ポップオーバーの配置、モーダル、キーボード操作できるリスト等）
 も同梱しています。`cargo run -p gallery` で全コンポーネントを確認できます。
+ウェブサイト（`site/`）では、WebAssembly にコンパイルした
+iced で各サンプルをブラウザ上で動かしながら、そのコードを確認できます。

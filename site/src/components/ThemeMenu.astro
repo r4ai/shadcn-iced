@@ -1,0 +1,85 @@
+---
+// The theme of the previews: a base color, a theme (accent) and a radius.
+import { ACCENTS, BASES, RADII, capitalize } from "../lib/theme";
+import Icon from "./Icon.astro";
+
+interface Props {
+  /** Shows the controls inline instead of in a popover. */
+  inline?: boolean;
+  idPrefix?: string;
+}
+
+const { inline = false, idPrefix = "theme" } = Astro.props;
+const select =
+  "border-input bg-background hover:bg-accent/50 h-8 w-full rounded-md border px-2 text-sm shadow-xs transition-colors";
+---
+
+{
+  inline ? (
+    <div class="grid gap-4 sm:grid-cols-3">
+      <label class="grid gap-1.5 text-sm font-medium" for={`${idPrefix}-base`}>
+        Base color
+        <select id={`${idPrefix}-base`} data-theme-option="base" class={select}>
+          {BASES.map((base) => <option value={base}>{capitalize(base)}</option>)}
+        </select>
+      </label>
+      <label class="grid gap-1.5 text-sm font-medium" for={`${idPrefix}-accent`}>
+        Theme
+        <select id={`${idPrefix}-accent`} data-theme-option="accent" class={select}>
+          <option value="">Same as base</option>
+          {ACCENTS.map((accent) => <option value={accent}>{capitalize(accent)}</option>)}
+        </select>
+      </label>
+      <label class="grid gap-1.5 text-sm font-medium" for={`${idPrefix}-radius`}>
+        Radius
+        <select id={`${idPrefix}-radius`} data-theme-option="radius" class={select}>
+          {RADII.map((radius) => <option value={radius}>{capitalize(radius)}</option>)}
+        </select>
+      </label>
+    </div>
+  ) : (
+    <div data-popover data-open="false" class="group/popover relative">
+      <button
+        type="button"
+        data-popover-trigger
+        class="hover:bg-accent inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors"
+        aria-label="Theme of the previews"
+      >
+        <Icon name="palette" size={16} />
+        <span class="hidden sm:inline">Theme</span>
+      </button>
+      <div class="bg-popover text-popover-foreground absolute right-0 top-10 z-50 hidden w-64 gap-3 rounded-lg border p-4 shadow-md group-data-[open=true]/popover:grid">
+        <div>
+          <p class="text-sm font-medium">Preview theme</p>
+          <p class="text-muted-foreground text-xs">Applies to every live preview.</p>
+        </div>
+        <label class="grid gap-1.5 text-xs font-medium" for={`${idPrefix}-base`}>
+          Base color
+          <select id={`${idPrefix}-base`} data-theme-option="base" class={select}>
+            {BASES.map((base) => <option value={base}>{capitalize(base)}</option>)}
+          </select>
+        </label>
+        <label class="grid gap-1.5 text-xs font-medium" for={`${idPrefix}-accent`}>
+          Theme
+          <select id={`${idPrefix}-accent`} data-theme-option="accent" class={select}>
+            <option value="">Same as base</option>
+            {ACCENTS.map((accent) => <option value={accent}>{capitalize(accent)}</option>)}
+          </select>
+        </label>
+        <label class="grid gap-1.5 text-xs font-medium" for={`${idPrefix}-radius`}>
+          Radius
+          <select id={`${idPrefix}-radius`} data-theme-option="radius" class={select}>
+            {RADII.map((radius) => <option value={radius}>{capitalize(radius)}</option>)}
+          </select>
+        </label>
+        <button
+          type="button"
+          data-theme-reset
+          class="hover:bg-accent h-8 rounded-md border text-xs font-medium transition-colors"
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+  )
+}

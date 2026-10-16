@@ -1,0 +1,3 @@
+# The live previews are rebuilt on every deploy; let browsers revalidate them.
+/wasm/*
+  Cache-Control: public, max-age=0, must-revalidate

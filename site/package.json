@@ -1,0 +1,23 @@
+{
+  "name": "iced-ui-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "data": "node scripts/gen-data.mjs",
+    "wasm": "node scripts/build-wasm.mjs",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "astro": "^7.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "binaryen": "^132.0.0",
+    "tailwindcss": "^4.3.3",
+    "wrangler": "^4.151.1"
+  }
+}

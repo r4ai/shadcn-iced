@@ -1,0 +1,104 @@
+---
+import CodeBlock from "../../components/CodeBlock.astro";
+import PreviewFrame from "../../components/PreviewFrame.astro";
+import ThemeMenu from "../../components/ThemeMenu.astro";
+import Docs from "../../layouts/Docs.astro";
+import { components, url } from "../../lib/data";
+
+const toc = [
+  { id: "customize", label: "Customize" },
+  { id: "tokens", label: "Tokens" },
+];
+
+// A few examples that show the colors, the radius and the charts.
+const picks: [string, string][] = [
+  ["card", "Demo"],
+  ["chart", "Area Chart - Stacked"],
+  ["button", "Variants"],
+  ["switch", "Choice Card"],
+];
+
+const tokensExample = `container(content).style(|theme: &Theme| {
+    let t = tokens(theme);
+    container::Style {
+        background: Some(t.palette.muted.into()),
+        border: style::rounded(t.radius_lg()),
+        ..Default::default()
+    }
+})`;
+
+const previews = picks.flatMap(([id, title]) => {
+  const component = components.find((c) => c.id === id);
+  const example = component?.examples.find((e) => e.title === title);
+  return component && example ? [{ id, example: example.index }] : [];
+});
+---
+
+<Docs
+  title="Theming"
+  description="Every theme of shadcn/ui's create page, generated from its OKLCH tokens, in light and dark mode."
+  toc={toc}
+  prev={{ href: url("/docs/installation"), label: "Installation" }}
+  next={{ href: url("/docs/components"), label: "Components" }}
+>
+  <h2 id="customize">Customize</h2>
+  <p>
+    Pick a base color, a theme and a radius: the previews below, and every preview of the site, follow. Then copy the
+    code that builds the theme into your application.
+  </p>
+  <div class="not-prose mt-6 grid gap-6 rounded-xl border p-4 sm:p-6">
+    <ThemeMenu inline idPrefix="theming" />
+    <div class="bg-code relative overflow-hidden rounded-lg border" data-copy-scope>
+      <button
+        type="button"
+        data-copy
+        class="text-muted-foreground hover:bg-accent hover:text-foreground absolute right-2 top-2 rounded-md border bg-background px-2 py-1 text-xs font-medium transition-colors"
+      >
+        Copy
+      </button>
+      <pre
+        data-copy-source
+        data-theme-code
+        class="text-muted-foreground min-h-28 overflow-x-auto px-4 py-3.5 font-mono text-[13px] leading-relaxed">Loading…</pre>
+    </div>
+  </div>
+  <div class="not-prose mt-6 grid gap-4 lg:grid-cols-2">
+    {
+      previews.map((preview) => (
+        <div class="overflow-hidden rounded-xl border">
+          <PreviewFrame page={preview.id} example={preview.example} minHeight={300} />
+        </div>
+      ))
+    }
+  </div>
+
+  <h2 id="tokens">Tokens</h2>
+  <p>
+    A theme is an <code>iced::Theme</code> that carries the tokens of shadcn/ui: <code>background</code>,
+    <code>foreground</code>, <code>primary</code>, <code>muted</code>, <code>accent</code>, <code>border</code>,
+    <code>ring</code>, the chart and sidebar colors, and the radius. Components read them with
+    <code>iced_ui::tokens(theme)</code>, and so can your own widgets:
+  </p>
+  <CodeBlock class="mt-4" code={tokensExample} />
+</Docs>
+
+<script>
+  import { load } from "../../scripts/previews";
+  import { currentTheme, isDark, onThemeChange } from "../../scripts/theme";
+
+  const output = document.querySelector<HTMLElement>("[data-theme-code]")!;
+
+  load()
+    .then((api) => {
+      const render = () => {
+        const theme = currentTheme();
+        output.textContent = api.themeCode(isDark(), theme.base, theme.accent, theme.radius);
+        output.classList.remove("text-muted-foreground");
+      };
+      render();
+      onThemeChange(render);
+    })
+    .catch(() => {
+      output.textContent = "The theme code needs WebAssembly.";
+    });
+</script>
