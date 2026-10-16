@@ -10,6 +10,8 @@
 //! # }
 //! ```
 use iced_ui_core::icon::Icon;
+use iced_ui_core::primitive::FocusWithin;
+use iced_ui_core::primitive::focus;
 use iced_ui_core::theme::{alpha, tokens};
 use iced_ui_core::{Element, font, style};
 
@@ -22,6 +24,7 @@ pub struct Input<'a, Message: Clone> {
     raw: TextInput<'a, Message>,
     invalid: bool,
     icon: Option<Icon>,
+    chromeless: bool,
 }
 
 /// Creates an [`Input`] with a placeholder and a value.
@@ -36,6 +39,7 @@ pub fn input<'a, Message: Clone + 'a>(placeholder: &str, value: &str) -> Input<'
             .font(font::SANS),
         invalid: false,
         icon: None,
+        chromeless: false,
     }
 }
 
@@ -76,6 +80,19 @@ impl<'a, Message: Clone + 'a> Input<'a, Message> {
         self
     }
 
+    /// Removes the border, background and focus ring, e.g. to embed the
+    /// input in an [`input_group`](super::input_group).
+    pub fn chromeless(mut self, chromeless: bool) -> Self {
+        self.chromeless = chromeless;
+        self
+    }
+
+    /// Sets the padding.
+    pub fn padding(mut self, padding: impl Into<iced::Padding>) -> Self {
+        self.raw = self.raw.padding(padding);
+        self
+    }
+
     /// Adds a leading icon.
     pub fn icon(mut self, icon: Icon) -> Self {
         self.icon = Some(icon);
@@ -97,6 +114,7 @@ impl<'a, Message: Clone + 'a> Input<'a, Message> {
     /// Returns the underlying iced [`TextInput`], styled.
     pub fn into_text_input(self) -> TextInput<'a, Message> {
         let invalid = self.invalid;
+        let chromeless = self.chromeless;
         let mut raw = self.raw;
 
         if let Some(icon) = self.icon {
@@ -111,13 +129,45 @@ impl<'a, Message: Clone + 'a> Input<'a, Message> {
                 .padding([8, 12]);
         }
 
-        raw.style(move |theme, status| style(theme, status, invalid))
+        raw.style(move |theme, status| {
+            let mut style = style(theme, status, invalid);
+
+            if chromeless {
+                style.background = Background::Color(Color::TRANSPARENT);
+                style.border = Border::default();
+            }
+
+            style
+        })
     }
 }
 
 impl<'a, Message: Clone + 'a> From<Input<'a, Message>> for Element<'a, Message> {
     fn from(input: Input<'a, Message>) -> Self {
-        input.into_text_input().into()
+        let invalid = input.invalid;
+
+        if input.chromeless {
+            return input.into_text_input().into();
+        }
+
+        FocusWithin::new(input.into_text_input(), move |theme, status| {
+            ring(theme, status, invalid)
+        })
+        .into()
+    }
+}
+
+/// The ring drawn around a focused (or invalid) control.
+pub fn ring(theme: &Theme, status: focus::Status, invalid: bool) -> focus::Style {
+    let t = tokens(theme);
+
+    focus::Style {
+        ring: match (status.focused, invalid) {
+            (true, false) => Some(style::ring(&t, t.radius_md())),
+            (true, true) => Some(style::invalid_outset_ring(&t, t.radius_md())),
+            (false, _) => None,
+        },
+        ..focus::Style::default()
     }
 }
 

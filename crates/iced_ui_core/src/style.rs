@@ -3,6 +3,53 @@ use crate::theme::{Tokens, alpha};
 
 use iced::{Border, Color, Shadow, Vector, border};
 
+/// Where an item sits in a joined group (button group, toggle group...),
+/// which decides its corners.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Position {
+    /// A standalone item.
+    #[default]
+    Alone,
+    /// The first item of a group.
+    First,
+    /// An item in the middle of a group.
+    Middle,
+    /// The last item of a group.
+    Last,
+}
+
+impl Position {
+    /// Computes the position of the item at `index` in a group of `count`.
+    pub fn of(index: usize, count: usize) -> Self {
+        match (index, count) {
+            (_, 0 | 1) => Position::Alone,
+            (0, _) => Position::First,
+            (i, n) if i + 1 == n => Position::Last,
+            _ => Position::Middle,
+        }
+    }
+
+    /// The corner radius of a horizontal group item for the given radius.
+    pub fn radius(self, radius: f32) -> border::Radius {
+        match self {
+            Position::Alone => border::radius(radius),
+            Position::First => border::radius(0).top_left(radius).bottom_left(radius),
+            Position::Middle => border::radius(0),
+            Position::Last => border::radius(0).top_right(radius).bottom_right(radius),
+        }
+    }
+
+    /// The corner radius of a vertical group item for the given radius.
+    pub fn vertical_radius(self, radius: f32) -> border::Radius {
+        match self {
+            Position::Alone => border::radius(radius),
+            Position::First => border::radius(0).top_left(radius).top_right(radius),
+            Position::Middle => border::radius(0),
+            Position::Last => border::radius(0).bottom_left(radius).bottom_right(radius),
+        }
+    }
+}
+
 /// Font sizes of Tailwind CSS, in logical pixels.
 pub mod text {
     /// `text-xs`
@@ -71,6 +118,26 @@ pub fn focus_ring(tokens: &Tokens) -> Shadow {
         color: alpha(tokens.palette.ring, 0.5),
         offset: Vector::ZERO,
         blur_radius: 6.0,
+    }
+}
+
+/// The focus ring as an outset [`Ring`](crate::primitive::focus::Ring)
+/// (`ring-[3px] ring-ring/50`) around a control of the given radius.
+pub fn ring(tokens: &Tokens, radius: f32) -> crate::primitive::focus::Ring {
+    crate::primitive::focus::Ring {
+        color: alpha(tokens.palette.ring, 0.5),
+        width: 3.0,
+        radius,
+    }
+}
+
+/// The ring of an invalid control as an outset ring
+/// (`ring-destructive/20`, `/40` in dark mode).
+pub fn invalid_outset_ring(tokens: &Tokens, radius: f32) -> crate::primitive::focus::Ring {
+    crate::primitive::focus::Ring {
+        color: alpha(tokens.palette.destructive, if tokens.is_dark() { 0.4 } else { 0.2 }),
+        width: 3.0,
+        radius,
     }
 }
 

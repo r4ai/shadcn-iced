@@ -76,10 +76,13 @@ impl<'a, Message: Clone + 'a> From<Textarea<'a, Message>> for Element<'a, Messag
     fn from(textarea: Textarea<'a, Message>) -> Self {
         let invalid = textarea.invalid;
 
-        textarea
-            .raw
-            .style(move |theme, status| style(theme, status, invalid))
-            .into()
+        iced_ui_core::primitive::FocusWithin::new(
+            textarea
+                .raw
+                .style(move |theme, status| style(theme, status, invalid)),
+            move |theme, status| super::input::ring(theme, status, invalid),
+        )
+        .into()
     }
 }
 

@@ -134,6 +134,8 @@ pub struct Button<'a, Message> {
     size: Size,
     disabled: bool,
     width: Option<Length>,
+    position: style::Position,
+    vertical: bool,
 }
 
 /// Creates a [`Button`] with a text label.
@@ -157,6 +159,8 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
             size: Size::Default,
             disabled: false,
             width: None,
+            position: style::Position::Alone,
+            vertical: false,
         }
     }
 
@@ -204,6 +208,14 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
     /// Disables the button.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    /// Sets the position of the button in a joined group, which flattens
+    /// the inner corners. See [`button_group`](super::button_group).
+    pub fn position(mut self, position: style::Position, vertical: bool) -> Self {
+        self.position = position;
+        self.vertical = vertical;
         self
     }
 
@@ -255,6 +267,8 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         };
 
         let variant = button.variant;
+        let position = button.position;
+        let vertical = button.vertical;
 
         Pressable::new(content)
             .on_press_maybe(button.on_press)
@@ -262,7 +276,18 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             .width(width)
             .height(height)
             .padding([0.0, size.padding_x(has_icon)])
-            .style(move |theme, status| self::style(theme, status, variant))
+            .style(move |theme, status| {
+                let mut style = self::style(theme, status, variant);
+                let radius = tokens(theme).radius_md();
+
+                style.border.radius = if vertical {
+                    position.vertical_radius(radius)
+                } else {
+                    position.radius(radius)
+                };
+
+                style
+            })
             .into()
     }
 }

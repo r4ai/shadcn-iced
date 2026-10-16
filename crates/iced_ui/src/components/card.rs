@@ -41,7 +41,7 @@ pub fn card<'a, Message: 'a>() -> Card<'a, Message> {
         action: None,
         content: Vec::new(),
         footer: None,
-        width: Length::Shrink,
+        width: Length::Fill,
         header_border: false,
         footer_border: false,
     }
@@ -109,7 +109,8 @@ impl<'a, Message: 'a> Card<'a, Message> {
         self
     }
 
-    /// Sets the width.
+    /// Sets the width. Cards fill the available width by default, like a
+    /// block element.
     pub fn width(mut self, width: impl Into<Length>) -> Self {
         self.width = width.into();
         self
@@ -120,12 +121,15 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
     fn from(card: Card<'a, Message>) -> Self {
         let mut sections: Vec<Element<'a, Message>> = Vec::new();
 
+        // Sections stretch to the card, unless the card shrinks to fit them.
+        let inner = if card.width == Length::Shrink { Length::Shrink } else { Length::Fill };
+
         if card.title.is_some() || card.description.is_some() || card.action.is_some() {
             let titles = Column::new()
                 .push(card.title)
                 .push(card.description)
                 .spacing(8)
-                .width(Length::Fill);
+                .width(inner);
 
             let header = Row::new().push(titles).push(card.action).spacing(8);
 
@@ -137,7 +141,7 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
         }
 
         for content in card.content {
-            sections.push(container(content).padding([0, 24]).width(Length::Fill).into());
+            sections.push(container(content).padding([0, 24]).width(inner).into());
         }
 
         if let Some(footer) = card.footer {
@@ -145,7 +149,7 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
                 sections.push(super::separator::separator().into());
             }
 
-            sections.push(container(footer).padding([0, 24]).width(Length::Fill).into());
+            sections.push(container(footer).padding([0, 24]).width(inner).into());
         }
 
         container(Column::with_children(sections).spacing(24))
