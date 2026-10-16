@@ -11,10 +11,10 @@ rust-version.workspace = true
 default = ["lucide", "inter", "geist"]
 # Bundles the Lucide icon font (~900 KB).
 lucide = []
-# Bundles the Inter font (`font-sans` of shadcn/ui's default style).
-inter = []
-# Bundles the Geist Mono font (`font-mono`).
+# Bundles the Geist and Geist Mono fonts (the defaults of shadcn/ui's Nova).
 geist = []
+# Bundles the Inter font.
+inter = []
 
 [dependencies]
 iced.workspace = true

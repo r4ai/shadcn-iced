@@ -28,9 +28,9 @@ copies or substantial portions of the Software.
 distributed under the SIL Open Font License 1.1. See
 [`INTER-LICENSE.txt`](crates/iced_ui_core/assets/fonts/INTER-LICENSE.txt).
 
-## Geist Mono
+## Geist and Geist Mono
 
-`crates/iced_ui_core/assets/fonts/GeistMono-*.ttf` are distributed under the SIL
+`crates/iced_ui_core/assets/fonts/Geist*.ttf` are distributed under the SIL
 Open Font License 1.1. See
 [`GEIST-LICENSE.txt`](crates/iced_ui_core/assets/fonts/GEIST-LICENSE.txt).
 

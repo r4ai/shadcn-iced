@@ -21,7 +21,7 @@ fn main() -> iced::Result {
     iced::application(|| (), |_: &mut (), _: Message| {}, view)
         // Any shadcn/ui preset, e.g. zinc in dark mode:
         .theme(|_: &()| iced_ui::theme::zinc(Mode::Dark).build())
-        // Loads Inter, Geist Mono and the Lucide icons.
+        // Loads Geist, Inter and the Lucide icons.
         .iced_ui()
         .run()
 }

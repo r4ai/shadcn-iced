@@ -218,9 +218,57 @@ pub struct Tokens {
     pub radius: f32,
     /// Whether the tokens describe a light or a dark theme.
     pub mode: Mode,
+    /// The colors of menus (`menuColor`). See [`Tokens::menu`].
+    pub menu: Menu,
+}
+
+/// The colors of menus (dropdown and context menus, menubars, selects and
+/// comboboxes), which shadcn/ui can invert or make translucent
+/// (`menuColor`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Menu {
+    /// The palette of menu surfaces: the theme palette, or the palette of
+    /// the opposite mode when menus are inverted.
+    pub palette: Palette,
+    /// The mode of [`Menu::palette`].
+    pub mode: Mode,
+    /// Whether menus are translucent (`bg-popover/70`, items highlighted
+    /// with `bg-foreground/10`).
+    pub translucent: bool,
+}
+
+impl Menu {
+    /// Opaque menus using the given palette.
+    pub fn new(palette: Palette, mode: Mode) -> Self {
+        Self {
+            palette,
+            mode,
+            translucent: false,
+        }
+    }
 }
 
 impl Tokens {
+    /// Creates tokens whose menus use the same palette.
+    pub fn new(palette: Palette, radius: f32, mode: Mode) -> Self {
+        Self {
+            palette,
+            radius,
+            mode,
+            menu: Menu::new(palette, mode),
+        }
+    }
+
+    /// The tokens to style a menu surface with: the menu palette and mode
+    /// (see [`Menu`]).
+    pub fn menu(&self) -> Tokens {
+        Tokens {
+            palette: self.menu.palette,
+            mode: self.menu.mode,
+            ..*self
+        }
+    }
+
     /// The default radius of shadcn/ui (`0.625rem`).
     pub const DEFAULT_RADIUS: f32 = 10.0;
 
@@ -390,12 +438,170 @@ impl std::fmt::Display for Accent {
     }
 }
 
+/// A color theme of shadcn/ui: a base color or an accent color. Used to
+/// pick the chart colors (`chartColor`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ThemeColor {
+    /// A base color.
+    Base(BaseColor),
+    /// An accent color.
+    Accent(Accent),
+}
+
+impl From<BaseColor> for ThemeColor {
+    fn from(base: BaseColor) -> Self {
+        Self::Base(base)
+    }
+}
+
+impl From<Accent> for ThemeColor {
+    fn from(accent: Accent) -> Self {
+        Self::Accent(accent)
+    }
+}
+
+impl ThemeColor {
+    /// The chart colors (`--chart-1` … `--chart-5`) of the theme, on top of
+    /// the given base color.
+    pub fn chart(self, base: BaseColor, mode: Mode) -> [Color; 5] {
+        match self {
+            ThemeColor::Base(base) => base.palette(mode).chart,
+            ThemeColor::Accent(accent) => accent
+                .overrides(mode)
+                .chart
+                .unwrap_or(base.palette(mode).chart),
+        }
+    }
+}
+
+impl std::fmt::Display for ThemeColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ThemeColor::Base(base) => base.fmt(f),
+            ThemeColor::Accent(accent) => accent.fmt(f),
+        }
+    }
+}
+
+/// How menu items are highlighted (`menuAccent`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum MenuAccent {
+    /// With the `accent` color.
+    #[default]
+    Subtle,
+    /// With the `primary` color: `--accent` becomes `--primary`.
+    Bold,
+}
+
+/// How menus are colored (`menuColor`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum MenuColor {
+    /// Like popovers.
+    #[default]
+    Default,
+    /// With the palette of the opposite mode (dark menus in a light theme).
+    Inverted,
+    /// Translucent.
+    DefaultTranslucent,
+    /// Inverted and translucent.
+    InvertedTranslucent,
+}
+
+impl MenuColor {
+    /// Every menu color.
+    pub const ALL: &'static [Self] = &[
+        Self::Default,
+        Self::Inverted,
+        Self::DefaultTranslucent,
+        Self::InvertedTranslucent,
+    ];
+
+    /// Whether menus use the palette of the opposite mode.
+    pub fn is_inverted(self) -> bool {
+        matches!(self, Self::Inverted | Self::InvertedTranslucent)
+    }
+
+    /// Whether menus are translucent.
+    pub fn is_translucent(self) -> bool {
+        matches!(self, Self::DefaultTranslucent | Self::InvertedTranslucent)
+    }
+}
+
+impl std::fmt::Display for MenuColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Default => "Default",
+            Self::Inverted => "Inverted",
+            Self::DefaultTranslucent => "Default Translucent",
+            Self::InvertedTranslucent => "Inverted Translucent",
+        })
+    }
+}
+
+/// The radius presets of shadcn/ui (`radius`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Radius {
+    /// The radius of the theme (`0.625rem`).
+    #[default]
+    Default,
+    /// `0`
+    None,
+    /// `0.45rem`
+    Small,
+    /// `0.625rem`
+    Medium,
+    /// `0.875rem`
+    Large,
+}
+
+impl Radius {
+    /// Every radius preset.
+    pub const ALL: &'static [Self] = &[
+        Self::Default,
+        Self::None,
+        Self::Small,
+        Self::Medium,
+        Self::Large,
+    ];
+
+    /// The radius in logical pixels.
+    pub fn value(self) -> f32 {
+        match self {
+            Radius::Default | Radius::Medium => Tokens::DEFAULT_RADIUS,
+            Radius::None => 0.0,
+            Radius::Small => 7.2,
+            Radius::Large => 14.0,
+        }
+    }
+}
+
+impl From<Radius> for f32 {
+    fn from(radius: Radius) -> Self {
+        radius.value()
+    }
+}
+
+impl std::fmt::Display for Radius {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Radius::Default => "Default",
+            Radius::None => "None",
+            Radius::Small => "Small",
+            Radius::Medium => "Medium",
+            Radius::Large => "Large",
+        })
+    }
+}
+
 /// A builder for an [`iced::Theme`] carrying shadcn/ui [`Tokens`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Config {
     name: Option<String>,
     base: BaseColor,
     accent: Option<Accent>,
+    chart: Option<ThemeColor>,
+    menu_accent: MenuAccent,
+    menu_color: MenuColor,
     tokens: Tokens,
 }
 
@@ -437,11 +643,10 @@ impl Config {
             name: None,
             base,
             accent: None,
-            tokens: Tokens {
-                palette: base.palette(mode),
-                radius: Tokens::DEFAULT_RADIUS,
-                mode,
-            },
+            chart: None,
+            menu_accent: MenuAccent::Subtle,
+            menu_color: MenuColor::Default,
+            tokens: Tokens::new(base.palette(mode), Tokens::DEFAULT_RADIUS, mode),
         }
     }
 
@@ -451,23 +656,80 @@ impl Config {
             name: Some(name.into()),
             base: BaseColor::Neutral,
             accent: None,
+            chart: None,
+            menu_accent: MenuAccent::Subtle,
+            menu_color: MenuColor::Default,
             tokens,
         }
     }
 
-    /// Applies an accent color.
+    /// Applies an accent color (`theme`).
+    ///
+    /// Like the other color settings, this recomputes the palette: call
+    /// [`Config::palette`] last.
     pub fn accent(mut self, accent: Accent) -> Self {
         self.accent = Some(accent);
-        self.tokens.palette = self
-            .base
-            .palette(self.tokens.mode)
-            .apply(&accent.overrides(self.tokens.mode));
+        self.recompute()
+    }
+
+    /// Applies an accent color, or none.
+    pub fn accent_maybe(mut self, accent: Option<Accent>) -> Self {
+        self.accent = accent;
+        self.recompute()
+    }
+
+    /// Takes the chart colors from another theme (`chartColor`). By
+    /// default, they come from the accent color or the base color.
+    pub fn chart_color(mut self, color: impl Into<ThemeColor>) -> Self {
+        self.chart = Some(color.into());
+        self.recompute()
+    }
+
+    /// Sets how menu items are highlighted (`menuAccent`).
+    pub fn menu_accent(mut self, accent: MenuAccent) -> Self {
+        self.menu_accent = accent;
+        self.recompute()
+    }
+
+    /// Sets how menus are colored (`menuColor`).
+    pub fn menu_color(mut self, color: MenuColor) -> Self {
+        self.menu_color = color;
         self
     }
 
     /// Sets the base radius (`--radius`) in logical pixels.
     pub fn radius(mut self, radius: f32) -> Self {
         self.tokens.radius = radius;
+        self
+    }
+
+    /// Sets the base radius to one of shadcn/ui's [`Radius`] presets.
+    pub fn radius_preset(self, radius: Radius) -> Self {
+        self.radius(radius.value())
+    }
+
+    /// The palette of the configured colors in the given mode.
+    fn compute(&self, mode: Mode) -> Palette {
+        let mut palette = self.base.palette(mode);
+
+        if let Some(accent) = self.accent {
+            palette = palette.apply(&accent.overrides(mode));
+        }
+
+        if let Some(chart) = self.chart {
+            palette.chart = chart.chart(self.base, mode);
+        }
+
+        if self.menu_accent == MenuAccent::Bold {
+            palette.accent = palette.primary;
+            palette.accent_foreground = palette.primary_foreground;
+        }
+
+        palette
+    }
+
+    fn recompute(mut self) -> Self {
+        self.tokens.palette = self.compute(self.tokens.mode);
         self
     }
 
@@ -488,7 +750,22 @@ impl Config {
 
     /// Returns the tokens of the configuration.
     pub fn tokens(&self) -> Tokens {
-        self.tokens
+        let mut tokens = self.tokens;
+        let mode = tokens.mode;
+
+        tokens.menu = if self.menu_color.is_inverted() {
+            let mode = match mode {
+                Mode::Light => Mode::Dark,
+                Mode::Dark => Mode::Light,
+            };
+
+            Menu::new(self.compute(mode), mode)
+        } else {
+            Menu::new(tokens.palette, mode)
+        };
+        tokens.menu.translucent = self.menu_color.is_translucent();
+
+        tokens
     }
 
     /// Builds the [`iced::Theme`].
@@ -497,7 +774,7 @@ impl Config {
     /// [`tokens`] can retrieve them later. The extended palette of the theme
     /// is derived from the tokens too, so built-in iced widgets blend in.
     pub fn build(self) -> Theme {
-        let tokens = self.tokens;
+        let tokens = self.tokens();
         let name = self.name.clone().unwrap_or_else(|| self.default_name());
 
         let _ = REGISTRY
@@ -519,7 +796,7 @@ impl Config {
 
     fn default_name(&self) -> String {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        format!("{:?}", self.tokens).hash(&mut hasher);
+        format!("{:?}", self.tokens()).hash(&mut hasher);
 
         let mode = match self.tokens.mode {
             Mode::Light => "Light",
@@ -665,8 +942,8 @@ fn derive(extended: &Extended) -> Tokens {
     let primary = extended.primary.base;
     let secondary = extended.background.weak;
 
-    Tokens {
-        palette: Palette {
+    Tokens::new(
+        Palette {
             background,
             foreground,
             card: background,
@@ -701,13 +978,13 @@ fn derive(extended: &Extended) -> Tokens {
                 extended.secondary.base.color,
             ],
         },
-        radius: Tokens::DEFAULT_RADIUS,
-        mode: if extended.is_dark {
+        Tokens::DEFAULT_RADIUS,
+        if extended.is_dark {
             Mode::Dark
         } else {
             Mode::Light
         },
-    }
+    )
 }
 
 /// Linearly mixes two colors in sRGB space. `factor` is the weight of `b`.
@@ -782,5 +1059,30 @@ mod tests {
 
         assert_ne!(a.to_string(), b.to_string());
         assert_eq!(tokens(&b).radius, 4.0);
+    }
+
+    #[test]
+    fn create_options() {
+        let tokens = light()
+            .accent(Accent::Blue)
+            .chart_color(Accent::Rose)
+            .menu_accent(MenuAccent::Bold)
+            .menu_color(MenuColor::InvertedTranslucent)
+            .radius_preset(Radius::Large)
+            .tokens();
+
+        assert_eq!(
+            tokens.palette.chart,
+            ThemeColor::Accent(Accent::Rose).chart(BaseColor::Neutral, Mode::Light)
+        );
+        assert_eq!(tokens.palette.accent, tokens.palette.primary);
+        assert_eq!(tokens.radius, 14.0);
+        assert_eq!(tokens.menu.mode, Mode::Dark);
+        assert!(tokens.menu.translucent);
+        assert!(tokens.menu().is_dark());
+        assert_eq!(tokens.menu.palette.accent, tokens.menu.palette.primary);
+
+        let theme = light().menu_color(MenuColor::Inverted).build();
+        assert_eq!(super::tokens(&theme).menu.mode, Mode::Dark);
     }
 }

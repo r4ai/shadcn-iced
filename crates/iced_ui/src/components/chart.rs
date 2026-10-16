@@ -768,7 +768,7 @@ impl Chart {
     }
 }
 
-/// Approximates the width of some text in Inter.
+/// Approximates the width of some text in Geist.
 fn text_width(content: &str, size: f32) -> f32 {
     content.chars().count() as f32 * size * 0.56
 }
