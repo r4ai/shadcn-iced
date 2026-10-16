@@ -46,9 +46,41 @@ pub enum Variant {
     Inset,
 }
 
+/// The size of an [`Item`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Size {
+    /// `h-8 text-sm`
+    #[default]
+    Default,
+    /// `h-7 text-xs`
+    Sm,
+    /// `h-12 text-sm`
+    Lg,
+}
+
+impl Size {
+    fn height(self) -> f32 {
+        match self {
+            Size::Default => 32.0,
+            Size::Sm => 28.0,
+            Size::Lg => 48.0,
+        }
+    }
+
+    fn text_size(self) -> f32 {
+        match self {
+            Size::Sm => style::text::XS,
+            _ => style::text::SM,
+        }
+    }
+}
+
 /// An item of a [`Group`] (`SidebarMenuButton`).
 pub struct Item<'a, Message> {
     label: String,
+    size: Size,
+    content: Option<Element<'a, Message>>,
+    leading: Option<Element<'a, Message>>,
     icon: Option<Icon>,
     active: bool,
     badge: Option<String>,
@@ -61,6 +93,9 @@ pub struct Item<'a, Message> {
 pub fn item<'a, Message>(label: impl Into<String>) -> Item<'a, Message> {
     Item {
         label: label.into(),
+        size: Size::Default,
+        content: None,
+        leading: None,
         icon: None,
         active: false,
         badge: None,
@@ -74,6 +109,27 @@ impl<'a, Message> Item<'a, Message> {
     /// Sets the icon.
     pub fn icon(mut self, icon: Icon) -> Self {
         self.icon = Some(icon);
+        self
+    }
+
+    /// Sets the size (`size="sm"`, `size="lg"`).
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+
+    /// Replaces the label with arbitrary content, e.g. an avatar and two
+    /// lines of text in a `size="lg"` item. The label is still used for the
+    /// tooltip of a collapsed sidebar.
+    pub fn content(mut self, content: impl Into<Element<'a, Message>>) -> Self {
+        self.content = Some(content.into());
+        self
+    }
+
+    /// Shows an arbitrary element instead of an icon, e.g. a logo or an
+    /// avatar in a `size="lg"` item.
+    pub fn icon_element(mut self, element: impl Into<Element<'a, Message>>) -> Self {
+        self.leading = Some(element.into());
         self
     }
 
@@ -102,7 +158,7 @@ impl<'a, Message> Item<'a, Message> {
     }
 
     /// Shows an element on the right instead of a badge
-    /// (`SidebarMenuAction`), e.g. a dropdown menu.
+    /// (`SidebarMenuAction`), e.g. a [`menu_action`] or a dropdown menu.
     pub fn action(mut self, action: impl Into<Element<'a, Message>>) -> Self {
         self.action = Some(action.into());
         self
@@ -142,6 +198,8 @@ impl<'a, Message> Group<'a, Message> {
 /// A sidebar. See the [module documentation](self).
 pub struct Sidebar<'a, Message> {
     header: Option<Element<'a, Message>>,
+    header_item: Option<Item<'a, Message>>,
+    footer_item: Option<Item<'a, Message>>,
     groups: Vec<Group<'a, Message>>,
     footer: Option<Element<'a, Message>>,
     collapsed: bool,
@@ -154,6 +212,8 @@ pub struct Sidebar<'a, Message> {
 pub fn sidebar<'a, Message: Clone + 'a>() -> Sidebar<'a, Message> {
     Sidebar {
         header: None,
+        header_item: None,
+        footer_item: None,
         groups: Vec::new(),
         footer: None,
         collapsed: false,
@@ -167,6 +227,20 @@ impl<'a, Message: Clone + 'a> Sidebar<'a, Message> {
     /// Sets the header (`SidebarHeader`).
     pub fn header(mut self, header: impl Into<Element<'a, Message>>) -> Self {
         self.header = Some(header.into());
+        self
+    }
+
+    /// Sets the header to a menu item, e.g. a team switcher, which
+    /// collapses with the sidebar.
+    pub fn header_item(mut self, item: Item<'a, Message>) -> Self {
+        self.header_item = Some(item);
+        self
+    }
+
+    /// Sets the footer to a menu item, e.g. the current user, which
+    /// collapses with the sidebar.
+    pub fn footer_item(mut self, item: Item<'a, Message>) -> Self {
+        self.footer_item = Some(item);
         self
     }
 
@@ -227,6 +301,56 @@ pub fn button_style(theme: &Theme, status: Status, active: bool) -> Style {
     }
 }
 
+/// `SidebarMenuBadge`: `h-5 min-w-5 rounded-md px-1 text-xs font-medium`.
+fn badge<'a, Message: 'a>(badge: String, highlighted: bool) -> Element<'a, Message> {
+    let narrow = badge.chars().count() < 2;
+    let label = text(badge)
+        .size(style::text::XS)
+        .font(font::MEDIUM)
+        .style(move |theme: &Theme| {
+            let p = tokens(theme).palette;
+            text::Style {
+                color: Some(if highlighted {
+                    p.sidebar_accent_foreground
+                } else {
+                    p.sidebar_foreground
+                }),
+            }
+        });
+
+    let badge = container(label).center_y(20);
+
+    if narrow {
+        badge.center_x(20).into()
+    } else {
+        badge.padding([0, 4]).into()
+    }
+}
+
+/// A small button shown on the right of an [`Item`] (`SidebarMenuAction`,
+/// `w-5 aspect-square rounded-md hover:bg-sidebar-accent`).
+pub fn menu_action<'a, Message: Clone + 'a>(icon: Icon, on_press: Message) -> Element<'a, Message> {
+    Pressable::new(container(icon.sized(16)).center(20))
+        .on_press(on_press)
+        .style(|theme, status| {
+            let t = tokens(theme);
+            let p = &t.palette;
+            let hovered = matches!(status, Status::Hovered | Status::Pressed);
+
+            Style {
+                background: hovered.then_some(Background::Color(p.sidebar_accent)),
+                text_color: if hovered {
+                    p.sidebar_accent_foreground
+                } else {
+                    p.sidebar_foreground
+                },
+                border: border::rounded(t.radius_md()),
+                ..Style::default()
+            }
+        })
+        .into()
+}
+
 fn menu_button<'a, Message: Clone + 'a>(
     item: Item<'a, Message>,
     collapsed: bool,
@@ -234,35 +358,63 @@ fn menu_button<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     let active = item.active;
     let label = item.label.clone();
+    let size = item.size;
 
     let trailing: Option<Element<'a, Message>> = if collapsed {
         None
     } else if let Some(action) = item.action {
         Some(action)
     } else {
-        item.badge.map(|badge| {
-            text(badge)
-                .size(style::text::XS)
-                .font(font::MEDIUM)
-                .style(|theme: &Theme| text::Style {
-                    color: Some(tokens(theme).palette.sidebar_foreground),
+        item.badge.map(|label| badge(label, active))
+    };
+    let has_trailing = trailing.is_some();
+
+    // `gap-2 rounded-md p-2 text-sm`, `data-active:font-medium`
+    let body: Option<Element<'a, Message>> = match item.content {
+        Some(content) => (!collapsed).then_some(content),
+        None => (!collapsed).then(|| {
+            text(item.label)
+                .size(if sub {
+                    style::text::SM
+                } else {
+                    size.text_size()
                 })
+                .font(if active && !sub {
+                    font::MEDIUM
+                } else {
+                    font::SANS
+                })
+                .wrapping(text::Wrapping::None)
+                .width(Length::Fill)
                 .into()
-        })
+        }),
     };
 
     let content = Row::new()
+        .push(item.leading)
         .push(item.icon.map(|icon| icon.sized(16)))
-        .push((!collapsed).then(|| {
-            text(item.label)
-                .size(style::text::SM)
-                .font(if active { font::MEDIUM } else { font::SANS })
-                .wrapping(text::Wrapping::None)
-                .width(Length::Fill)
-        }))
+        .push(body.map(|body| container(body).width(Length::Fill)))
         .push(trailing)
         .spacing(8)
         .align_y(Alignment::Center);
+
+    // `group-data-[collapsible=icon]:size-8! p-2!`, `p-0!` when `lg`
+    let padding = if collapsed && size == Size::Lg {
+        iced::Padding::ZERO
+    } else if has_trailing && !sub {
+        // The badge and the action sit at `right-1`.
+        iced::Padding::from([0, 8]).right(4)
+    } else {
+        iced::Padding::from([0, 8])
+    };
+
+    let height = if sub {
+        28.0
+    } else if collapsed {
+        32.0
+    } else {
+        size.height()
+    };
 
     let button: Element<'a, Message> = Pressable::new(container(content).center_y(Length::Fill))
         .on_press_maybe(item.on_press)
@@ -271,8 +423,9 @@ fn menu_button<'a, Message: Clone + 'a>(
         } else {
             Length::Fill
         })
-        .height(if sub { 28 } else { 32 })
-        .padding([0, 8])
+        .height(height)
+        .padding(padding)
+        .clip(true)
         .style(move |theme, status| button_style(theme, status, active))
         .into();
 
@@ -289,13 +442,15 @@ fn menu_button<'a, Message: Clone + 'a>(
         return button;
     }
 
+    // `SidebarMenuSub`: `mx-3.5 translate-x-px border-l px-2.5 py-0.5
+    // gap-1`
     let children = Column::with_children(
         item.children
             .into_iter()
             .map(|child| menu_button(child, false, true)),
     )
     .spacing(4)
-    .padding(iced::Padding::ZERO.left(11).top(2).bottom(2));
+    .padding(iced::Padding::from([2, 10]).left(11));
 
     let line =
         container(space().width(1).height(Length::Fill)).style(|theme: &Theme| container::Style {
@@ -309,9 +464,8 @@ fn menu_button<'a, Message: Clone + 'a>(
         .push(button)
         .push(
             container(iced::widget::Stack::new().push(children).push(line))
-                .padding(iced::Padding::ZERO.left(14)),
+                .padding(iced::Padding::ZERO.left(15).right(13)),
         )
-        .spacing(4)
         .into()
 }
 
@@ -333,37 +487,54 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
             Column::new()
                 .push(label)
                 .push(
+                    // `SidebarMenu`: `gap-0`
                     Column::with_children(
                         group
                             .items
                             .into_iter()
                             .map(|item| menu_button(item, collapsed, false)),
-                    )
-                    .spacing(4),
+                    ),
                 )
                 .padding(8)
                 .width(Length::Fill)
                 .into()
         });
 
+        // `SidebarHeader` / `SidebarFooter`: `gap-2 p-2`
+        let header = sidebar.header.or_else(|| {
+            sidebar
+                .header_item
+                .map(|item| menu_button(item, collapsed, false))
+        });
+        let footer = sidebar.footer.or_else(|| {
+            sidebar
+                .footer_item
+                .map(|item| menu_button(item, collapsed, false))
+        });
+
         let body = Column::new()
+            .push(header.map(|header| container(header).padding(8).width(Length::Fill)))
             .push(
-                sidebar
-                    .header
-                    .map(|header| container(header).padding(8).width(Length::Fill)),
+                // `SidebarContent`: `no-scrollbar gap-0`
+                iced::widget::scrollable(Column::with_children(groups))
+                    .direction(iced::widget::scrollable::Direction::Vertical(
+                        iced::widget::scrollable::Scrollbar::hidden(),
+                    ))
+                    .height(Length::Fill),
             )
-            .push(
-                super::scroll_area::scroll_area(Column::with_children(groups)).height(Length::Fill),
-            )
-            .push(
-                sidebar
-                    .footer
-                    .map(|footer| container(footer).padding(8).width(Length::Fill)),
-            )
+            .push(footer.map(|footer| container(footer).padding(8).width(Length::Fill)))
             .height(Length::Fill);
 
         let variant = sidebar.variant;
-        let width = if collapsed { WIDTH_ICON } else { sidebar.width };
+        // The container is `--sidebar-width` wide, border or `p-2`
+        // included; collapsed floating sidebars keep their `p-2` and ring
+        // (`w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]`).
+        let width = match (variant, collapsed) {
+            (Variant::Sidebar, true) => WIDTH_ICON - 1.0,
+            (Variant::Sidebar, false) => sidebar.width - 1.0,
+            (_, true) => WIDTH_ICON + 2.0,
+            (_, false) => sidebar.width - 16.0,
+        };
 
         let panel =
             container(body)
@@ -421,6 +592,7 @@ pub fn layout<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     let variant = sidebar.variant;
     let side = sidebar.side;
+    let collapsed = sidebar.collapsed;
 
     let main = container(content)
         .width(Length::Fill)
@@ -444,10 +616,16 @@ pub fn layout<'a, Message: Clone + 'a>(
             }
         });
 
+    // `m-2 ml-0`, `ml-2` when collapsed
     let main: Element<'a, Message> = if variant == Variant::Inset {
-        container(main)
-            .padding(iced::Padding::new(8.0).left(0))
-            .into()
+        let padding = iced::Padding::new(8.0);
+        let padding = match (side, collapsed) {
+            (_, true) => padding,
+            (Side::Right, false) => padding.right(0),
+            (_, false) => padding.left(0),
+        };
+
+        container(main).padding(padding).into()
     } else {
         main.into()
     };

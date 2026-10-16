@@ -7,7 +7,8 @@ use iced_ui::calendar::Date;
 use iced_ui::chart::{self, Series};
 use iced_ui::date_picker::date_range_picker;
 use iced_ui::prelude::*;
-use iced_ui::sidebar::{group, item};
+use iced_ui::separator::vertical_separator;
+use iced_ui::sidebar::{Item, Size as SidebarSize, group, item, menu_action};
 
 use iced::widget::{column, container, row, text};
 use iced::{Center, Fill, Length};
@@ -196,38 +197,80 @@ pub const DATE_PICKER: Page = Page {
     },
 };
 
+/// A slide of the carousel examples: a card with a square content
+/// (`p-1`, `aspect-square p-6`).
+fn slide(n: usize, size: f32, square: bool) -> iced::Element<'static, Message> {
+    let number = container(text(n.to_string()).size(size).font(iced_ui::font::SEMIBOLD))
+        .center_x(Fill)
+        .center_y(Fill)
+        .padding(24);
+
+    let content: iced::Element<'static, Message> = if square {
+        iced_ui::aspect_ratio::aspect_ratio(1.0, number).into()
+    } else {
+        number.height(Length::Shrink).into()
+    };
+
+    container(card().content(content)).padding(4).into()
+}
+
 pub const CAROUSEL: Page = Page {
     id: "carousel",
     title: "Carousel",
     description: "A carousel with motion and swipe built using iced.",
     view: |gallery| {
-        let slide = |n: usize| -> iced::Element<'static, Message> {
-            card()
-                .content(
-                    container(text(n.to_string()).size(36).font(iced_ui::font::SEMIBOLD))
-                        .center_x(Fill)
-                        .center_y(160),
-                )
-                .into()
-        };
+        let index = gallery.demo.slide;
+        let on_change = |i| demo(DemoMessage::Slide(i));
 
         column![
             example(
-                "Default",
-                container(
-                    carousel(gallery.demo.slide, |i| demo(DemoMessage::Slide(i)))
-                        .items((1..=5).map(slide))
-                )
-                .max_width(380)
+                "Demo",
+                // `max-w-xs`, plus the buttons outside of it.
+                container(carousel(index, on_change).items((1..=5).map(|n| slide(n, 36.0, true))))
+                    .max_width(320 + 96)
             ),
             example(
-                "Multiple per view",
+                "Sizes",
                 container(
-                    carousel(gallery.demo.slide, |i| demo(DemoMessage::Slide(i)))
-                        .items((1..=5).map(slide))
+                    carousel(index, on_change)
+                        .items((1..=5).map(|n| slide(n, 30.0, true)))
                         .per_view(3)
                 )
-                .max_width(560)
+                .max_width(384 + 96)
+            ),
+            example(
+                "Spacing",
+                container(
+                    carousel(index, on_change)
+                        .items((1..=5).map(|n| slide(n, 24.0, true)))
+                        .per_view(3)
+                        .spacing(4.0)
+                )
+                .max_width(384 + 96)
+            ),
+            example(
+                "Orientation",
+                container(
+                    carousel(index, on_change)
+                        .items((1..=5).map(|n| slide(n, 30.0, false)))
+                        .per_view(2)
+                        .orientation(iced_ui::carousel::Orientation::Vertical)
+                )
+                .max_width(320)
+            ),
+            example(
+                "API",
+                container(column![
+                    carousel(index, on_change).items((1..=5).map(|n| slide(n, 36.0, true))),
+                    container(
+                        text(format!("Slide {} of 5", index.min(4) + 1))
+                            .size(14)
+                            .style(crate::muted)
+                    )
+                    .center_x(Fill)
+                    .padding([8, 0]),
+                ])
+                .max_width(320 + 96)
             ),
         ]
         .into()
@@ -243,18 +286,52 @@ pub const CHART: Page = Page {
     view: |_| {
         let desktop = || Series::new("Desktop", [186.0, 305.0, 237.0, 73.0, 209.0, 214.0]);
         let mobile = || Series::new("Mobile", [80.0, 200.0, 120.0, 190.0, 130.0, 140.0]);
+        let months = MONTHS.map(|month| &month[..3]);
 
-        let frame = |content: iced::Element<'static, Message>| card().content(content);
+        let frame = |title: &'static str,
+                     description: &'static str,
+                     content: iced::Element<'static, Message>| {
+            card()
+                .title(title)
+                .description(description)
+                .content(content)
+        };
 
         column![
             example(
-                "Bar",
-                frame(chart::bar(MONTHS).series(desktop()).series(mobile()).into())
+                "Your First Chart",
+                chart::bar(months)
+                    .series(desktop())
+                    .series(mobile())
+                    .grid(false)
+                    .legend(false)
+                    .tooltip(false)
             ),
             example(
-                "Area (stacked)",
+                "Add a Grid",
+                chart::bar(months)
+                    .series(desktop())
+                    .series(mobile())
+                    .legend(false)
+                    .tooltip(false)
+            ),
+            example(
+                "Add Tooltip",
+                chart::bar(months)
+                    .series(desktop())
+                    .series(mobile())
+                    .legend(false)
+            ),
+            example(
+                "Add Legend",
+                chart::bar(months).series(desktop()).series(mobile())
+            ),
+            example(
+                "Area Chart - Stacked",
                 frame(
-                    chart::area(MONTHS)
+                    "Area Chart - Stacked",
+                    "Showing total visitors for the last 6 months",
+                    chart::area(months)
                         .series(desktop())
                         .series(mobile())
                         .stacked(true)
@@ -262,9 +339,11 @@ pub const CHART: Page = Page {
                 )
             ),
             example(
-                "Line",
+                "Line Chart - Dots",
                 frame(
-                    chart::line(MONTHS)
+                    "Line Chart - Dots",
+                    "January - June 2024",
+                    chart::line(months)
                         .series(desktop())
                         .series(mobile())
                         .dots(true)
@@ -272,8 +351,10 @@ pub const CHART: Page = Page {
                 )
             ),
             example(
-                "Pie",
+                "Pie Chart - Donut",
                 frame(
+                    "Pie Chart - Donut",
+                    "January - June 2024",
                     chart::pie(
                         ["Chrome", "Safari", "Firefox", "Edge", "Other"],
                         [275.0, 200.0, 187.0, 173.0, 90.0]
@@ -287,6 +368,76 @@ pub const CHART: Page = Page {
     },
 };
 
+/// Two lines of text in a large sidebar item
+/// (`grid flex-1 text-left text-sm leading-tight`).
+fn two_lines(
+    title: &'static str,
+    subtitle: &'static str,
+    trailing: iced_ui::Icon,
+) -> iced::Element<'static, Message> {
+    row![
+        column![
+            text(title)
+                .size(14)
+                .font(iced_ui::font::MEDIUM)
+                .line_height(1.25),
+            text(subtitle).size(12).line_height(1.25),
+        ]
+        .width(Fill),
+        trailing.sized(16),
+    ]
+    .align_y(Center)
+    .into()
+}
+
+/// The square logo of the team switcher (`size-8 rounded-lg
+/// bg-sidebar-primary`).
+fn logo(icon: iced_ui::Icon) -> iced::Element<'static, Message> {
+    container(icon.sized(16))
+        .center(32)
+        .style(|theme: &iced::Theme| {
+            let t = iced_ui::tokens(theme);
+            container::Style {
+                background: Some(t.palette.sidebar_primary.into()),
+                text_color: Some(t.palette.sidebar_primary_foreground),
+                border: iced_ui::style::rounded(t.radius_lg()),
+                ..Default::default()
+            }
+        })
+        .into()
+}
+
+/// A collapsible item of the main navigation, with a chevron.
+fn nav_item(
+    title: &'static str,
+    icon: iced_ui::Icon,
+    open: bool,
+    children: &[&'static str],
+) -> Item<'static, Message> {
+    let mut item = item(title)
+        .icon(icon)
+        .content(
+            row![
+                text(title).size(14).width(Fill),
+                if open {
+                    lucide::CHEVRON_DOWN.sized(16)
+                } else {
+                    lucide::CHEVRON_RIGHT.sized(16)
+                },
+            ]
+            .align_y(Center),
+        )
+        .on_press(Message::Noop);
+
+    if open {
+        for child in children {
+            item = item.child(iced_ui::sidebar::item(*child).on_press(Message::Noop));
+        }
+    }
+
+    item
+}
+
 pub const SIDEBAR: Page = Page {
     id: "sidebar",
     title: "Sidebar",
@@ -295,93 +446,102 @@ pub const SIDEBAR: Page = Page {
         let collapsed = gallery.demo.sidebar_collapsed;
 
         let nav = sidebar()
-            .header(
-                row![
-                    container(lucide::GALLERY_VERTICAL_END.sized(16))
-                        .center(32)
-                        .style(|theme: &iced::Theme| {
-                            let t = iced_ui::tokens(theme);
-                            container::Style {
-                                background: Some(t.palette.sidebar_primary.into()),
-                                text_color: Some(t.palette.sidebar_primary_foreground),
-                                border: iced_ui::style::rounded(t.radius_lg()),
-                                ..Default::default()
-                            }
-                        }),
-                    column![
-                        text("Acme Inc").size(14).font(iced_ui::font::SEMIBOLD),
-                        text("Enterprise").size(12),
-                    ],
-                ]
-                .spacing(8)
-                .align_y(Center),
+            .header_item(
+                item("Acme Inc")
+                    .size(SidebarSize::Lg)
+                    .icon_element(logo(lucide::GALLERY_VERTICAL_END))
+                    .content(two_lines(
+                        "Acme Inc",
+                        "Enterprise",
+                        lucide::CHEVRONS_UP_DOWN,
+                    ))
+                    .on_press(Message::Noop),
             )
             .group(
                 group("Platform")
-                    .item(
-                        item("Playground")
-                            .icon(lucide::SQUARE_TERMINAL)
-                            .active(true)
-                            .on_press(Message::Noop)
-                            .child(item("History").on_press(Message::Noop))
-                            .child(item("Starred").on_press(Message::Noop)),
-                    )
-                    .item(item("Models").icon(lucide::BOT).on_press(Message::Noop))
-                    .item(
-                        item("Documentation")
-                            .icon(lucide::BOOK_OPEN)
-                            .on_press(Message::Noop),
-                    )
-                    .item(
-                        item("Settings")
-                            .icon(lucide::SETTINGS_2)
-                            .on_press(Message::Noop),
-                    ),
+                    .item(nav_item(
+                        "Playground",
+                        lucide::SQUARE_TERMINAL,
+                        true,
+                        &["History", "Starred", "Settings"],
+                    ))
+                    .item(nav_item("Models", lucide::BOT, false, &[]))
+                    .item(nav_item("Documentation", lucide::BOOK_OPEN, false, &[]))
+                    .item(nav_item("Settings", lucide::SETTINGS_2, false, &[])),
             )
             .group(
                 group("Projects")
                     .item(
                         item("Design Engineering")
                             .icon(lucide::FRAME)
-                            .badge("12")
+                            .action(menu_action(lucide::ELLIPSIS, Message::Noop))
                             .on_press(Message::Noop),
                     )
                     .item(
                         item("Sales & Marketing")
                             .icon(lucide::CHART_PIE)
+                            .action(menu_action(lucide::ELLIPSIS, Message::Noop))
                             .on_press(Message::Noop),
                     )
-                    .item(item("Travel").icon(lucide::MAP).on_press(Message::Noop)),
+                    .item(
+                        item("Travel")
+                            .icon(lucide::MAP)
+                            .action(menu_action(lucide::ELLIPSIS, Message::Noop))
+                            .on_press(Message::Noop),
+                    )
+                    .item(
+                        item("More")
+                            .icon(lucide::ELLIPSIS)
+                            .badge("24")
+                            .on_press(Message::Noop),
+                    ),
             )
-            .footer(item_footer())
+            .footer_item(
+                item("shadcn")
+                    .size(SidebarSize::Lg)
+                    .icon_element(avatar("CN"))
+                    .content(two_lines(
+                        "shadcn",
+                        "m@example.com",
+                        lucide::CHEVRONS_UP_DOWN,
+                    ))
+                    .on_press(Message::Noop),
+            )
             .collapsed(collapsed)
             .variant(iced_ui::sidebar::Variant::Inset);
 
+        // `h-16 shrink-0 items-center gap-2 px-4`, then `gap-4 p-4 pt-0`
         let main = column![
             row![
                 iced_ui::sidebar::trigger(demo(DemoMessage::SidebarCollapsed(!collapsed))),
+                container(vertical_separator()).height(16),
                 breadcrumb()
-                    .link("Building Your Application", Message::Noop)
+                    .link("Build Your Application", Message::Noop)
                     .page("Data Fetching"),
             ]
             .spacing(8)
+            .height(64)
+            .padding([0, 16])
             .align_y(Center),
-            row![
-                skeleton(Fill, 100).radius(12.0),
-                skeleton(Fill, 100).radius(12.0),
-                skeleton(Fill, 100).radius(12.0)
+            column![
+                row![
+                    skeleton(Fill, 120).radius(12.0),
+                    skeleton(Fill, 120).radius(12.0),
+                    skeleton(Fill, 120).radius(12.0)
+                ]
+                .spacing(16),
+                skeleton(Fill, Fill).radius(12.0),
             ]
-            .spacing(16),
-            skeleton(Fill, Fill).radius(12.0),
-        ]
-        .spacing(16)
-        .padding(16);
+            .spacing(16)
+            .padding(iced::Padding::new(16.0).top(0)),
+        ];
 
         example(
-            "Inset",
+            "Demo",
             container(iced_ui::sidebar::layout(nav, main))
-                .height(480)
+                .height(560)
                 .width(Fill)
+                .clip(true)
                 .style(|theme: &iced::Theme| {
                     let t = iced_ui::tokens(theme);
                     container::Style {
@@ -392,19 +552,3 @@ pub const SIDEBAR: Page = Page {
         )
     },
 };
-
-fn item_footer() -> iced::Element<'static, Message> {
-    row![
-        avatar("CN"),
-        column![
-            text("shadcn").size(14).font(iced_ui::font::SEMIBOLD),
-            text("m@example.com").size(12)
-        ]
-        .width(Fill),
-        lucide::CHEVRONS_UP_DOWN.sized(16),
-    ]
-    .spacing(8)
-    .align_y(Center)
-    .padding(8)
-    .into()
-}
