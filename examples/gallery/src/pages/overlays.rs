@@ -304,7 +304,10 @@ pub const POPOVER: Page = Page {
         // `grid grid-cols-3 items-center gap-4`, inputs `col-span-2 h-8`.
         let dimension = |label: &'static str, value: &str| {
             row![
-                text(label).size(14).font(iced_ui::font::medium()).width(Fill),
+                text(label)
+                    .size(14)
+                    .font(iced_ui::font::medium())
+                    .width(Fill),
                 container(input("", value).on_input(|_| Message::Noop))
                     .width(iced::Length::FillPortion(2)),
             ]

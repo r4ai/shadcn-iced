@@ -136,6 +136,13 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
                 .width(Length::Fill)
         });
 
+        // Content that fills the height (e.g. a scrollable) takes the room
+        // left above the footer.
+        let fills = sheet
+            .content
+            .iter()
+            .any(|element| element.as_widget().size_hint().height.is_fill());
+
         let content = (!sheet.content.is_empty()).then(|| {
             Column::with_children(sheet.content.into_iter().map(|element| {
                 container(element)
@@ -154,7 +161,7 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
         let body = Column::new()
             .push(header)
             .push(content)
-            .push(vertical.then(space::vertical))
+            .push((vertical && !fills).then(space::vertical))
             .push(footer)
             .spacing(16)
             .width(Length::Fill)

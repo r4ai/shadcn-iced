@@ -12,6 +12,11 @@
 //! - `--key escape|enter|tab|down|up`: taps a key,
 //! - `--wait MS`: lets time pass (for hover delays and timers).
 //!
+//! Theme options: `--base NAME`, `--accent NAME`, `--chart NAME`,
+//! `--radius none|small|medium|large`, `--menu-color
+//! inverted|translucent|inverted-translucent`, `--menu-accent bold`,
+//! `--heading geist|inter`, and `--customize` to open the customizer.
+//!
 //! Animations are disabled unless `--animations` is passed, e.g. to capture
 //! a frame in the middle of one with `--animations --live --click Open --wait 75`.
 //!
@@ -103,6 +108,7 @@ fn main() {
     let mut base = None;
     let mut animations = false;
     let mut accent = None;
+    let mut setup: Vec<Message> = Vec::new();
     let mut args = std::env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -141,6 +147,72 @@ fn main() {
                     .iter()
                     .copied()
                     .find(|a| a.name() == name);
+                None
+            }
+            "--chart" => {
+                use iced_ui::theme::{Accent, BaseColor, ThemeColor};
+                let name = args.next().expect("chart color");
+                let color = BaseColor::ALL
+                    .iter()
+                    .find(|b| b.name() == name)
+                    .map(|b| ThemeColor::Base(*b))
+                    .or_else(|| {
+                        Accent::ALL
+                            .iter()
+                            .find(|a| a.name() == name)
+                            .map(|a| ThemeColor::Accent(*a))
+                    });
+                setup.push(Message::Chart(color));
+                None
+            }
+            "--radius" => {
+                use iced_ui::theme::Radius;
+                setup.push(Message::Radius(
+                    match args.next().expect("radius").as_str() {
+                        "none" => Radius::None,
+                        "small" => Radius::Small,
+                        "medium" => Radius::Medium,
+                        "large" => Radius::Large,
+                        _ => Radius::Default,
+                    },
+                ));
+                None
+            }
+            "--menu-color" => {
+                use iced_ui::theme::MenuColor;
+                setup.push(Message::MenuColor(
+                    match args.next().expect("menu color").as_str() {
+                        "inverted" => MenuColor::Inverted,
+                        "translucent" => MenuColor::DefaultTranslucent,
+                        "inverted-translucent" => MenuColor::InvertedTranslucent,
+                        _ => MenuColor::Default,
+                    },
+                ));
+                None
+            }
+            "--menu-accent" => {
+                use iced_ui::theme::MenuAccent;
+                setup.push(Message::MenuAccent(
+                    match args.next().expect("menu accent").as_str() {
+                        "bold" => MenuAccent::Bold,
+                        _ => MenuAccent::Subtle,
+                    },
+                ));
+                None
+            }
+            "--heading" => {
+                use gallery::customizer::Heading;
+                setup.push(Message::Heading(
+                    match args.next().expect("heading").as_str() {
+                        "geist" => Heading::Geist,
+                        "inter" => Heading::Inter,
+                        _ => Heading::Inherit,
+                    },
+                ));
+                None
+            }
+            "--customize" => {
+                setup.push(Message::Customize(true));
                 None
             }
             "--suffix" => {
@@ -193,6 +265,10 @@ fn main() {
 
             if accent.is_some() {
                 let _ = gallery.update(Message::Accent(accent));
+            }
+
+            for message in &setup {
+                let _ = gallery.update(message.clone());
             }
 
             for action in &before {

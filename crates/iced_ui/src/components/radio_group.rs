@@ -117,7 +117,14 @@ pub fn radio_item<'a, Message: Clone + 'a>(
     label: impl Into<String>,
     on_select: Option<Message>,
 ) -> Element<'a, Message> {
-    item(selected, label.into(), None, on_select, false, font::medium())
+    item(
+        selected,
+        label.into(),
+        None,
+        on_select,
+        false,
+        font::medium(),
+    )
 }
 
 fn item<'a, Message: Clone + 'a>(

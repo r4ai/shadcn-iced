@@ -475,11 +475,14 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
 
         let groups = sidebar.groups.into_iter().map(|group| {
             let label = group.label.filter(|_| !collapsed).map(|label| {
-                container(text(label).size(style::text::XS).font(font::medium()).style(
-                    |theme: &Theme| text::Style {
-                        color: Some(alpha(tokens(theme).palette.sidebar_foreground, 0.7)),
-                    },
-                ))
+                container(
+                    text(label)
+                        .size(style::text::XS)
+                        .font(font::medium())
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(alpha(tokens(theme).palette.sidebar_foreground, 0.7)),
+                        }),
+                )
                 .padding([0, 8])
                 .center_y(32)
             });

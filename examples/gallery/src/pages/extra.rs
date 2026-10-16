@@ -198,10 +198,14 @@ pub const DATE_PICKER: Page = Page {
 /// A slide of the carousel examples: a card with a square content
 /// (`p-1`, `aspect-square p-6`).
 fn slide(n: usize, size: f32, square: bool) -> iced::Element<'static, Message> {
-    let number = container(text(n.to_string()).size(size).font(iced_ui::font::semibold()))
-        .center_x(Fill)
-        .center_y(Fill)
-        .padding(24);
+    let number = container(
+        text(n.to_string())
+            .size(size)
+            .font(iced_ui::font::semibold()),
+    )
+    .center_x(Fill)
+    .center_y(Fill)
+    .padding(24);
 
     let content: iced::Element<'static, Message> = if square {
         iced_ui::aspect_ratio::aspect_ratio(1.0, number).into()

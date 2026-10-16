@@ -1194,7 +1194,8 @@ pub const RESIZABLE: Page = Page {
     description: "Accessible resizable panel groups and layouts with keyboard support.",
     view: |_| {
         // `flex items-center justify-center p-6`, `font-semibold`
-        let panel = |label: &'static str| container(text(label).font(font::semibold())).center(Fill);
+        let panel =
+            |label: &'static str| container(text(label).font(font::semibold())).center(Fill);
 
         column![
             example(

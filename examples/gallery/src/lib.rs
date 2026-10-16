@@ -1,8 +1,9 @@
 //! The iced_ui gallery: a documentation-like showcase of every component.
+pub mod customizer;
 pub mod pages;
 
 use iced_ui::prelude::*;
-use iced_ui::theme::{Accent, BaseColor};
+use iced_ui::theme::{Accent, BaseColor, MenuAccent, MenuColor, Radius, ThemeColor};
 use iced_ui::{font, style, tokens};
 
 use iced::widget::{column, container, row, rule, space, text};
@@ -17,7 +18,13 @@ pub struct Gallery {
     pub mode: Mode,
     pub base: BaseColor,
     pub accent: Option<Accent>,
-    pub radius: f32,
+    pub chart: Option<ThemeColor>,
+    pub radius: Radius,
+    pub menu_color: MenuColor,
+    pub menu_accent: MenuAccent,
+    pub heading: customizer::Heading,
+    pub customize: bool,
+    pub copied: bool,
     pub theme: Theme,
     pub demo: pages::Demo,
 }
@@ -28,7 +35,14 @@ pub enum Message {
     ToggleMode,
     Base(BaseColor),
     Accent(Option<Accent>),
-    Radius(f32),
+    Chart(Option<ThemeColor>),
+    Radius(Radius),
+    MenuColor(MenuColor),
+    MenuAccent(MenuAccent),
+    Heading(customizer::Heading),
+    Customize(bool),
+    CopyTheme,
+    ResetTheme,
     Demo(pages::DemoMessage),
     Noop,
 }
@@ -49,7 +63,13 @@ impl Gallery {
             mode,
             base: BaseColor::Neutral,
             accent: None,
-            radius: iced_ui::Tokens::DEFAULT_RADIUS,
+            chart: None,
+            radius: Radius::Default,
+            menu_color: MenuColor::Default,
+            menu_accent: MenuAccent::Subtle,
+            heading: customizer::Heading::Inherit,
+            customize: false,
+            copied: false,
             theme: Theme::Light,
             demo: pages::Demo::default(),
         };
@@ -62,12 +82,18 @@ impl Gallery {
     }
 
     fn rebuild_theme(&mut self) {
-        let mut config = iced_ui::theme::Config::new(self.base, self.mode).radius(self.radius);
+        let mut config = iced_ui::theme::Config::new(self.base, self.mode)
+            .accent_maybe(self.accent)
+            .radius_preset(self.radius)
+            .menu_accent(self.menu_accent)
+            .menu_color(self.menu_color);
 
-        if let Some(accent) = self.accent {
-            config = config.accent(accent);
+        if let Some(chart) = self.chart {
+            config = config.chart_color(chart);
         }
 
+        font::set_heading(self.heading.family());
+        self.copied = false;
         self.theme = config.build();
     }
 
@@ -80,15 +106,47 @@ impl Gallery {
             }
             Message::Base(base) => {
                 self.base = base;
+                if matches!(self.chart, Some(ThemeColor::Base(_))) {
+                    self.chart = Some(ThemeColor::Base(base));
+                }
                 self.rebuild_theme();
             }
             Message::Accent(accent) => {
                 self.accent = accent;
                 self.rebuild_theme();
             }
+            Message::Chart(chart) => {
+                self.chart = chart;
+                self.rebuild_theme();
+            }
             Message::Radius(radius) => {
                 self.radius = radius;
                 self.rebuild_theme();
+            }
+            Message::MenuColor(color) => {
+                self.menu_color = color;
+                self.rebuild_theme();
+            }
+            Message::MenuAccent(accent) => {
+                self.menu_accent = accent;
+                self.rebuild_theme();
+            }
+            Message::Heading(heading) => {
+                self.heading = heading;
+                self.rebuild_theme();
+            }
+            Message::Customize(open) => self.customize = open,
+            Message::CopyTheme => {
+                self.copied = true;
+                return iced::clipboard::write(customizer::code(self));
+            }
+            Message::ResetTheme => {
+                let customize = self.customize;
+                *self = Self {
+                    customize,
+                    demo: std::mem::take(&mut self.demo),
+                    ..Self::new(self.page, self.mode)
+                };
             }
             Message::Demo(message) => return self.demo.update(message),
             Message::Noop => {}
@@ -141,37 +199,14 @@ impl Gallery {
                 ))
                 .width(240.0);
 
-        let base = iced_ui::select::select(Some(self.base), Message::Base)
-            .options(BaseColor::ALL.iter().copied())
-            .size(iced_ui::select::Size::Sm)
-            .width(120);
-
-        let accent = Accent::ALL
-            .iter()
-            .fold(
-                iced_ui::select::select(Some(self.accent), Message::Accent)
-                    .option(None, "No accent"),
-                |select, accent| select.option(Some(*accent), accent.to_string()),
-            )
-            .size(iced_ui::select::Size::Sm)
-            .width(130);
-
-        let radius = iced_ui::toggle_group::toggle_group(&[self.radius as u32], |r| {
-            Message::Radius(r as f32)
-        })
-        .variant(iced_ui::toggle::Variant::Outline)
-        .size(iced_ui::toggle::Size::Sm)
-        .label(0, "0")
-        .label(6, "0.3")
-        .label(10, "0.6")
-        .label(16, "1.0");
-
         let header = row![
             text(page.title).size(style::text::SM).font(font::medium()),
             space::horizontal(),
-            base,
-            accent,
-            radius,
+            iced_ui::button::button("Customize")
+                .icon(lucide::PALETTE)
+                .variant(iced_ui::button::Variant::Outline)
+                .size(iced_ui::button::Size::Sm)
+                .on_press(Message::Customize(true)),
             iced_ui::button::icon_button(match self.mode {
                 Mode::Light => lucide::MOON,
                 Mode::Dark => lucide::SUN,
@@ -199,7 +234,14 @@ impl Gallery {
         .width(Fill)
         .height(Fill);
 
-        let main = column![header, rule::horizontal(1).style(separator), content];
+        let main = iced_ui::sheet::sheet(
+            column![header, rule::horizontal(1).style(separator), content],
+            self.customize,
+        )
+        .title("Customize")
+        .description("Pick a style and color for your components.")
+        .content(scrollable(customizer::view(self)).height(Fill))
+        .on_close(Message::Customize(false));
 
         iced_ui::sonner::toaster(
             iced_ui::sidebar::layout(nav, main),
@@ -254,7 +296,10 @@ pub fn example<'a>(
 pub fn settings() -> iced::Settings {
     iced::Settings {
         fonts: iced_ui::font::all(),
-        default_font: iced_ui::font::sans(),
+        default_font: {
+            iced_ui::font::set_sans(customizer::body_font());
+            iced_ui::font::sans()
+        },
         ..Default::default()
     }
 }
