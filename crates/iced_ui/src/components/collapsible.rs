@@ -17,8 +17,9 @@ use iced_ui_core::{Element, font, style};
 use iced::widget::{Row, text};
 use iced::{Alignment, Length};
 
-/// Creates a collapsible with a text header and a chevron button, like the
-/// shadcn/ui example. For custom triggers, use [`custom`].
+/// Creates a collapsible with a text header (`text-sm font-semibold`) and
+/// a ghost chevron button (`size-8`) in a `px-4 gap-4` row, like the
+/// shadcn/ui example. The content is shown `gap-2` below. For custom triggers, use [`custom`].
 pub fn collapsible<'a, Message: Clone + 'a>(
     title: impl Into<String>,
     content: impl Into<Element<'a, Message>>,
@@ -36,9 +37,10 @@ pub fn collapsible<'a, Message: Clone + 'a>(
             .push(
                 icon_button::<Message>(lucide::CHEVRONS_UP_DOWN)
                     .variant(Variant::Ghost)
-                    .size(Size::IconSm),
+                    .size(Size::Icon),
             )
             .spacing(16)
+            .padding([0, 16])
             .align_y(Alignment::Center)
             .into()
     };

@@ -25,9 +25,9 @@ use iced::{Alignment, Background, Color, Event, Length, Rectangle, Theme, border
 /// The size of a [`Switch`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Size {
-    /// 24x14
+    /// `h-[14px] w-[24px]`, with a `size-3` thumb.
     Sm,
-    /// 32x18
+    /// `h-[18.4px] w-[32px]`, with a `size-4` thumb.
     #[default]
     Default,
 }
@@ -38,6 +38,7 @@ pub struct Switch<'a, Message> {
     label: Option<String>,
     on_toggle: Option<Box<dyn Fn(bool) -> Message + 'a>>,
     disabled: bool,
+    invalid: bool,
     size: Size,
 }
 
@@ -48,6 +49,7 @@ pub fn switch<'a, Message: Clone + 'a>(checked: bool) -> Switch<'a, Message> {
         label: None,
         on_toggle: None,
         disabled: false,
+        invalid: false,
         size: Size::Default,
     }
 }
@@ -71,6 +73,12 @@ impl<'a, Message: Clone + 'a> Switch<'a, Message> {
         self
     }
 
+    /// Marks the switch as invalid (`aria-invalid`).
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
+        self
+    }
+
     /// Sets the size.
     pub fn size(mut self, size: Size) -> Self {
         self.size = size;
@@ -84,13 +92,14 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
         let disabled = switch.disabled || switch.on_toggle.is_none();
 
         let (width, height, thumb) = match switch.size {
-            Size::Default => (32.0, 18.0, 16.0),
+            Size::Default => (32.0, 18.4, 16.0),
             Size::Sm => (24.0, 14.0, 12.0),
         };
 
         let track = Track {
             checked,
             disabled,
+            invalid: switch.invalid,
             size: iced::Size::new(width, height),
             thumb,
         };
@@ -157,7 +166,6 @@ pub fn track(theme: &Theme, checked: bool, disabled: bool) -> container::Style {
             width: 1.0,
             radius: border::radius(f32::MAX),
         },
-        shadow: style::shadow_xs(),
         ..container::Style::default()
     }
 }
@@ -192,6 +200,7 @@ pub fn thumb(theme: &Theme, checked: bool, disabled: bool) -> container::Style {
 struct Track {
     checked: bool,
     disabled: bool,
+    invalid: bool,
     size: iced::Size,
     thumb: f32,
 }
@@ -287,11 +296,48 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Track {
             _ => Color::TRANSPARENT,
         };
 
+        let t = tokens(theme);
+        let opacity = if self.disabled {
+            style::DISABLED_OPACITY
+        } else {
+            1.0
+        };
+
+        // `aria-invalid:ring-3 aria-invalid:ring-destructive/20`
+        if self.invalid {
+            let ring = style::invalid_outset_ring(&t, bounds.height / 2.0);
+
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: bounds.expand(ring.width),
+                    border: iced::Border {
+                        color: alpha(ring.color, opacity),
+                        width: ring.width,
+                        radius: border::radius(f32::MAX),
+                    },
+                    ..renderer::Quad::default()
+                },
+                Background::Color(Color::TRANSPARENT),
+            );
+        }
+
         renderer.fill_quad(
             renderer::Quad {
                 bounds,
-                border: border::rounded(f32::MAX),
-                shadow: style::shadow_xs(),
+                // `border border-transparent`, or
+                // `aria-invalid:border-destructive dark:aria-invalid:border-destructive/50`
+                border: iced::Border {
+                    color: if self.invalid {
+                        alpha(
+                            t.palette.destructive,
+                            opacity * if t.is_dark() { 0.5 } else { 1.0 },
+                        )
+                    } else {
+                        Color::TRANSPARENT
+                    },
+                    width: 1.0,
+                    radius: border::radius(f32::MAX),
+                },
                 ..renderer::Quad::default()
             },
             Background::Color(mix(color(&off), color(&on), position)),
