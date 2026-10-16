@@ -3,6 +3,7 @@ mod basics;
 mod button;
 pub mod interactive;
 pub mod overlays;
+pub mod extra;
 
 use crate::{Gallery, Message};
 
@@ -26,12 +27,16 @@ pub const PAGES: &[Page] = &[
     basics::BREADCRUMB,
     button::PAGE,
     interactive::BUTTON_GROUP,
+    extra::CALENDAR,
     basics::CARD,
+    extra::CAROUSEL,
+    extra::CHART,
     interactive::CHECKBOX,
     interactive::COLLAPSIBLE,
     overlays::COMBOBOX,
     overlays::COMMAND,
     overlays::CONTEXT_MENU,
+    extra::DATE_PICKER,
     overlays::DIALOG,
     overlays::DRAWER,
     overlays::DROPDOWN_MENU,
@@ -54,6 +59,7 @@ pub const PAGES: &[Page] = &[
     basics::SCROLL_AREA,
     overlays::SELECT,
     basics::SEPARATOR,
+    extra::SIDEBAR,
     overlays::SHEET,
     basics::SKELETON,
     interactive::SLIDER,
@@ -105,6 +111,11 @@ pub struct Demo {
     pub framework: Option<&'static str>,
     pub toasts: Vec<iced_ui::sonner::Toast<Message>>,
     pub next_toast: u64,
+    pub month: iced_ui::calendar::Month,
+    pub date: Option<iced_ui::calendar::Date>,
+    pub range: (Option<iced_ui::calendar::Date>, Option<iced_ui::calendar::Date>),
+    pub slide: usize,
+    pub sidebar_collapsed: bool,
 }
 
 pub const FRUITS: [&str; 5] = ["Apple", "Banana", "Blueberry", "Grapes", "Pineapple"];
@@ -145,6 +156,11 @@ impl Default for Demo {
             framework: None,
             toasts: Vec::new(),
             next_toast: 0,
+            month: iced_ui::calendar::Month { year: 2026, month: 10 },
+            date: iced_ui::calendar::Date::new(2026, 10, 16),
+            range: (iced_ui::calendar::Date::new(2026, 10, 12), iced_ui::calendar::Date::new(2026, 10, 22)),
+            slide: 0,
+            sidebar_collapsed: false,
         }
     }
 }
@@ -184,6 +200,11 @@ pub enum DemoMessage {
     Framework(&'static str),
     Toast(iced_ui::sonner::Kind),
     DismissToast(u64),
+    Month(iced_ui::calendar::Month),
+    Date(iced_ui::calendar::Date),
+    Range(iced_ui::calendar::Date),
+    Slide(usize),
+    SidebarCollapsed(bool),
 }
 
 impl Demo {
@@ -249,6 +270,16 @@ impl Demo {
                 self.toasts.push(toast.kind(kind));
             }
             DemoMessage::DismissToast(id) => self.toasts.retain(|toast| toast.id != id),
+            DemoMessage::Month(month) => self.month = month,
+            DemoMessage::Date(date) => self.date = Some(date),
+            DemoMessage::Range(date) => {
+                self.range = match self.range {
+                    (Some(start), None) if date >= start => (Some(start), Some(date)),
+                    _ => (Some(date), None),
+                };
+            }
+            DemoMessage::Slide(index) => self.slide = index,
+            DemoMessage::SidebarCollapsed(collapsed) => self.sidebar_collapsed = collapsed,
         }
 
         Task::none()

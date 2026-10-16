@@ -136,6 +136,7 @@ pub struct Button<'a, Message> {
     width: Option<Length>,
     position: style::Position,
     vertical: bool,
+    rounded: bool,
 }
 
 /// Creates a [`Button`] with a text label.
@@ -161,6 +162,7 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
             width: None,
             position: style::Position::Alone,
             vertical: false,
+            rounded: false,
         }
     }
 
@@ -219,6 +221,12 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
         self
     }
 
+    /// Makes the button fully rounded (`rounded-full`).
+    pub fn rounded(mut self, rounded: bool) -> Self {
+        self.rounded = rounded;
+        self
+    }
+
     /// Sets the width. Buttons shrink to fit their content by default.
     pub fn width(mut self, width: impl Into<Length>) -> Self {
         self.width = Some(width.into());
@@ -269,6 +277,7 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         let variant = button.variant;
         let position = button.position;
         let vertical = button.vertical;
+        let rounded = button.rounded;
 
         Pressable::new(content)
             .on_press_maybe(button.on_press)
@@ -278,7 +287,7 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             .padding([0.0, size.padding_x(has_icon)])
             .style(move |theme, status| {
                 let mut style = self::style(theme, status, variant);
-                let radius = tokens(theme).radius_md();
+                let radius = if rounded { f32::MAX } else { tokens(theme).radius_md() };
 
                 style.border.radius = if vertical {
                     position.vertical_radius(radius)
