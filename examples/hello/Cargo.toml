@@ -1,0 +1,12 @@
+[package]
+name = "hello"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+iced.workspace = true
+iced_ui = { path = "../../crates/iced_ui" }
+
+[lints]
+workspace = true
