@@ -18,20 +18,22 @@
 //! .into()
 //! # }
 //! ```
-use super::menu::Menu;
+use super::menu::{Kind, Menu};
 
 use iced_ui_core::Element;
 use iced_ui_core::primitive::{Align, Anchored, Side};
 
 /// Creates a dropdown menu opened by clicking `trigger`.
 ///
-/// The returned [`Anchored`] can be customized further, e.g. with
-/// [`Anchored::side`] or [`Anchored::align`].
+/// The menu is placed below the trigger, aligned with its start
+/// (`side="bottom" align="start" sideOffset={4}`). The returned
+/// [`Anchored`] can be customized further, e.g. with [`Anchored::side`] or
+/// [`Anchored::align`].
 pub fn dropdown_menu<'a, Message: Clone + 'a>(
     trigger: impl Into<Element<'a, Message>>,
     menu: Menu<'a, Message>,
 ) -> Anchored<'a, Message> {
-    Anchored::new(trigger, menu)
+    Anchored::new(trigger, menu.kind(Kind::Dropdown))
         .side(Side::Bottom)
         .align(Align::Start)
         .offset(4.0)

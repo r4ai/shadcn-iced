@@ -15,7 +15,7 @@
 //!     .into()
 //! # }
 //! ```
-use super::menu;
+use super::menu::{self, menu_tokens};
 
 use iced_ui_core::icon::lucide;
 use iced_ui_core::primitive::{Align, Anchored, Pressable, Side, listbox};
@@ -24,7 +24,7 @@ use iced_ui_core::{Element, style, tokens};
 
 use iced::widget::button::{Status, Style};
 use iced::widget::{Row, container, scrollable, text};
-use iced::{Alignment, Background, Border, Color, Length, Padding, Theme, border};
+use iced::{Alignment, Background, Border, Color, Length, Theme, border};
 
 enum Entry<T> {
     Option(T, String, bool),
@@ -32,14 +32,37 @@ enum Entry<T> {
     Separator,
 }
 
+impl<T> Entry<T> {
+    /// The height of the entry in the list.
+    fn height(&self) -> f32 {
+        match self {
+            // `py-1` + `text-sm`
+            Entry::Option(..) => 28.0,
+            // `py-1` + `text-xs`
+            Entry::Label(_) => 24.0,
+            // `my-1 h-px`
+            Entry::Separator => 9.0,
+        }
+    }
+}
+
 /// The size of the trigger of a [`Select`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Size {
-    /// `h-8`
+    /// `h-7`
     Sm,
-    /// `h-9`
+    /// `h-8`
     #[default]
     Default,
+}
+
+impl Size {
+    fn height(self) -> f32 {
+        match self {
+            Size::Sm => 28.0,
+            Size::Default => 32.0,
+        }
+    }
 }
 
 /// A select. See the [module documentation](self).
@@ -52,6 +75,7 @@ pub struct Select<'a, T, Message> {
     size: Size,
     disabled: bool,
     invalid: bool,
+    align_item_with_trigger: bool,
 }
 
 /// Creates a [`Select`] with the given selected value.
@@ -68,6 +92,7 @@ pub fn select<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a>(
         size: Size::Default,
         disabled: false,
         invalid: false,
+        align_item_with_trigger: true,
     }
 }
 
@@ -137,6 +162,14 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> Select<'a, T, Message> 
         self.invalid = invalid;
         self
     }
+
+    /// Sets whether the list opens over the trigger, with the selected item
+    /// (or the first one) on top of the trigger (`alignItemWithTrigger`,
+    /// the default). Otherwise it opens below the trigger.
+    pub fn align_item_with_trigger(mut self, align: bool) -> Self {
+        self.align_item_with_trigger = align;
+        self
+    }
 }
 
 impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Message>>
@@ -152,7 +185,9 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
 
         let has_value = selected_label.is_some();
         let invalid = select.invalid;
+        let size = select.size;
 
+        // `gap-1.5 py-2 pr-2 pl-2.5 text-sm`
         let trigger = Pressable::new(
             Row::new()
                 .push(
@@ -173,21 +208,43 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                     lucide::CHEVRON_DOWN
                         .sized(16)
                         .style(|theme: &Theme| text::Style {
-                            color: Some(alpha(tokens(theme).palette.muted_foreground, 0.5)),
+                            color: Some(tokens(theme).palette.muted_foreground),
                         }),
                 )
-                .spacing(8)
+                .spacing(6)
                 .align_y(Alignment::Center)
                 .height(Length::Fill),
         )
         .width(select.width)
-        .height(match select.size {
-            Size::Sm => 32,
-            Size::Default => 36,
+        .height(size.height())
+        .padding(iced::Padding {
+            top: 0.0,
+            right: 8.0,
+            bottom: 0.0,
+            left: 10.0,
         })
-        .padding([0, 12])
         .disabled(select.disabled)
-        .style(move |theme, status| trigger(theme, status, invalid));
+        .style(move |theme, status| trigger_style(theme, status, invalid, size));
+
+        // Where the selected (or first) option sits in the list, to open
+        // the list with it on top of the trigger.
+        let mut item_top = 1.0 + 4.0;
+        let mut aligned = None;
+        let mut first = None;
+
+        for entry in &select.entries {
+            if let Entry::Option(value, ..) = entry {
+                first.get_or_insert(item_top);
+
+                if select.selected.as_ref() == Some(value) {
+                    aligned = Some(item_top);
+                }
+            }
+
+            item_top += entry.height();
+        }
+
+        let aligned_top = aligned.or(first).unwrap_or(0.0);
 
         let mut list = listbox::Listbox::new(menu::highlight);
 
@@ -203,66 +260,82 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                         .style(move |theme: &Theme| text::Style {
                             color: disabled.then(|| {
                                 alpha(
-                                    tokens(theme).palette.popover_foreground,
+                                    menu_tokens(theme).palette.popover_foreground,
                                     style::DISABLED_OPACITY,
                                 )
                             }),
                         });
 
+                    // `absolute right-2 size-4`
                     let check = container(is_selected.then(|| lucide::CHECK.sized(16)))
                         .width(16)
                         .into();
 
+                    // `gap-1.5 py-1 pr-8 pl-1.5`
                     list.item(
                         listbox::row(label, Some(check))
                             .spacing(8.0)
-                            .padding(Padding {
-                                top: 6.0,
-                                bottom: 6.0,
-                                left: 8.0,
-                                right: 8.0,
-                            }),
+                            .padding(menu::ITEM_PADDING.right(8)),
                         (!disabled).then(|| (select.on_select)(value)),
                     )
                 }
                 Entry::Label(label) => list.push(
-                    container(text(label).size(style::text::XS).style(|theme: &Theme| {
-                        text::Style {
-                            color: Some(tokens(theme).palette.muted_foreground),
-                        }
-                    }))
-                    .padding([6, 8]),
+                    // `px-1.5 py-1 text-xs text-muted-foreground`
+                    container(
+                        text(label)
+                            .size(style::text::XS)
+                            .line_height(iced::Pixels(16.0))
+                            .style(|theme: &Theme| text::Style {
+                                color: Some(menu_tokens(theme).palette.muted_foreground),
+                            }),
+                    )
+                    .padding(menu::ITEM_PADDING),
                 ),
-                Entry::Separator => {
-                    list.push(container(super::separator::separator()).padding([4, 0]))
-                }
+                Entry::Separator => list.push(menu::separator()),
             };
         }
 
+        // `min-w-36 rounded-lg shadow-md ring-1`, `p-1` groups.
         let content = container(
-            scrollable(list.padding(4))
+            scrollable(list.padding(4).min_width(144.0 - 10.0))
                 .width(Length::Shrink)
                 .direction(scrollable::Direction::Vertical(
                     super::scroll_area::scrollbar(),
                 ))
                 .style(super::scroll_area::style),
         )
-        .max_height(300)
+        .padding(1)
+        .max_height(600)
         .style(menu::panel);
 
-        Anchored::new(trigger, content)
-            .side(Side::Bottom)
+        let anchored = Anchored::new(trigger, content)
             .align(Align::Start)
-            .offset(4.0)
             .match_anchor_width(true)
             .close_on_select(true)
-            .modal(true)
-            .into()
+            .modal(true);
+
+        if select.align_item_with_trigger {
+            // The item centered on the trigger, its text aligned with the
+            // value (`pl-2.5` against the ring, `p-1` and `pl-1.5`).
+            anchored
+                .side(Side::Bottom)
+                .offset(-(size.height() + 28.0) / 2.0 - aligned_top)
+                .align_offset(-1.0)
+                .animate(false)
+                .into()
+        } else {
+            anchored.side(Side::Bottom).offset(4.0).into()
+        }
     }
 }
 
-/// The style of the trigger of a select.
+/// The style of the trigger of a select (`rounded-lg border border-input
+/// bg-transparent dark:bg-input/30 dark:hover:bg-input/50`).
 pub fn trigger(theme: &Theme, status: Status, invalid: bool) -> Style {
+    trigger_style(theme, status, invalid, Size::Default)
+}
+
+fn trigger_style(theme: &Theme, status: Status, invalid: bool, size: Size) -> Style {
     let t = tokens(theme);
     let p = &t.palette;
     let dark = t.is_dark();
@@ -281,9 +354,24 @@ pub fn trigger(theme: &Theme, status: Status, invalid: bool) -> Style {
         })),
         text_color: alpha(p.foreground, opacity),
         border: Border {
-            color: alpha(if invalid { p.destructive } else { p.input }, opacity),
+            color: alpha(
+                if invalid {
+                    if dark {
+                        alpha(p.destructive, 0.5)
+                    } else {
+                        p.destructive
+                    }
+                } else {
+                    p.input
+                },
+                opacity,
+            ),
             width: 1.0,
-            radius: border::radius(t.radius_md()),
+            radius: border::radius(match size {
+                Size::Default => t.radius_lg(),
+                // `rounded-[min(var(--radius-md),10px)]`
+                Size::Sm => t.radius_md().min(10.0),
+            }),
         },
         ..Style::default()
     }

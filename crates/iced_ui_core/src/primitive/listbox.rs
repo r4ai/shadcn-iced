@@ -32,6 +32,7 @@ struct Child<'a, Message, Theme, Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
     on_select: Option<Message>,
     selectable: bool,
+    style: Option<Box<dyn Fn(&Theme) -> Style + 'a>>,
 }
 
 /// A vertical list of selectable items.
@@ -78,6 +79,26 @@ where
             content: content.into(),
             on_select,
             selectable,
+            style: None,
+        });
+        self
+    }
+
+    /// Appends a selectable item highlighted with its own style, e.g. a
+    /// destructive menu item.
+    pub fn styled_item(
+        mut self,
+        content: impl Into<Element<'a, Message, Theme, Renderer>>,
+        on_select: Option<Message>,
+        style: impl Fn(&Theme) -> Style + 'a,
+    ) -> Self {
+        let selectable = on_select.is_some();
+
+        self.children.push(Child {
+            content: content.into(),
+            on_select,
+            selectable,
+            style: Some(Box::new(style)),
         });
         self
     }
@@ -89,6 +110,7 @@ where
             content: content.into(),
             on_select: None,
             selectable: true,
+            style: None,
         });
         self
     }
@@ -99,6 +121,7 @@ where
             content: content.into(),
             on_select: None,
             selectable: false,
+            style: None,
         });
         self
     }
@@ -455,6 +478,10 @@ where
             .enumerate()
         {
             let is_active = active == Some(index);
+            let highlight = match &child.style {
+                Some(style) if is_active => style(theme),
+                _ => highlight,
+            };
 
             if is_active {
                 renderer.fill_quad(

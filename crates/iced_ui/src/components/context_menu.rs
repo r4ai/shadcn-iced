@@ -15,15 +15,18 @@
 //! .into()
 //! # }
 //! ```
-use super::menu::Menu;
+use super::menu::{Kind, Menu};
 
 use iced_ui_core::Element;
 use iced_ui_core::primitive::Anchored;
 
-/// Shows `menu` at the cursor when `area` is right clicked.
+/// Shows `menu` at the cursor when `area` is right clicked
+/// (`side="right" align="start" alignOffset={4}`: just below the cursor).
 pub fn context_menu<'a, Message: Clone + 'a>(
     area: impl Into<Element<'a, Message>>,
     menu: Menu<'a, Message>,
 ) -> Anchored<'a, Message> {
-    Anchored::new(area, menu).context_menu()
+    Anchored::new(area, menu.kind(Kind::Context))
+        .context_menu()
+        .offset(4.0)
 }

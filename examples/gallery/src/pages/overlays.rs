@@ -1,19 +1,40 @@
-//! Pages of the overlay components.
+//! Pages of the overlay components, mirroring the examples of the Base UI
+//! docs of shadcn/ui.
 use super::{DemoMessage, Page};
 use crate::{Message, example};
 
-use iced_ui::button::{Variant, button};
+use iced_ui::button::{Size, Variant, button};
 use iced_ui::command::item as command_item;
 use iced_ui::menu::item;
 use iced_ui::prelude::*;
+use iced_ui::primitive::{Align, Side};
 use iced_ui::sonner::Kind;
-use iced_ui::{avatar, popover as pop, sheet as sh};
+use iced_ui::{alert_dialog as ad, drawer as dr, popover as pop, sheet as sh};
 
+use iced::time::Duration;
 use iced::widget::{column, container, row, text};
 use iced::{Center, Fill};
 
 fn demo(message: DemoMessage) -> Message {
     Message::Demo(message)
+}
+
+/// The Name and Username fields of the profile examples.
+fn profile_fields<'a>(gallery: &'a crate::Gallery, spacing: u32) -> iced::Element<'a, Message> {
+    let d = &gallery.demo;
+
+    column![
+        field(
+            "Name",
+            input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))
+        ),
+        field(
+            "Username",
+            input("@peduarte", &d.username).on_input(|v| demo(DemoMessage::Username(v)))
+        ),
+    ]
+    .spacing(spacing)
+    .into()
 }
 
 pub const DIALOG: Page = Page {
@@ -26,27 +47,15 @@ pub const DIALOG: Page = Page {
         example(
             "Default",
             dialog(
-                button("Edit Profile")
+                button("Open Dialog")
                     .variant(Variant::Outline)
                     .on_press(demo(DemoMessage::Dialog(true))),
                 d.dialog,
             )
             .title("Edit profile")
             .description("Make changes to your profile here. Click save when you're done.")
-            .content(
-                column![
-                    iced_ui::field::field(
-                        "Name",
-                        input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))
-                    ),
-                    iced_ui::field::field(
-                        "Username",
-                        input("@peduarte", &d.username)
-                            .on_input(|v| demo(DemoMessage::Username(v)))
-                    ),
-                ]
-                .spacing(16),
-            )
+            // `FieldGroup`: `gap-5`
+            .content(profile_fields(gallery, 20))
             .footer(
                 row![
                     button("Cancel")
@@ -56,7 +65,6 @@ pub const DIALOG: Page = Page {
                 ]
                 .spacing(8),
             )
-            .width(425.0)
             .on_close(demo(DemoMessage::Dialog(false))),
         )
     },
@@ -67,17 +75,55 @@ pub const ALERT_DIALOG: Page = Page {
     title: "Alert Dialog",
     description: "A modal dialog that interrupts the user with important content and expects a response.",
     view: |gallery| {
-        example(
-            "Default",
-            alert_dialog(
-                button("Show Dialog").variant(Variant::Outline).on_press(demo(DemoMessage::AlertDialog(true))),
-                gallery.demo.alert_dialog,
-            )
-            .title("Are you absolutely sure?")
-            .description("This action cannot be undone. This will permanently delete your account and remove your data from our servers.")
-            .cancel("Cancel", demo(DemoMessage::AlertDialog(false)))
-            .action("Continue", demo(DemoMessage::AlertDialog(false))),
-        )
+        let d = &gallery.demo;
+
+        // One alert dialog layer for the page: the small variant is opened
+        // by setting `position` to 3, the default one with `alert_dialog`.
+        let small = d.position == 3;
+        let open = d.alert_dialog || small;
+        let close = || {
+            demo(if small {
+                DemoMessage::Position(0)
+            } else {
+                DemoMessage::AlertDialog(false)
+            })
+        };
+
+        let dialog = alert_dialog(
+            row![
+                button("Show Dialog")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::AlertDialog(true))),
+            ],
+            open,
+        );
+
+        let dialog = if small {
+            dialog
+                .size(ad::Size::Sm)
+                .media(lucide::BLUETOOTH)
+                .title("Allow accessory to connect?")
+                .description("Do you want to allow the USB accessory to connect to this device?")
+                .cancel("Don't allow", close())
+                .action("Allow", close())
+        } else {
+            dialog
+                .title("Are you absolutely sure?")
+                .description("This action cannot be undone. This will permanently delete your account from our servers.")
+                .cancel("Cancel", close())
+                .action("Continue", close())
+        };
+
+        column![
+            example("Default", dialog),
+            example(
+                "Small with media",
+                button("Show Small Dialog")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Position(3))),
+            ),
+        ]
+        .into()
     },
 };
 
@@ -87,103 +133,155 @@ pub const SHEET: Page = Page {
     description: "Extends the Dialog component to display content that complements the main content of the screen.",
     view: |gallery| {
         let d = &gallery.demo;
-
         let open = |side| demo(DemoMessage::Sheet(Some(side)));
 
-        example(
-            "Sides",
-            sheet(
-                row![
-                    button("Top")
-                        .variant(Variant::Outline)
-                        .on_press(open(sh::Side::Top)),
-                    button("Right")
-                        .variant(Variant::Outline)
-                        .on_press(open(sh::Side::Right)),
-                    button("Bottom")
-                        .variant(Variant::Outline)
-                        .on_press(open(sh::Side::Bottom)),
-                    button("Left")
-                        .variant(Variant::Outline)
-                        .on_press(open(sh::Side::Left)),
-                ]
-                .spacing(8),
-                d.sheet.is_some(),
-            )
-            .side(d.sheet.unwrap_or_default())
-            .title("Edit profile")
-            .description("Make changes to your profile here. Click save when you're done.")
-            .content(
-                column![
-                    iced_ui::field::field(
-                        "Name",
-                        input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))
-                    ),
-                    iced_ui::field::field(
-                        "Username",
-                        input("@peduarte", &d.username)
-                            .on_input(|v| demo(DemoMessage::Username(v)))
-                    ),
-                ]
-                .spacing(24),
-            )
-            .footer(
-                column![
-                    button("Save changes")
-                        .width(Fill)
-                        .on_press(demo(DemoMessage::Sheet(None))),
-                    button("Close")
-                        .variant(Variant::Outline)
-                        .width(Fill)
-                        .on_press(demo(DemoMessage::Sheet(None))),
-                ]
-                .spacing(8),
-            )
-            .on_close(demo(DemoMessage::Sheet(None))),
+        // A single sheet layer serves every trigger of the page.
+        let sheet = sheet(
+            row![
+                button("top")
+                    .variant(Variant::Outline)
+                    .on_press(open(sh::Side::Top)),
+                button("right")
+                    .variant(Variant::Outline)
+                    .on_press(open(sh::Side::Right)),
+                button("bottom")
+                    .variant(Variant::Outline)
+                    .on_press(open(sh::Side::Bottom)),
+                button("left")
+                    .variant(Variant::Outline)
+                    .on_press(open(sh::Side::Left)),
+            ]
+            .spacing(8),
+            d.sheet.is_some(),
         )
+        .side(d.sheet.unwrap_or_default())
+        .title("Edit profile")
+        .description("Make changes to your profile here. Click save when you're done.")
+        // `grid gap-6 px-4`
+        .content(profile_fields(gallery, 24))
+        .footer(
+            column![
+                button("Save changes")
+                    .width(Fill)
+                    .on_press(demo(DemoMessage::Sheet(None))),
+                button("Close")
+                    .variant(Variant::Outline)
+                    .width(Fill)
+                    .on_press(demo(DemoMessage::Sheet(None))),
+            ]
+            .spacing(8),
+        )
+        .on_close(demo(DemoMessage::Sheet(None)));
+
+        column![
+            example(
+                "Default",
+                button("Open")
+                    .variant(Variant::Outline)
+                    .on_press(open(sh::Side::Right)),
+            ),
+            example("Side", sheet),
+        ]
+        .into()
     },
 };
+
+const DELIVERY_TIMES: [(&str, &str, Option<&str>); 5] = [
+    (
+        "Standard delivery",
+        "25–35 min · Driver assigned now",
+        Some("Fastest"),
+    ),
+    ("5:00 PM – 5:15 PM", "Prep starts at 4:45 PM", None),
+    ("5:30 PM – 5:45 PM", "Good if you're heading home", None),
+    ("6:00 PM – 6:15 PM", "Most popular · High demand", None),
+    ("6:30 PM – 6:45 PM", "Last slot before kitchen closes", None),
+];
+
+/// A delivery time: a `FieldLabel` card holding a horizontal `Field` with a
+/// radio item.
+fn delivery_time<'a>(index: u8, selected: bool) -> iced::Element<'a, Message> {
+    let (label, description, badge_label) = DELIVERY_TIMES[index as usize];
+
+    let title = row![text(label).size(14).font(iced_ui::font::MEDIUM)]
+        .push(badge_label.map(|label| badge(label).variant(iced_ui::badge::Variant::Secondary)))
+        .spacing(8)
+        .align_y(Center);
+
+    let content = row![
+        column![title, text(description).size(14).style(crate::muted)]
+            .spacing(4)
+            .width(Fill),
+        iced_ui::radio_group::radio_item(selected, "", Some(demo(DemoMessage::Position(index)))),
+    ]
+    .spacing(12)
+    .align_y(Center);
+
+    iced_ui::primitive::Pressable::new(content)
+        .on_press(demo(DemoMessage::Position(index)))
+        .padding(10)
+        .width(Fill)
+        .style(move |theme: &iced::Theme, status| {
+            let t = iced_ui::tokens(theme);
+            let p = t.palette;
+            let hovered = matches!(
+                status,
+                iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed
+            );
+            let dark = t.is_dark();
+
+            iced::widget::button::Style {
+                background: Some(iced::Background::Color(if selected {
+                    iced_ui::theme::alpha(p.primary, if dark { 0.1 } else { 0.05 })
+                } else if hovered {
+                    iced_ui::theme::alpha(p.muted, 0.5)
+                } else {
+                    iced::Color::TRANSPARENT
+                })),
+                text_color: p.foreground,
+                border: iced_ui::style::border(
+                    if selected {
+                        iced_ui::theme::alpha(p.primary, if dark { 0.2 } else { 0.3 })
+                    } else {
+                        p.border
+                    },
+                    t.radius_lg(),
+                ),
+                ..Default::default()
+            }
+        })
+        .into()
+}
 
 pub const DRAWER: Page = Page {
     id: "drawer",
     title: "Drawer",
-    description: "A drawer component for iced.",
+    description: "A panel that slides in from an edge of the window.",
     view: |gallery| {
-        let goal = gallery.demo.goal;
+        let d = &gallery.demo;
+        let selected = d.position.min(4);
 
         example(
             "Default",
             drawer(
                 button("Open Drawer")
-                    .variant(Variant::Outline)
+                    .variant(Variant::Secondary)
                     .on_press(demo(DemoMessage::Drawer(true))),
-                gallery.demo.drawer,
+                d.drawer,
             )
-            .title("Move Goal")
-            .description("Set your daily activity goal.")
+            // `swipeDirection={isMobile ? "down" : "right"}`
+            .direction(dr::Direction::Right)
+            .title("Pick a delivery time")
+            .description("We'll prepare your order as soon as possible.")
             .content(
-                row![
-                    iced_ui::button::icon_button(lucide::MINUS)
-                        .variant(Variant::Outline)
-                        .size(iced_ui::button::Size::IconSm)
-                        .on_press(demo(DemoMessage::Goal(-10))),
-                    column![
-                        text(goal.to_string()).size(72).font(iced_ui::font::BOLD),
-                        text("CALORIES/DAY").size(12).style(crate::muted),
-                    ]
-                    .align_x(Center)
-                    .width(Fill),
-                    iced_ui::button::icon_button(lucide::PLUS)
-                        .variant(Variant::Outline)
-                        .size(iced_ui::button::Size::IconSm)
-                        .on_press(demo(DemoMessage::Goal(10))),
-                ]
-                .align_y(Center)
-                .padding([16, 0]),
+                iced::widget::Column::with_children(
+                    (0..5).map(|index| delivery_time(index, index == selected)),
+                )
+                .spacing(8),
             )
             .footer(
                 column![
-                    button("Submit")
+                    button("Confirm Delivery Time")
                         .width(Fill)
                         .on_press(demo(DemoMessage::Drawer(false))),
                     button("Cancel")
@@ -203,32 +301,65 @@ pub const POPOVER: Page = Page {
     title: "Popover",
     description: "Displays rich content in a portal, triggered by a button.",
     view: |_| {
+        // `grid grid-cols-3 items-center gap-4`, inputs `col-span-2 h-8`.
         let dimension = |label: &'static str, value: &str| {
             row![
-                text(label).size(14).width(96),
-                input("", value).on_input(|_| Message::Noop),
+                text(label).size(14).font(iced_ui::font::MEDIUM).width(Fill),
+                container(input("", value).on_input(|_| Message::Noop))
+                    .width(iced::Length::FillPortion(2)),
             ]
             .spacing(16)
             .align_y(Center)
         };
 
-        example(
-            "Default",
-            popover(
-                button("Open popover").variant(Variant::Outline),
-                column![
-                    pop::header("Dimensions", "Set the dimensions for the layer."),
+        let aligned = |label: &'static str, content: &'static str, align: Align| {
+            pop::popover_with_width(
+                button(label).variant(Variant::Outline).size(Size::Sm),
+                text(content).size(14),
+                160.0,
+            )
+            .align(align)
+        };
+
+        column![
+            example(
+                "Default",
+                pop::popover_with_width(
+                    button("Open popover").variant(Variant::Outline),
                     column![
-                        dimension("Width", "100%"),
-                        dimension("Max. width", "300px"),
-                        dimension("Height", "25px"),
-                        dimension("Max. height", "none"),
+                        column![
+                            text("Dimensions")
+                                .size(14)
+                                .font(iced_ui::font::MEDIUM)
+                                .line_height(1.0),
+                            text("Set the dimensions for the layer.")
+                                .size(14)
+                                .style(crate::muted),
+                        ]
+                        .spacing(8),
+                        column![
+                            dimension("Width", "100%"),
+                            dimension("Max. width", "300px"),
+                            dimension("Height", "25px"),
+                            dimension("Max. height", "none"),
+                        ]
+                        .spacing(8),
                     ]
-                    .spacing(8),
-                ]
-                .spacing(16),
+                    .spacing(16),
+                    320.0,
+                ),
             ),
-        )
+            example(
+                "Alignments",
+                row![
+                    aligned("Start", "Aligned to start", Align::Start),
+                    aligned("Center", "Aligned to center", Align::Center),
+                    aligned("End", "Aligned to end", Align::End),
+                ]
+                .spacing(24),
+            ),
+        ]
+        .into()
     },
 };
 
@@ -237,19 +368,27 @@ pub const TOOLTIP: Page = Page {
     title: "Tooltip",
     description: "A popup that displays information related to an element when the element receives keyboard focus or the mouse hovers over it.",
     view: |_| {
-        example(
-            "Sides",
-            row![
-                tooltip(button("Top").variant(Variant::Outline), "Add to library"),
-                tooltip(button("Bottom").variant(Variant::Outline), "Add to library")
-                    .side(iced_ui::primitive::Side::Bottom),
-                tooltip(button("Left").variant(Variant::Outline), "Add to library")
-                    .side(iced_ui::primitive::Side::Left),
-                tooltip(button("Right").variant(Variant::Outline), "Add to library")
-                    .side(iced_ui::primitive::Side::Right),
-            ]
-            .spacing(8),
-        )
+        let side = |label: &'static str, side: Side| {
+            tooltip(button(label).variant(Variant::Outline), "Add to library").side(side)
+        };
+
+        column![
+            example(
+                "Default",
+                tooltip(button("Hover").variant(Variant::Outline), "Add to library"),
+            ),
+            example(
+                "Sides",
+                row![
+                    side("left", Side::Left),
+                    side("top", Side::Top),
+                    side("bottom", Side::Bottom),
+                    side("right", Side::Right),
+                ]
+                .spacing(8),
+            ),
+        ]
+        .into()
     },
 };
 
@@ -261,93 +400,20 @@ pub const HOVER_CARD: Page = Page {
         example(
             "Default",
             hover_card(
-                button("@nextjs").variant(Variant::Link),
-                row![
-                    avatar("VC").size(avatar::Size::Lg),
-                    column![
-                        text("@nextjs").size(14).font(iced_ui::font::SEMIBOLD),
-                        text("The React Framework – created and maintained by @vercel.").size(14),
-                        text("Joined December 2021").size(12).style(crate::muted),
-                    ]
-                    .spacing(4),
+                button("Hover Here").variant(Variant::Link),
+                // `flex flex-col gap-0.5`
+                column![
+                    text("@nextjs").size(14).font(iced_ui::font::SEMIBOLD),
+                    text("The React Framework – created and maintained by @vercel.").size(14),
+                    container(text("Joined December 2021").size(12).style(crate::muted))
+                        .padding(iced::Padding::ZERO.top(4)),
                 ]
-                .spacing(16),
-            ),
+                .spacing(2),
+            )
+            .hover(Duration::from_millis(10), Duration::from_millis(100)),
         )
     },
 };
-
-fn account_menu<'a>(gallery: &crate::Gallery) -> iced_ui::menu::Menu<'a, Message> {
-    let d = &gallery.demo;
-
-    menu()
-        .label("My Account")
-        .separator()
-        .item(
-            item("Profile")
-                .icon(lucide::USER)
-                .shortcut("⇧⌘P")
-                .on_select(Message::Noop),
-        )
-        .item(
-            item("Billing")
-                .icon(lucide::CREDIT_CARD)
-                .shortcut("⌘B")
-                .on_select(Message::Noop),
-        )
-        .item(
-            item("Settings")
-                .icon(lucide::SETTINGS)
-                .shortcut("⌘S")
-                .on_select(Message::Noop),
-        )
-        .item(
-            item("Keyboard shortcuts")
-                .icon(lucide::KEYBOARD)
-                .shortcut("⌘K")
-                .on_select(Message::Noop),
-        )
-        .separator()
-        .item(item("Team").icon(lucide::USERS).on_select(Message::Noop))
-        .sub_with_icon(
-            lucide::USER_PLUS,
-            "Invite users",
-            menu()
-                .item(item("Email").icon(lucide::MAIL).on_select(Message::Noop))
-                .item(
-                    item("Message")
-                        .icon(lucide::MESSAGE_SQUARE)
-                        .on_select(Message::Noop),
-                )
-                .separator()
-                .item(
-                    item("More...")
-                        .icon(lucide::CIRCLE_PLUS)
-                        .on_select(Message::Noop),
-                ),
-        )
-        .item(
-            item("New Team")
-                .icon(lucide::PLUS)
-                .shortcut("⌘+T")
-                .on_select(Message::Noop),
-        )
-        .separator()
-        .checkbox(
-            "Status Bar",
-            d.status_bar,
-            demo(DemoMessage::StatusBar(!d.status_bar)),
-        )
-        .item(item("API").icon(lucide::CLOUD))
-        .separator()
-        .item(
-            item("Log out")
-                .icon(lucide::LOG_OUT)
-                .shortcut("⇧⌘Q")
-                .destructive()
-                .on_select(Message::Noop),
-        )
-}
 
 pub const DROPDOWN_MENU: Page = Page {
     id: "dropdown-menu",
@@ -361,21 +427,75 @@ pub const DROPDOWN_MENU: Page = Page {
                 "Default",
                 dropdown_menu(
                     button("Open").variant(Variant::Outline),
-                    account_menu(gallery).min_width(224.0)
-                )
+                    menu()
+                        .label("My Account")
+                        .item(item("Profile").shortcut("⇧⌘P").on_select(Message::Noop))
+                        .item(item("Billing").shortcut("⌘B").on_select(Message::Noop))
+                        .item(item("Settings").shortcut("⌘S").on_select(Message::Noop))
+                        .separator()
+                        .item(item("Team").on_select(Message::Noop))
+                        .sub(
+                            "Invite users",
+                            menu()
+                                .item(item("Email").on_select(Message::Noop))
+                                .item(item("Message").on_select(Message::Noop))
+                                .separator()
+                                .item(item("More...").on_select(Message::Noop)),
+                        )
+                        .item(item("New Team").shortcut("⌘+T").on_select(Message::Noop))
+                        .separator()
+                        .item(item("GitHub").on_select(Message::Noop))
+                        .item(item("Support").on_select(Message::Noop))
+                        .item(item("API"))
+                        .separator()
+                        .item(item("Log out").shortcut("⇧⌘Q").on_select(Message::Noop))
+                        // `w-40`
+                        .min_width(160.0),
+                ),
             ),
             example(
-                "Radio group",
+                "Checkboxes",
                 dropdown_menu(
-                    button("Panel position").variant(Variant::Outline),
+                    button("Checkboxes").variant(Variant::Outline),
+                    menu()
+                        .label("Appearance")
+                        .checkbox(
+                            "Status Bar",
+                            d.status_bar,
+                            demo(DemoMessage::StatusBar(!d.status_bar)),
+                        )
+                        .checkbox_maybe("Activity Bar", false, None)
+                        .checkbox("Panel", false, Message::Noop)
+                        .min_width(160.0),
+                ),
+            ),
+            example(
+                "Radio Group",
+                dropdown_menu(
+                    button("Radio Group").variant(Variant::Outline),
                     menu()
                         .label("Panel Position")
-                        .separator()
                         .radio("Top", d.position == 0, demo(DemoMessage::Position(0)))
                         .radio("Bottom", d.position == 1, demo(DemoMessage::Position(1)))
                         .radio("Right", d.position == 2, demo(DemoMessage::Position(2)))
-                        .min_width(224.0),
-                )
+                        .min_width(128.0),
+                ),
+            ),
+            example(
+                "Destructive",
+                dropdown_menu(
+                    button("Destructive").variant(Variant::Outline),
+                    menu()
+                        .item(item("Edit").icon(lucide::PENCIL).on_select(Message::Noop))
+                        .item(item("Share").icon(lucide::SHARE).on_select(Message::Noop))
+                        .separator()
+                        .item(
+                            item("Delete")
+                                .icon(lucide::TRASH)
+                                .destructive()
+                                .on_select(Message::Noop),
+                        ),
+                ),
             ),
         ]
         .into()
@@ -392,34 +512,34 @@ pub const CONTEXT_MENU: Page = Page {
         example(
             "Default",
             context_menu(
+                // `aspect-video w-full max-w-xs rounded-xl border border-dashed
+                // text-sm`
                 container(text("Right click here").size(14))
-                    .center_x(300)
-                    .center_y(150)
+                    .center_x(320)
+                    .center_y(180)
                     .style(|theme: &iced::Theme| {
                         let t = iced_ui::tokens(theme);
                         container::Style {
-                            border: iced_ui::style::border(t.palette.border, t.radius_md()),
+                            border: iced_ui::style::border(t.palette.border, t.radius_xl()),
                             ..Default::default()
                         }
                     }),
                 menu()
-                    .item(item("Back").inset().shortcut("⌘[").on_select(Message::Noop))
-                    .item(item("Forward").inset().shortcut("⌘]"))
-                    .item(
-                        item("Reload")
-                            .inset()
-                            .shortcut("⌘R")
-                            .on_select(Message::Noop),
-                    )
+                    .item(item("Back").shortcut("⌘[").on_select(Message::Noop))
+                    .item(item("Forward").shortcut("⌘]"))
+                    .item(item("Reload").shortcut("⌘R").on_select(Message::Noop))
                     .sub(
                         "More Tools",
                         menu()
                             .item(item("Save Page...").on_select(Message::Noop))
                             .item(item("Create Shortcut...").on_select(Message::Noop))
+                            .item(item("Name Window...").on_select(Message::Noop))
                             .separator()
                             .item(item("Developer Tools").on_select(Message::Noop))
                             .separator()
-                            .item(item("Delete").destructive().on_select(Message::Noop)),
+                            .item(item("Delete").destructive().on_select(Message::Noop))
+                            // `w-44`
+                            .min_width(176.0),
                     )
                     .separator()
                     .checkbox(
@@ -429,10 +549,10 @@ pub const CONTEXT_MENU: Page = Page {
                     )
                     .checkbox("Show Full URLs", false, Message::Noop)
                     .separator()
-                    .inset_label("People")
+                    .label("People")
                     .radio(
                         "Pedro Duarte",
-                        d.position == 0,
+                        d.position != 1,
                         demo(DemoMessage::Position(0)),
                     )
                     .radio(
@@ -440,7 +560,8 @@ pub const CONTEXT_MENU: Page = Page {
                         d.position == 1,
                         demo(DemoMessage::Position(1)),
                     )
-                    .min_width(208.0),
+                    // `w-48`
+                    .min_width(192.0),
             ),
         )
     },
@@ -479,6 +600,16 @@ pub const MENUBAR: Page = Page {
                         .item(item("Undo").shortcut("⌘Z").on_select(Message::Noop))
                         .item(item("Redo").shortcut("⇧⌘Z").on_select(Message::Noop))
                         .separator()
+                        .sub(
+                            "Find",
+                            menu()
+                                .item(item("Search the web").on_select(Message::Noop))
+                                .separator()
+                                .item(item("Find...").on_select(Message::Noop))
+                                .item(item("Find Next").on_select(Message::Noop))
+                                .item(item("Find Previous").on_select(Message::Noop)),
+                        )
+                        .separator()
                         .item(item("Cut").on_select(Message::Noop))
                         .item(item("Copy").on_select(Message::Noop))
                         .item(item("Paste").on_select(Message::Noop)),
@@ -487,11 +618,11 @@ pub const MENUBAR: Page = Page {
                     "View",
                     menu()
                         .checkbox(
-                            "Always Show Bookmarks Bar",
+                            "Bookmarks Bar",
                             d.status_bar,
                             demo(DemoMessage::StatusBar(!d.status_bar)),
                         )
-                        .checkbox("Always Show Full URLs", true, Message::Noop)
+                        .checkbox("Full URLs", true, Message::Noop)
                         .separator()
                         .item(
                             item("Reload")
@@ -501,7 +632,11 @@ pub const MENUBAR: Page = Page {
                         )
                         .item(item("Force Reload").inset().shortcut("⇧⌘R"))
                         .separator()
-                        .item(item("Toggle Fullscreen").inset().on_select(Message::Noop)),
+                        .item(item("Toggle Fullscreen").inset().on_select(Message::Noop))
+                        .separator()
+                        .item(item("Hide Sidebar").inset().on_select(Message::Noop))
+                        // `w-44`
+                        .min_width(176.0),
                 )
                 .menu(
                     "Profiles",
@@ -510,7 +645,9 @@ pub const MENUBAR: Page = Page {
                         .radio("Benoit", d.position == 1, demo(DemoMessage::Position(1)))
                         .radio("Luis", d.position == 2, demo(DemoMessage::Position(2)))
                         .separator()
-                        .item(item("Edit...").inset().on_select(Message::Noop)),
+                        .item(item("Edit...").inset().on_select(Message::Noop))
+                        .separator()
+                        .item(item("Add Profile...").inset().on_select(Message::Noop)),
                 ),
         )
     },
@@ -521,25 +658,44 @@ pub const SELECT: Page = Page {
     title: "Select",
     description: "Displays a list of options for the user to pick from—triggered by a button.",
     view: |gallery| {
-        example(
-            "Default",
-            select(gallery.demo.fruit, |f| demo(DemoMessage::Fruit(f)))
-                .placeholder("Select a fruit")
-                .label("Fruits")
-                .option("Apple", "Apple")
-                .option("Banana", "Banana")
-                .option("Blueberry", "Blueberry")
-                .option("Grapes", "Grapes")
-                .disabled_option("Pineapple", "Pineapple")
-                .width(180),
-        )
+        let fruit = gallery.demo.fruit;
+
+        column![
+            example(
+                "Default",
+                select(fruit, |f| demo(DemoMessage::Fruit(f)))
+                    .placeholder("Select a fruit")
+                    .label("Fruits")
+                    .option("Apple", "Apple")
+                    .option("Banana", "Banana")
+                    .option("Blueberry", "Blueberry")
+                    .option("Grapes", "Grapes")
+                    .option("Pineapple", "Pineapple")
+                    // `w-full max-w-48`
+                    .width(192),
+            ),
+            example(
+                "Align Item With Trigger off",
+                select(fruit, |f| demo(DemoMessage::Fruit(f)))
+                    .placeholder("Select a fruit")
+                    .option("Apple", "Apple")
+                    .option("Banana", "Banana")
+                    .option("Blueberry", "Blueberry")
+                    .separator()
+                    .option("Grapes", "Grapes")
+                    .disabled_option("Pineapple", "Pineapple")
+                    .align_item_with_trigger(false)
+                    .width(192),
+            ),
+        ]
+        .into()
     },
 };
 
 pub const COMBOBOX: Page = Page {
     id: "combobox",
     title: "Combobox",
-    description: "Autocomplete input and command palette with a list of suggestions.",
+    description: "Autocomplete input with a list of suggestions.",
     view: |gallery| {
         let d = &gallery.demo;
 
@@ -551,14 +707,13 @@ pub const COMBOBOX: Page = Page {
                 &d.query,
                 |q| demo(DemoMessage::Query(q)),
             )
-            .placeholder("Select framework...")
-            .search_placeholder("Search framework...")
-            .empty("No framework found.")
-            .option("next", "Next.js")
-            .option("sveltekit", "SvelteKit")
-            .option("nuxt", "Nuxt.js")
-            .option("remix", "Remix")
-            .option("astro", "Astro"),
+            .placeholder("Select a framework")
+            .empty("No items found.")
+            .option("Next.js", "Next.js")
+            .option("SvelteKit", "SvelteKit")
+            .option("Nuxt.js", "Nuxt.js")
+            .option("Remix", "Remix")
+            .option("Astro", "Astro"),
         )
     },
 };
@@ -602,7 +757,8 @@ pub const COMMAND: Page = Page {
                         ],
                     ),
             )
-            .max_width(450),
+            // `max-w-sm`
+            .max_width(384),
         )
     },
 };
@@ -645,7 +801,43 @@ pub const NAVIGATION_MENU: Page = Page {
     title: "Navigation Menu",
     description: "A collection of links for navigating websites.",
     view: |_| {
-        use iced_ui::navigation_menu::link;
+        use iced_ui::navigation_menu::{icon_link, link};
+
+        let components = [
+            (
+                "Alert Dialog",
+                "A modal dialog that interrupts the user with important content and expects a response.",
+            ),
+            (
+                "Hover Card",
+                "For sighted users to preview content available behind a link.",
+            ),
+            (
+                "Progress",
+                "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar.",
+            ),
+            ("Scroll-area", "Visually or semantically separates content."),
+            (
+                "Tabs",
+                "A set of layered sections of content—known as tab panels—that are displayed one at a time.",
+            ),
+            (
+                "Tooltip",
+                "A popup that displays information related to an element when the element receives keyboard focus or the mouse hovers over it.",
+            ),
+        ];
+
+        // `grid w-[500px] gap-2 md:grid-cols-2`
+        let grid = iced::widget::Column::with_children(components.chunks(2).map(|pair| {
+            iced::widget::Row::with_children(
+                pair.iter()
+                    .map(|(title, description)| link(*title, *description, Message::Noop)),
+            )
+            .spacing(8)
+            .into()
+        }))
+        .spacing(8)
+        .width(500);
 
         example(
             "Default",
@@ -653,74 +845,40 @@ pub const NAVIGATION_MENU: Page = Page {
                 navigation_menu()
                     .menu(
                         "Getting started",
-                        row![
-                            container(
-                                column![
-                                    lucide::BOXES.sized(24),
-                                    text("iced-ui").size(18).font(iced_ui::font::MEDIUM),
-                                    text("Beautifully designed components built with iced.")
-                                        .size(14)
-                                        .style(crate::muted),
-                                ]
-                                .spacing(8)
-                            )
-                            .padding(16)
-                            .width(180)
-                            .height(Fill)
-                            .style(|theme: &iced::Theme| {
-                                let t = iced_ui::tokens(theme);
-                                container::Style {
-                                    background: Some(t.palette.muted.into()),
-                                    border: iced_ui::style::rounded(t.radius_md()),
-                                    ..Default::default()
-                                }
-                            }),
-                            column![
-                                link(
-                                    "Introduction",
-                                    "Re-usable components built using iced.",
-                                    Message::Noop
-                                ),
-                                link(
-                                    "Installation",
-                                    "How to install dependencies and structure your app.",
-                                    Message::Noop
-                                ),
-                                link(
-                                    "Typography",
-                                    "Styles for headings, paragraphs, lists...etc",
-                                    Message::Noop
-                                ),
-                            ]
-                            .width(260),
-                        ]
-                        .spacing(8)
-                        .height(220),
-                    )
-                    .menu(
-                        "Components",
+                        // `w-96`
                         column![
                             link(
-                                "Alert Dialog",
-                                "A modal dialog that interrupts the user.",
+                                "Introduction",
+                                "Re-usable components built with Tailwind CSS.",
                                 Message::Noop
                             ),
                             link(
-                                "Hover Card",
-                                "Preview content available behind a link.",
+                                "Installation",
+                                "How to install dependencies and structure your app.",
                                 Message::Noop
                             ),
                             link(
-                                "Progress",
-                                "Displays the completion progress of a task.",
+                                "Typography",
+                                "Styles for headings, paragraphs, lists...etc",
                                 Message::Noop
                             ),
                         ]
-                        .width(300),
+                        .width(384),
+                    )
+                    .menu("Components", grid)
+                    .menu(
+                        "With Icon",
+                        // `w-[200px]`
+                        column![
+                            icon_link(lucide::CIRCLE_ALERT, "Backlog", Message::Noop),
+                            icon_link(lucide::CIRCLE_DASHED, "To Do", Message::Noop),
+                            icon_link(lucide::CIRCLE_CHECK, "Done", Message::Noop),
+                        ]
+                        .width(200),
                     )
                     .link("Docs", Message::Noop),
             )
-            .padding(iced::Padding::ZERO.bottom(240)),
+            .padding(iced::Padding::ZERO.bottom(260)),
         )
     },
 };

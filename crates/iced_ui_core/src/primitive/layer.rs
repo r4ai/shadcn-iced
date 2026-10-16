@@ -51,35 +51,55 @@ pub enum Edge {
 pub enum Animation {
     /// No animation.
     None,
-    /// `fade-in-0`, 150ms.
+    /// `fade-in-0 duration-100`.
     Fade,
-    /// `fade-in-0 zoom-in-95`, 200ms, like dialogs.
+    /// `fade-in-0 zoom-in-95 duration-100`, like dialogs.
     #[default]
     FadeZoom,
-    /// `slide-in-from-{edge}`: 500ms in, 300ms out, like sheets.
+    /// Slides the whole content in from an edge, like drawers:
+    /// `duration-450 ease-[cubic-bezier(0.32,0.72,0,1)]` in, 400ms out.
     Slide(Edge),
+    /// Fades the content in while it moves `2.5rem` away from an edge,
+    /// like sheets: `transition duration-200 ease-in-out`.
+    SlideFade(Edge),
 }
+
+/// The easing of drawers: `cubic-bezier(0.32, 0.72, 0, 1)`.
+fn drawer_ease(t: f32) -> f32 {
+    animation::cubic_bezier(0.32, 0.72, 0.0, 1.0, t)
+}
+
+/// `duration-100`, the duration of Nova's overlays.
+const OVERLAY: iced::time::Duration = iced::time::Duration::from_millis(100);
 
 impl Animation {
     fn duration(self, opening: bool) -> iced::time::Duration {
         match self {
             Animation::None => iced::time::Duration::ZERO,
-            Animation::Fade => animation::FAST,
-            Animation::FadeZoom => animation::NORMAL,
-            Animation::Slide(_) if opening => animation::SLOWER,
-            Animation::Slide(_) => animation::SLOW,
+            Animation::Fade | Animation::FadeZoom => OVERLAY,
+            Animation::Slide(_) if opening => iced::time::Duration::from_millis(450),
+            Animation::Slide(_) => iced::time::Duration::from_millis(400),
+            Animation::SlideFade(_) => animation::NORMAL,
         }
     }
 
     fn easing(self) -> animation::Easing {
         match self {
-            Animation::Slide(_) => animation::ease_in_out,
+            Animation::Slide(_) => drawer_ease,
+            Animation::SlideFade(_) => animation::ease_in_out,
             _ => animation::ease_out,
         }
     }
 
     fn appearance(self, progress: f32, bounds: Rectangle) -> Appearance {
         let hidden = 1.0 - progress;
+
+        let towards = |edge: Edge, distance: f32| match edge {
+            Edge::Top => Vector::new(0.0, -distance),
+            Edge::Right => Vector::new(distance, 0.0),
+            Edge::Bottom => Vector::new(0.0, distance),
+            Edge::Left => Vector::new(-distance, 0.0),
+        };
 
         match self {
             Animation::None => Appearance::VISIBLE,
@@ -96,11 +116,16 @@ impl Animation {
                 opacity: 1.0,
                 scale: 1.0,
                 offset: match edge {
-                    Edge::Top => Vector::new(0.0, -(bounds.y + bounds.height) * hidden),
-                    Edge::Right => Vector::new(bounds.width * hidden, 0.0),
-                    Edge::Bottom => Vector::new(0.0, bounds.height * hidden),
-                    Edge::Left => Vector::new(-(bounds.x + bounds.width) * hidden, 0.0),
+                    Edge::Top => Vector::new(0.0, -(bounds.y + bounds.height + 2.0) * hidden),
+                    Edge::Right => Vector::new((bounds.width + 2.0) * hidden, 0.0),
+                    Edge::Bottom => Vector::new(0.0, (bounds.height + 2.0) * hidden),
+                    Edge::Left => Vector::new(-(bounds.x + bounds.width + 2.0) * hidden, 0.0),
                 },
+            },
+            Animation::SlideFade(edge) => Appearance {
+                opacity: progress,
+                scale: 1.0,
+                offset: towards(edge, 40.0 * hidden),
             },
         }
     }
@@ -118,7 +143,7 @@ where
     /// Creates a new [`Layer`] showing `content` over `base` when `open`.
     ///
     /// By default, the layer is modal, centered and dims the window with a
-    /// translucent black backdrop.
+    /// translucent black backdrop (`bg-black/10`).
     pub fn new(
         base: impl Into<Element<'a, Message, Theme, Renderer>>,
         content: impl Into<Element<'a, Message, Theme, Renderer>>,
@@ -131,7 +156,7 @@ where
             align_x: alignment::Horizontal::Center,
             align_y: alignment::Vertical::Center,
             padding: Padding::ZERO,
-            backdrop: Some(Box::new(|_| Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
+            backdrop: Some(Box::new(|_| Color::from_rgba(0.0, 0.0, 0.0, 0.1))),
             modal: true,
             on_dismiss: None,
             dismiss_on_backdrop: true,
