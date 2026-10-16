@@ -92,9 +92,11 @@ impl Size {
             _ => (0.0, 0.0),
         };
 
+        // The padding sits inside a 1px transparent border (`border
+        // border-transparent`).
         Padding {
-            left: if leading { icon_side } else { base },
-            right: if trailing { icon_side } else { base },
+            left: 1.0 + if leading { icon_side } else { base },
+            right: 1.0 + if trailing { icon_side } else { base },
             ..Padding::ZERO
         }
     }
