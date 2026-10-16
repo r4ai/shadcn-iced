@@ -1,0 +1,17 @@
+[package]
+name = "gallery"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+iced.workspace = true
+iced_ui = { path = "../../crates/iced_ui" }
+
+[dev-dependencies]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+iced_test.workspace = true
+
+[lints]
+workspace = true

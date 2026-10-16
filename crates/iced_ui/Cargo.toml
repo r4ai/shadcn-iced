@@ -1,0 +1,15 @@
+[package]
+name = "iced_ui"
+description = "shadcn/ui components for iced"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+iced.workspace = true
+iced_ui_core = { path = "../iced_ui_core", version = "0.1.0" }
+
+[lints]
+workspace = true

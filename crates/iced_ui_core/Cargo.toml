@@ -1,0 +1,21 @@
+[package]
+name = "iced_ui_core"
+description = "Theme tokens, fonts, icons and headless primitives for iced_ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["lucide", "geist"]
+# Bundles the Lucide icon font (~900 KB).
+lucide = []
+# Bundles the Geist and Geist Mono fonts.
+geist = []
+
+[dependencies]
+iced.workspace = true
+
+[lints]
+workspace = true

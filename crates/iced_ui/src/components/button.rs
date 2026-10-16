@@ -1,0 +1,371 @@
+//! Displays a button or a component that looks like a button.
+//!
+//! Port of <https://ui.shadcn.com/docs/components/button>.
+//!
+//! ```no_run
+//! use iced_ui_core::icon::lucide;
+//! # use iced_ui::button::{self, button};
+//! # #[derive(Clone)] enum Message { Save }
+//! # fn view<'a>() -> iced::Element<'a, Message> {
+//! button("Save")
+//!     .variant(button::Variant::Outline)
+//!     .icon(lucide::SAVE)
+//!     .on_press(Message::Save)
+//!     .into()
+//! # }
+//! ```
+use iced_ui_core::icon::Icon;
+use iced_ui_core::primitive::Pressable;
+use iced_ui_core::theme::{alpha, tokens};
+use iced_ui_core::{Element, font, style};
+
+use iced::widget::button::{Status, Style};
+use iced::widget::{Row, text};
+use iced::{Alignment, Background, Color, Length, Theme};
+
+/// The visual style of a [`Button`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Variant {
+    /// A solid button using the primary color.
+    #[default]
+    Default,
+    /// A solid button for destructive actions.
+    Destructive,
+    /// A bordered button.
+    Outline,
+    /// A solid button using the secondary color.
+    Secondary,
+    /// A transparent button that is highlighted on hover.
+    Ghost,
+    /// A button that looks like a link.
+    Link,
+}
+
+/// The size of a [`Button`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Size {
+    /// `h-9 px-4`
+    #[default]
+    Default,
+    /// `h-6 px-2 text-xs`
+    Xs,
+    /// `h-8 px-3`
+    Sm,
+    /// `h-10 px-6`
+    Lg,
+    /// A 36x36 square, for icon-only buttons.
+    Icon,
+    /// A 24x24 square, for icon-only buttons.
+    IconXs,
+    /// A 32x32 square, for icon-only buttons.
+    IconSm,
+    /// A 40x40 square, for icon-only buttons.
+    IconLg,
+}
+
+impl Size {
+    /// The height of the button.
+    pub fn height(self) -> f32 {
+        match self {
+            Size::Xs | Size::IconXs => 24.0,
+            Size::Sm | Size::IconSm => 32.0,
+            Size::Default | Size::Icon => 36.0,
+            Size::Lg | Size::IconLg => 40.0,
+        }
+    }
+
+    /// Whether the size is a square meant for icon-only buttons.
+    pub fn is_icon(self) -> bool {
+        matches!(self, Size::Icon | Size::IconXs | Size::IconSm | Size::IconLg)
+    }
+
+    fn padding_x(self, has_icon: bool) -> f32 {
+        match (self, has_icon) {
+            (Size::Default, false) => 16.0,
+            (Size::Default, true) => 12.0,
+            (Size::Xs, false) => 8.0,
+            (Size::Xs, true) => 6.0,
+            (Size::Sm, false) => 12.0,
+            (Size::Sm, true) => 10.0,
+            (Size::Lg, false) => 24.0,
+            (Size::Lg, true) => 16.0,
+            _ => 0.0,
+        }
+    }
+
+    fn gap(self) -> f32 {
+        match self {
+            Size::Xs => 4.0,
+            Size::Sm => 6.0,
+            _ => 8.0,
+        }
+    }
+
+    /// The font size of the label.
+    pub fn text_size(self) -> f32 {
+        match self {
+            Size::Xs | Size::IconXs => style::text::XS,
+            _ => style::text::SM,
+        }
+    }
+
+    /// The size of the icons.
+    pub fn icon_size(self) -> f32 {
+        match self {
+            Size::Xs | Size::IconXs => 12.0,
+            _ => 16.0,
+        }
+    }
+}
+
+enum Content<'a, Message> {
+    Label(String),
+    Icon(Icon),
+    Custom(Element<'a, Message>),
+}
+
+/// A button. See the [module documentation](self).
+pub struct Button<'a, Message> {
+    content: Content<'a, Message>,
+    leading: Option<Icon>,
+    trailing: Option<Icon>,
+    on_press: Option<Message>,
+    variant: Variant,
+    size: Size,
+    disabled: bool,
+    width: Option<Length>,
+}
+
+/// Creates a [`Button`] with a text label.
+pub fn button<'a, Message: Clone + 'a>(label: impl Into<String>) -> Button<'a, Message> {
+    Button::from_content(Content::Label(label.into()))
+}
+
+/// Creates an icon-only [`Button`] (`size="icon"`).
+pub fn icon_button<'a, Message: Clone + 'a>(icon: Icon) -> Button<'a, Message> {
+    Button::from_content(Content::Icon(icon)).size(Size::Icon)
+}
+
+impl<'a, Message: Clone + 'a> Button<'a, Message> {
+    fn from_content(content: Content<'a, Message>) -> Self {
+        Self {
+            content,
+            leading: None,
+            trailing: None,
+            on_press: None,
+            variant: Variant::Default,
+            size: Size::Default,
+            disabled: false,
+            width: None,
+        }
+    }
+
+    /// Creates a [`Button`] with arbitrary content.
+    pub fn new(content: impl Into<Element<'a, Message>>) -> Self {
+        Self::from_content(Content::Custom(content.into()))
+    }
+
+    /// Sets the message produced when the button is pressed.
+    pub fn on_press(mut self, message: Message) -> Self {
+        self.on_press = Some(message);
+        self
+    }
+
+    /// Sets the message produced when the button is pressed, if any.
+    pub fn on_press_maybe(mut self, message: Option<Message>) -> Self {
+        self.on_press = message;
+        self
+    }
+
+    /// Sets the variant.
+    pub fn variant(mut self, variant: Variant) -> Self {
+        self.variant = variant;
+        self
+    }
+
+    /// Sets the size.
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+
+    /// Adds an icon before the label.
+    pub fn icon(mut self, icon: Icon) -> Self {
+        self.leading = Some(icon);
+        self
+    }
+
+    /// Adds an icon after the label.
+    pub fn trailing_icon(mut self, icon: Icon) -> Self {
+        self.trailing = Some(icon);
+        self
+    }
+
+    /// Disables the button.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+
+    /// Sets the width. Buttons shrink to fit their content by default.
+    pub fn width(mut self, width: impl Into<Length>) -> Self {
+        self.width = Some(width.into());
+        self
+    }
+}
+
+impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message> {
+    fn from(button: Button<'a, Message>) -> Self {
+        let size = button.size;
+        let height = size.height();
+        let icon_size = size.icon_size();
+        let has_icon = button.leading.is_some() || button.trailing.is_some();
+
+        let label = match button.content {
+            Content::Label(label) => text(label)
+                .size(size.text_size())
+                .font(font::MEDIUM)
+                .wrapping(text::Wrapping::None)
+                .into(),
+            Content::Icon(icon) => icon.sized(icon_size).into(),
+            Content::Custom(element) => element,
+        };
+
+        let content = Row::new()
+            .push(button.leading.map(|icon| icon.sized(icon_size)))
+            .push(label)
+            .push(button.trailing.map(|icon| icon.sized(icon_size)))
+            .spacing(size.gap())
+            .align_y(Alignment::Center)
+            .height(Length::Fill);
+
+        let width = button.width.unwrap_or(if size.is_icon() {
+            Length::Fixed(height)
+        } else {
+            Length::Shrink
+        });
+
+        let content: Element<'a, Message> = if size.is_icon() || width != Length::Shrink {
+            iced::widget::container(content)
+                .center_x(Length::Fill)
+                .height(Length::Fill)
+                .into()
+        } else {
+            content.into()
+        };
+
+        let variant = button.variant;
+
+        Pressable::new(content)
+            .on_press_maybe(button.on_press)
+            .disabled(button.disabled)
+            .width(width)
+            .height(height)
+            .padding([0.0, size.padding_x(has_icon)])
+            .style(move |theme, status| self::style(theme, status, variant))
+            .into()
+    }
+}
+
+/// The style of a [`Button`] of the given variant.
+///
+/// Usable with plain iced buttons too:
+/// `iced::widget::button("Hi").style(|t, s| iced_ui::button::style(t, s, Variant::Outline))`.
+pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
+    let t = tokens(theme);
+    let p = &t.palette;
+    let dark = t.is_dark();
+    let hovered = matches!(status, Status::Hovered | Status::Pressed);
+    let radius = t.radius_md();
+
+    let mut style = match variant {
+        Variant::Default => Style {
+            background: Some(Background::Color(if hovered {
+                alpha(p.primary, 0.9)
+            } else {
+                p.primary
+            })),
+            text_color: p.primary_foreground,
+            border: style::rounded(radius),
+            ..Style::default()
+        },
+        Variant::Destructive => Style {
+            background: Some(Background::Color(alpha(
+                p.destructive,
+                match (dark, hovered) {
+                    (_, true) => 0.9,
+                    (true, false) => 0.6,
+                    (false, false) => 1.0,
+                },
+            ))),
+            text_color: Color::WHITE,
+            border: style::rounded(radius),
+            ..Style::default()
+        },
+        Variant::Outline => Style {
+            background: Some(Background::Color(match (dark, hovered) {
+                (false, false) => p.background,
+                (false, true) => p.accent,
+                (true, false) => alpha(p.input, 0.3),
+                (true, true) => alpha(p.input, 0.5),
+            })),
+            text_color: if hovered && !dark {
+                p.accent_foreground
+            } else {
+                p.foreground
+            },
+            border: style::border(if dark { p.input } else { p.border }, radius),
+            shadow: style::shadow_xs(),
+            ..Style::default()
+        },
+        Variant::Secondary => Style {
+            background: Some(Background::Color(if hovered {
+                alpha(p.secondary, 0.8)
+            } else {
+                p.secondary
+            })),
+            text_color: p.secondary_foreground,
+            border: style::rounded(radius),
+            ..Style::default()
+        },
+        Variant::Ghost => Style {
+            background: hovered.then(|| {
+                Background::Color(if dark { alpha(p.accent, 0.5) } else { p.accent })
+            }),
+            text_color: if hovered { p.accent_foreground } else { p.foreground },
+            border: style::rounded(radius),
+            ..Style::default()
+        },
+        Variant::Link => Style {
+            background: None,
+            text_color: p.primary,
+            border: style::rounded(radius),
+            ..Style::default()
+        },
+    };
+
+    if status == Status::Disabled {
+        style = disabled(style);
+    }
+
+    style
+}
+
+/// Applies `opacity-50` to a style.
+pub fn disabled(style: Style) -> Style {
+    let opacity = style::DISABLED_OPACITY;
+
+    Style {
+        background: style.background.map(|background| background.scale_alpha(opacity)),
+        text_color: alpha(style.text_color, opacity),
+        border: iced::Border {
+            color: alpha(style.border.color, opacity),
+            ..style.border
+        },
+        shadow: iced::Shadow {
+            color: alpha(style.shadow.color, opacity),
+            ..style.shadow
+        },
+        ..style
+    }
+}
