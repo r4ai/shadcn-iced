@@ -17,26 +17,33 @@ cargo iced-ui add button dialog dropdown-menu
 
 ## Components
 
-62 components, covering the shadcn/ui registry (`new-york-v4`):
+66 components, covering the whole shadcn/ui registry in its current default
+style (**Base UI + Nova**, the `base-nova` preset of `shadcn init`):
 
 accordion · alert · alert-dialog · aspect-ratio · attachment · avatar · badge ·
 breadcrumb · bubble · button · button-group · calendar · card · carousel ·
-chart · checkbox · collapsible · combobox · command · context-menu ·
-date-picker · dialog · drawer · dropdown-menu · empty · field · hover-card ·
-input · input-group · input-otp · item · kbd · label · marker · menu · menubar ·
-message · message-scroller · native-select · navigation-menu · pagination ·
-popover · progress · radio-group · resizable · scroll-area · select ·
-separator · sheet · sidebar · skeleton · slider · sonner · spinner · switch ·
-table · tabs · textarea · toggle · toggle-group · tooltip · typography
+chart · checkbox · code-block · collapsible · combobox · command ·
+context-menu · date-picker · dialog · drawer · dropdown-menu · empty · field ·
+hover-card · input · input-group · input-otp · item · kbd · label · marker ·
+menu · menubar · message · message-scroller · native-select · navigation-menu ·
+pagination · popover · progress · questionnaire · radio-group · resizable ·
+scroll-area · select · separator · sheet · sidebar · skeleton · slider ·
+sonner · spinner · switch · table · tabs · textarea · toast · toggle ·
+toggle-group · tooltip · trace · typography
 
 Plus everything shadcn/ui gets from its environment:
 
-- **Themes**: every base color (neutral, stone, zinc, mauve, olive, mist,
-  taupe) and accent (amber, blue, … yellow) in light and dark mode, generated
-  from shadcn/ui's OKLCH tokens, and a configurable radius.
-- **Fonts and icons**: Geist, Geist Mono and all 2,179
-  [Lucide](https://lucide.dev) icons are bundled.
-- **Headless primitives** (the part Radix UI plays for shadcn/ui): anchored
+- **Themes**: the options of shadcn/ui's `/create` page (except the style):
+  every base color (neutral, stone, zinc, mauve, olive, mist, taupe), theme
+  (amber, blue, … yellow), chart color, radius preset, menu color (default,
+  inverted, translucent) and menu accent (subtle, bold), in light and dark
+  mode, generated from shadcn/ui's OKLCH tokens.
+- **Fonts and icons**: Geist, Geist Mono, Inter and all 2,179
+  [Lucide](https://lucide.dev) icons are bundled; the body and heading fonts
+  are configurable.
+- **Animations**: overlays, sheets, drawers, accordions, toasts and hover
+  states animate like tw-animate-css.
+- **Headless primitives** (the part Base UI plays for shadcn/ui): anchored
   floating content with flipping and collision handling, modal layers,
   listboxes with keyboard navigation, disclosures, resizable splits and
   focus rings.
@@ -44,7 +51,7 @@ Plus everything shadcn/ui gets from its environment:
 Run the gallery to see them all:
 
 ```sh
-cargo run -p gallery     # every component
+cargo run -p gallery     # every component, with a theme customizer
 cargo run -p hello       # the example below
 ```
 
@@ -137,6 +144,25 @@ let theme = theme::Config::new(BaseColor::Stone, Mode::Light)
     .build();
 ```
 
+The other options of shadcn/ui's `/create` page are there too (the
+gallery's **Customize** sheet shows the code for any combination):
+
+```rust
+use iced_ui::theme::{Accent, MenuAccent, MenuColor, Radius};
+
+let theme = theme::Config::new(BaseColor::Neutral, Mode::Dark)
+    .accent(Accent::Blue)
+    .chart_color(Accent::Rose)
+    .radius_preset(Radius::Large)
+    .menu_accent(MenuAccent::Bold)
+    .menu_color(MenuColor::Inverted)
+    .build();
+
+// Fonts (`font` and `fontHeading`): Geist by default, Inter is bundled too.
+iced_ui::font::set_sans(iced_ui::font::INTER); // before `.iced_ui()`
+iced_ui::font::set_heading(Some(iced_ui::font::GEIST));
+```
+
 `Config::build` returns a plain `iced::Theme` whose extended palette is also
 derived from the tokens, so built-in iced widgets blend in. Inside a
 component, `iced_ui::tokens(theme)` returns the full token set (`background`,
@@ -173,7 +199,8 @@ ICED_TEST_BACKEND=tiny-skia cargo run -p gallery --bin snapshot
 # One page, after interacting with it
 cargo run -p gallery --bin snapshot -- dropdown-menu:dark --live --click "Open" --hover 700,538
 cargo run -p gallery --bin snapshot -- dialog:light --click "Edit Profile"
-cargo run -p gallery --bin snapshot -- chart:light --accent blue
+cargo run -p gallery --bin snapshot -- chart:light --accent blue --chart rose
+cargo run -p gallery --bin snapshot -- dropdown-menu:light --menu-color inverted --live --click "Open"
 
 # A frame in the middle of an animation (animations are off by default)
 cargo run -p gallery --bin snapshot -- dropdown-menu:light --animations --live --click "Open" --wait 70
@@ -185,6 +212,12 @@ cargo run -p gallery --bin snapshot -- dropdown-menu:light --animations --live -
 
 iced is not a browser, so a few things differ:
 
+- The style is fixed to Nova; the other styles of shadcn/ui (Vega, Maia,
+  Lyra, Mira, Luma, Rhea, Sera) are not ported.
+- No backdrop blur: modal backdrops and translucent menus are approximated
+  without it.
+- Text is clipped rather than ellipsized, and there is no syntax
+  highlighting in code blocks.
 - Animations are reimplemented natively rather than with CSS: overlays fade
   and zoom in and out (`animate-in`/`animate-out`), sheets and drawers slide
   from their edge, accordions and collapsibles expand, toasts slide in, the
@@ -193,7 +226,7 @@ iced is not a browser, so a few things differ:
 - Keyboard focus: iced only focuses text inputs, so focus rings are shown on
   inputs, input groups and OTP fields; menus, selects and command palettes
   support <kbd>↑</kbd>/<kbd>↓</kbd>/<kbd>Enter</kbd>/<kbd>Esc</kbd>.
-- Some state that Radix keeps internally (dialogs, selected values, the
+- Some state that Base UI keeps internally (dialogs, selected values, the
   current month of a calendar…) lives in your application state, the Elm way.
   Popovers, dropdown/context menus, selects, hover cards, tooltips,
   collapsibles and accordions manage themselves.
@@ -202,7 +235,7 @@ iced is not a browser, so a few things differ:
 
 ## License
 
-MIT. The design is ported from shadcn/ui (MIT); Geist is under the OFL and
+MIT. The design is ported from shadcn/ui (MIT); Geist and Inter are under the OFL and
 Lucide under the ISC license. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ---
@@ -213,6 +246,6 @@ shadcn/ui のデザインを iced で再現した UI ライブラリです。
 `iced_ui` をライブラリとして使うことも、`cargo iced-ui add button` で
 コンポーネントのソースを自分のプロジェクトにコピーして自由に改変することも
 できます。テーマ（全ベースカラー・アクセントカラー、ライト/ダーク）、
-Geist フォント、Lucide アイコン、アニメーション、Radix UI に相当するヘッドレスな
+最新のデフォルトスタイル（Base UI + Nova）、/create 相当のテーマ設定、Geist / Inter フォント、Lucide アイコン、アニメーション、Base UI に相当するヘッドレスな
 プリミティブ（ポップオーバーの配置、モーダル、キーボード操作できるリスト等）
 も同梱しています。`cargo run -p gallery` で全コンポーネントを確認できます。
