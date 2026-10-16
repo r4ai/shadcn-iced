@@ -33,7 +33,19 @@ pub struct ToggleGroup<'a, T, Message> {
     variant: Variant,
     size: Size,
     spacing: f32,
+    orientation: Orientation,
+    disabled: bool,
     width: Length,
+}
+
+/// The direction of a [`ToggleGroup`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Orientation {
+    /// Side by side.
+    #[default]
+    Horizontal,
+    /// Stacked (`data-vertical:flex-col`).
+    Vertical,
 }
 
 /// Creates a [`ToggleGroup`] where `selected` values are on.
@@ -47,7 +59,9 @@ pub fn toggle_group<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a>(
         on_toggle: Box::new(on_toggle),
         variant: Variant::Default,
         size: Size::Default,
-        spacing: 0.0,
+        spacing: 8.0,
+        orientation: Orientation::Horizontal,
+        disabled: false,
         width: Length::Shrink,
     }
 }
@@ -89,10 +103,22 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> ToggleGroup<'a, T, Messa
         self
     }
 
-    /// Sets the space between items. With `0.0` (the default), items are
-    /// joined.
+    /// Sets the space between items. Defaults to `8.0` (`spacing={2}`);
+    /// with `0.0`, items are joined.
     pub fn spacing(mut self, spacing: f32) -> Self {
         self.spacing = spacing;
+        self
+    }
+
+    /// Sets the orientation.
+    pub fn orientation(mut self, orientation: Orientation) -> Self {
+        self.orientation = orientation;
+        self
+    }
+
+    /// Disables every item.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -111,6 +137,7 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<ToggleGroup<'a, T, 
         let joined = group.spacing == 0.0;
         let fill = group.width != Length::Shrink;
         let variant = group.variant;
+        let vertical = group.orientation == Orientation::Vertical;
 
         let items =
             group
@@ -121,16 +148,28 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<ToggleGroup<'a, T, 
                     let on = group.selected.contains(&value);
                     let message = (group.on_toggle)(value);
 
+                    let position = if joined {
+                        Position::of(index, count)
+                    } else {
+                        Position::Alone
+                    };
+
                     let mut toggle = toggle::toggle(on)
                         .variant(group.variant)
                         .size(group.size)
-                        .position(if joined {
-                            Position::of(index, count)
-                        } else {
-                            Position::Alone
-                        })
-                        .disabled(disabled)
+                        .disabled(disabled || group.disabled)
                         .on_toggle(move |_| message.clone());
+
+                    toggle = if vertical {
+                        toggle.vertical_position(position)
+                    } else {
+                        toggle.position(position)
+                    };
+
+                    // `group-data-[spacing=0]/toggle-group:rounded-none px-2`
+                    if joined {
+                        toggle = toggle.padding(8.0);
+                    }
 
                     if let Some(icon) = icon {
                         toggle = toggle.icon(icon);
@@ -154,9 +193,17 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<ToggleGroup<'a, T, 
             group.spacing
         };
 
-        Row::with_children(items)
-            .spacing(spacing)
-            .width(group.width)
-            .into()
+        if vertical {
+            // `data-vertical:flex-col data-vertical:items-stretch`
+            iced::widget::Column::with_children(items)
+                .spacing(spacing)
+                .width(group.width)
+                .into()
+        } else {
+            Row::with_children(items)
+                .spacing(spacing)
+                .width(group.width)
+                .into()
+        }
     }
 }

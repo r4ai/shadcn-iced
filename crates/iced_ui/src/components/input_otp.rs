@@ -24,7 +24,9 @@ use iced::{
     border, mouse, window,
 };
 
-const SLOT: f32 = 36.0;
+/// `size-8`
+const SLOT: f32 = 32.0;
+/// A `size-4` minus icon with a `gap-2` on each side.
 const SEPARATOR: f32 = 32.0;
 
 /// A one-time password input. See the [module documentation](self).
@@ -34,6 +36,7 @@ pub struct InputOtp<'a, Message> {
     length: usize,
     groups: Vec<usize>,
     invalid: bool,
+    disabled: bool,
 }
 
 /// Creates an [`InputOtp`] with `length` slots. Extra characters are
@@ -70,6 +73,7 @@ pub fn input_otp<'a, Message: Clone + 'a>(
         length,
         groups: vec![length],
         invalid: false,
+        disabled: false,
     }
 }
 
@@ -90,6 +94,16 @@ impl<'a, Message: Clone + 'a> InputOtp<'a, Message> {
     /// Marks the input as invalid.
     pub fn invalid(mut self, invalid: bool) -> Self {
         self.invalid = invalid;
+        self
+    }
+
+    /// Disables the input (`has-disabled:opacity-50`).
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        if disabled {
+            self.input = self.input.on_input_maybe(None::<fn(String) -> Message>);
+        }
+
+        self.disabled = disabled;
         self
     }
 
@@ -275,10 +289,15 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
         _viewport: &Rectangle,
     ) {
         let state = tree.state.downcast_ref::<State>();
+        let faded = self
+            .disabled
+            .then(|| iced_ui_core::theme::faded(theme, style::DISABLED_OPACITY))
+            .flatten();
+        let theme = faded.as_ref().unwrap_or(theme);
         let t = tokens(theme);
         let p = &t.palette;
         let origin = layout.bounds().position();
-        let radius = t.radius_md();
+        let radius = t.radius_lg();
         let slots = self.slots();
         let chars: Vec<char> = self.value.chars().collect();
         let active = state
@@ -368,10 +387,11 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
                     },
                     ..renderer::Quad::default()
                 },
+                // `dark:bg-input/30`
                 Background::Color(if t.is_dark() {
                     alpha(p.input, 0.3)
                 } else {
-                    p.background
+                    Color::TRANSPARENT
                 }),
             );
 
@@ -408,6 +428,38 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
             }
         };
 
+        // `has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20` on
+        // each group.
+        if self.invalid {
+            let ring = style::invalid_outset_ring(&t, radius);
+
+            for &(start, end) in &groups {
+                if start >= end {
+                    continue;
+                }
+
+                let first = slots[start] + (origin - Point::ORIGIN);
+                let last = slots[end - 1] + (origin - Point::ORIGIN);
+                let bounds = Rectangle::new(
+                    first.position(),
+                    Size::new(last.x + last.width - first.x, first.height),
+                );
+
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: bounds.expand(ring.width),
+                        border: Border {
+                            color: ring.color,
+                            width: ring.width,
+                            radius: border::radius(radius + ring.width),
+                        },
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(Color::TRANSPARENT),
+                );
+            }
+        }
+
         for i in 0..self.length {
             if active != Some(i) {
                 draw_slot(i, renderer);
@@ -432,11 +484,12 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
 
             renderer.fill_quad(
                 renderer::Quad {
+                    // Lucide's `minus` at 16px.
                     bounds: Rectangle::new(
-                        Point::new(center.x - 5.0, center.y - 1.0),
-                        Size::new(10.0, 2.0),
+                        Point::new(center.x - 14.0 / 3.0 - 0.67, center.y - 0.67),
+                        Size::new(28.0 / 3.0 + 1.33, 1.33),
                     ),
-                    border: border::rounded(1),
+                    border: border::rounded(0.67),
                     ..renderer::Quad::default()
                 },
                 Background::Color(p.foreground),

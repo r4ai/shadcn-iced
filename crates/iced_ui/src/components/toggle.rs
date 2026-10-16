@@ -17,27 +17,27 @@ use iced_ui_core::{Element, font, style, tokens};
 
 use iced::widget::button::{Status, Style};
 use iced::widget::{Row, text};
-use iced::{Alignment, Background, Border, Color, Length, Theme};
+use iced::{Alignment, Background, Border, Color, Length, Padding, Theme};
 
 /// The visual style of a [`Toggle`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Variant {
-    /// Transparent until hovered or on.
+    /// Transparent until hovered or on (`bg-transparent`).
     #[default]
     Default,
-    /// Bordered.
+    /// Bordered (`border-input border bg-transparent`).
     Outline,
 }
 
 /// The size of a [`Toggle`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Size {
-    /// `h-8 min-w-8 px-1.5`
+    /// `h-7 min-w-7 px-2.5 text-[0.8rem]`
     Sm,
-    /// `h-9 min-w-9 px-2`
+    /// `h-8 min-w-8 px-2.5`
     #[default]
     Default,
-    /// `h-10 min-w-10 px-2.5`
+    /// `h-9 min-w-9 px-2.5`
     Lg,
 }
 
@@ -45,17 +45,39 @@ impl Size {
     /// The height of the toggle.
     pub fn height(self) -> f32 {
         match self {
-            Size::Sm => 32.0,
-            Size::Default => 36.0,
-            Size::Lg => 40.0,
+            Size::Sm => 28.0,
+            Size::Default => 32.0,
+            Size::Lg => 36.0,
         }
     }
 
+    /// The horizontal padding: `px-2.5`.
     fn padding(self) -> f32 {
+        10.0
+    }
+
+    /// The font size: `text-sm`, `text-[0.8rem]` when small.
+    pub fn text_size(self) -> f32 {
         match self {
-            Size::Sm => 6.0,
-            Size::Default => 8.0,
-            Size::Lg => 10.0,
+            Size::Sm => 12.8,
+            _ => style::text::SM,
+        }
+    }
+
+    /// The icon size: `size-4`, `size-3.5` when small.
+    pub fn icon_size(self) -> f32 {
+        match self {
+            Size::Sm => 14.0,
+            _ => 16.0,
+        }
+    }
+
+    /// The corner radius: `rounded-lg`, or
+    /// `rounded-[min(var(--radius-md),12px)]` when small.
+    pub fn radius(self, tokens: &iced_ui_core::Tokens) -> f32 {
+        match self {
+            Size::Sm => tokens.radius_md().min(12.0),
+            _ => tokens.radius_lg(),
         }
     }
 }
@@ -71,6 +93,8 @@ pub struct Toggle<'a, Message> {
     variant: Variant,
     size: Size,
     position: Position,
+    vertical: bool,
+    padding: Option<f32>,
     disabled: bool,
     width: Length,
 }
@@ -85,6 +109,8 @@ pub fn toggle<'a, Message: Clone + 'a>(on: bool) -> Toggle<'a, Message> {
         variant: Variant::Default,
         size: Size::Default,
         position: Position::Alone,
+        vertical: false,
+        padding: None,
         disabled: false,
         width: Length::Shrink,
     }
@@ -121,9 +147,23 @@ impl<'a, Message: Clone + 'a> Toggle<'a, Message> {
         self
     }
 
-    /// Sets the position in a joined group.
+    /// Sets the position in a joined horizontal group.
     pub fn position(mut self, position: Position) -> Self {
         self.position = position;
+        self.vertical = false;
+        self
+    }
+
+    /// Sets the position in a joined vertical group.
+    pub fn vertical_position(mut self, position: Position) -> Self {
+        self.position = position;
+        self.vertical = true;
+        self
+    }
+
+    /// Overrides the horizontal padding, e.g. `px-2` in joined groups.
+    pub fn padding(mut self, padding: f32) -> Self {
+        self.padding = Some(padding);
         self
     }
 
@@ -146,30 +186,34 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
         let size = toggle.size;
         let variant = toggle.variant;
         let position = toggle.position;
+        let vertical = toggle.vertical;
         let disabled = toggle.disabled || toggle.on_toggle.is_none();
 
-        let icon_only = toggle.label.is_none();
-
+        // `gap-1`
         let content = Row::new()
-            .push(toggle.icon.map(|icon| icon.sized(16)))
+            .push(toggle.icon.map(|icon| icon.sized(size.icon_size())))
             .push(toggle.label.map(|label| {
                 text(label)
-                    .size(style::text::SM)
+                    .size(size.text_size())
                     .font(font::MEDIUM)
                     .wrapping(text::Wrapping::None)
             }))
-            .spacing(8)
+            .spacing(4)
             .align_y(Alignment::Center)
             .height(Length::Fill);
 
-        // `min-w-*`: icon-only toggles are square.
-        let width = match toggle.width {
-            Length::Shrink if icon_only => Length::Fixed(size.height()),
-            width => width,
+        let padding = Padding {
+            left: toggle.padding.unwrap_or(size.padding()),
+            right: toggle.padding.unwrap_or(size.padding()),
+            ..Padding::ZERO
         };
 
-        let content: Element<'a, Message> = if width == Length::Shrink {
-            content.into()
+        // Icon-only toggles are at least square (`min-w-*`).
+        let content: Element<'a, Message> = if toggle.width == Length::Shrink {
+            iced::widget::container(content)
+                .center_x(Length::Shrink)
+                .height(Length::Fill)
+                .into()
         } else {
             iced::widget::container(content)
                 .center_x(Length::Fill)
@@ -180,10 +224,27 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
         Pressable::new(content)
             .on_press_maybe(toggle.on_toggle.map(|f| f(!on)))
             .disabled(disabled)
-            .width(width)
+            .width(toggle.width)
             .height(size.height())
-            .padding([0.0, if icon_only { 0.0 } else { size.padding() }])
-            .style(move |theme, status| self::style(theme, status, on, variant, position))
+            .padding(padding)
+            .style(move |theme, status| {
+                let mut style = self::style(theme, status, on, variant, position);
+                let t = tokens(theme);
+                // Joined group items: `first:rounded-l-lg last:rounded-r-lg`
+                let radius = if position == Position::Alone {
+                    size.radius(&t)
+                } else {
+                    t.radius_lg()
+                };
+
+                style.border.radius = if vertical {
+                    position.vertical_radius(radius)
+                } else {
+                    position.radius(radius)
+                };
+
+                style
+            })
             .into()
     }
 }
@@ -200,20 +261,10 @@ pub fn style(
     let p = &t.palette;
     let hovered = matches!(status, Status::Hovered | Status::Pressed);
 
-    let (background, text_color) = if on {
-        (Some(p.accent), p.accent_foreground)
-    } else if hovered {
-        match variant {
-            Variant::Default => (Some(p.muted), p.muted_foreground),
-            Variant::Outline => (Some(p.accent), p.accent_foreground),
-        }
-    } else {
-        (None, p.foreground)
-    };
-
+    // `hover:bg-muted hover:text-foreground aria-pressed:bg-muted`
     let mut style = Style {
-        background: background.map(Background::Color),
-        text_color,
+        background: (on || hovered).then_some(Background::Color(p.muted)),
+        text_color: p.foreground,
         border: Border {
             color: match variant {
                 Variant::Default => Color::TRANSPARENT,
@@ -223,14 +274,18 @@ pub fn style(
                 Variant::Default => 0.0,
                 Variant::Outline => 1.0,
             },
-            radius: position.radius(t.radius_md()),
+            radius: position.radius(t.radius_lg()),
         },
         ..Style::default()
     };
 
+    // `disabled:opacity-50`
     if status == Status::Disabled {
-        style = super::button::disabled(style);
+        style.background = style
+            .background
+            .map(|_| Background::Color(alpha(p.muted, style::DISABLED_OPACITY)));
         style.text_color = alpha(p.foreground, style::DISABLED_OPACITY);
+        style.border.color = alpha(style.border.color, style::DISABLED_OPACITY);
     }
 
     style

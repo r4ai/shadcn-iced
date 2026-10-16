@@ -38,7 +38,8 @@ where
     PickList::new(options, selected, on_select)
         .text_size(style::text::SM)
         .text_line_height(text::LineHeight::Absolute(Pixels(20.0)))
-        .padding([7, 12])
+        // `h-8 pl-2.5 pr-8 py-1`
+        .padding([6, 10])
         .font(font::SANS)
         .handle(Handle::Static(Icon {
             font: font::ICONS,
@@ -51,7 +52,46 @@ where
         .menu_style(menu_style)
 }
 
-/// The style of the select field.
+/// Makes a select small (`size="sm"`: `h-7 py-0.5
+/// rounded-[min(var(--radius-md),10px)]`).
+pub fn small<'a, T, L, V, Message: Clone + 'a>(
+    select: PickList<'a, T, L, V, Message>,
+) -> PickList<'a, T, L, V, Message>
+where
+    T: ToString + PartialEq + Clone + 'a,
+    L: Borrow<[T]> + 'a,
+    V: Borrow<T> + 'a,
+{
+    select.padding([4, 10]).style(|theme, status| {
+        let mut style = self::style(theme, status);
+        style.border.radius = border::radius(tokens(theme).radius_md().min(10.0));
+        style
+    })
+}
+
+/// Marks a select as invalid (`aria-invalid:border-destructive`).
+pub fn invalid<'a, T, L, V, Message: Clone + 'a>(
+    select: PickList<'a, T, L, V, Message>,
+) -> PickList<'a, T, L, V, Message>
+where
+    T: ToString + PartialEq + Clone + 'a,
+    L: Borrow<[T]> + 'a,
+    V: Borrow<T> + 'a,
+{
+    select.style(|theme, status| {
+        let t = tokens(theme);
+        let mut style = self::style(theme, status);
+        style.border.color = if t.is_dark() {
+            alpha(t.palette.destructive, 0.5)
+        } else {
+            t.palette.destructive
+        };
+        style
+    })
+}
+
+/// The style of the select field: `rounded-lg border border-input
+/// bg-transparent dark:bg-input/30 dark:hover:bg-input/50`.
 pub fn style(theme: &Theme, status: Status) -> Style {
     let t = tokens(theme);
     let p = &t.palette;
@@ -65,8 +105,9 @@ pub fn style(theme: &Theme, status: Status) -> Style {
 
     Style {
         text_color: p.foreground,
-        placeholder_color: p.muted_foreground,
-        handle_color: alpha(p.muted_foreground, 0.5),
+        // A native select shows its placeholder option like any other.
+        placeholder_color: p.foreground,
+        handle_color: p.muted_foreground,
         background: Background::Color(background),
         border: Border {
             color: match status {
@@ -74,7 +115,7 @@ pub fn style(theme: &Theme, status: Status) -> Style {
                 _ => p.input,
             },
             width: 1.0,
-            radius: border::radius(t.radius_md()),
+            radius: border::radius(t.radius_lg()),
         },
     }
 }
@@ -86,7 +127,7 @@ pub fn menu_style(theme: &Theme) -> menu::Style {
 
     menu::Style {
         background: Background::Color(p.popover),
-        border: style::border(p.border, t.radius_md()),
+        border: style::border(alpha(p.foreground, 0.1), t.radius_lg()),
         text_color: p.popover_foreground,
         selected_text_color: p.accent_foreground,
         selected_background: Background::Color(p.accent),
