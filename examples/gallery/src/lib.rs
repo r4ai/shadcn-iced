@@ -5,7 +5,8 @@ use iced_ui::prelude::*;
 use iced_ui::theme::{Accent, BaseColor};
 use iced_ui::{font, style, tokens};
 
-use iced::widget::{Column, column, container, row, rule, scrollable, space, text};
+use iced::widget::{Column, column, container, row, rule, space, text};
+use iced_ui::scroll_area::scroll_area as scrollable;
 use iced::{Element, Fill, Length, Task, Theme};
 
 pub use pages::{PAGES, Page};
@@ -34,7 +35,7 @@ pub enum Message {
 
 impl Default for Gallery {
     fn default() -> Self {
-        Self::new(0, Mode::Light)
+        Self::new(Self::page_by_id("button").unwrap_or(0), Mode::Light)
     }
 }
 
