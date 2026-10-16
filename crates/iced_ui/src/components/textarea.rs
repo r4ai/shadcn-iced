@@ -11,12 +11,11 @@
 //! textarea(content).placeholder("Type your message here.").on_action(Message::Edit).into()
 //! # }
 //! ```
-use iced_ui_core::theme::{alpha, tokens};
 use iced_ui_core::{Element, font, style};
 
-use iced::widget::TextEditor;
 use iced::widget::text_editor::{self, Status, Style};
-use iced::{Background, Border, Color, Length, Pixels, Theme, border};
+use iced::widget::{TextEditor, text_input};
+use iced::{Length, Pixels, Theme};
 
 pub use text_editor::{Action, Content};
 
@@ -24,6 +23,7 @@ pub use text_editor::{Action, Content};
 pub struct Textarea<'a, Message> {
     raw: TextEditor<'a, iced::advanced::text::highlighter::PlainText, Message>,
     invalid: bool,
+    disabled: bool,
 }
 
 /// Creates a [`Textarea`] editing the given [`Content`].
@@ -32,10 +32,12 @@ pub fn textarea<'a, Message: Clone + 'a>(content: &'a Content) -> Textarea<'a, M
         raw: TextEditor::new(content)
             .size(style::text::SM)
             .line_height(Pixels(20.0))
-            .padding([8, 12])
+            // `min-h-16 px-2.5 py-2 md:text-sm`, plus the 1px border.
+            .padding([9, 11])
             .font(font::SANS)
             .min_height(64),
         invalid: false,
+        disabled: true,
     }
 }
 
@@ -50,6 +52,7 @@ impl<'a, Message: Clone + 'a> Textarea<'a, Message> {
     /// disabled.
     pub fn on_action(mut self, f: impl Fn(Action) -> Message + 'a) -> Self {
         self.raw = self.raw.on_action(f);
+        self.disabled = false;
         self
     }
 
@@ -75,51 +78,40 @@ impl<'a, Message: Clone + 'a> Textarea<'a, Message> {
 impl<'a, Message: Clone + 'a> From<Textarea<'a, Message>> for Element<'a, Message> {
     fn from(textarea: Textarea<'a, Message>) -> Self {
         let invalid = textarea.invalid;
+        let disabled = textarea.disabled;
 
         iced_ui_core::primitive::FocusWithin::new(
-            textarea
-                .raw
-                .style(move |theme, status| style(theme, status, invalid)),
+            textarea.raw.style(move |theme, status| {
+                // iced only reports the disabled status after a redraw.
+                let status = if disabled { Status::Disabled } else { status };
+
+                style(theme, status, invalid)
+            }),
             move |theme, status| super::input::ring(theme, status, invalid),
         )
         .into()
     }
 }
 
-/// The style of a textarea.
+/// The style of a textarea: the same as an
+/// [input's](super::input::style).
 pub fn style(theme: &Theme, status: Status, invalid: bool) -> Style {
-    let t = tokens(theme);
-    let p = &t.palette;
-    let dark = t.is_dark();
-
-    let focused = matches!(status, Status::Focused { .. });
-    let opacity = if status == Status::Disabled {
-        style::DISABLED_OPACITY
-    } else {
-        1.0
-    };
-
-    let border_color = if invalid {
-        p.destructive
-    } else if focused {
-        p.ring
-    } else {
-        p.input
-    };
+    let input = super::input::style(
+        theme,
+        match status {
+            Status::Active => text_input::Status::Active,
+            Status::Hovered => text_input::Status::Hovered,
+            Status::Focused { is_hovered } => text_input::Status::Focused { is_hovered },
+            Status::Disabled => text_input::Status::Disabled,
+        },
+        invalid,
+    );
 
     Style {
-        background: Background::Color(if dark {
-            alpha(p.input, 0.3 * opacity)
-        } else {
-            Color::TRANSPARENT
-        }),
-        border: Border {
-            color: alpha(border_color, opacity),
-            width: 1.0,
-            radius: border::radius(t.radius_md()),
-        },
-        placeholder: alpha(p.muted_foreground, opacity),
-        value: alpha(p.foreground, opacity),
-        selection: alpha(p.primary, if dark { 0.4 } else { 0.2 }),
+        background: input.background,
+        border: input.border,
+        placeholder: input.placeholder,
+        value: input.value,
+        selection: input.selection,
     }
 }

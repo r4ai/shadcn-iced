@@ -35,7 +35,8 @@ pub fn input<'a, Message: Clone + 'a>(placeholder: &str, value: &str) -> Input<'
         raw: TextInput::new(placeholder, value)
             .size(style::text::SM)
             .line_height(Pixels(20.0))
-            .padding([8, 12])
+            // `h-8 px-2.5 py-1 md:text-sm`, plus the 1px border.
+            .padding([6, 11])
             .font(font::SANS),
         invalid: false,
         icon: None,
@@ -126,7 +127,7 @@ impl<'a, Message: Clone + 'a> Input<'a, Message> {
                     spacing: 8.0,
                     side: text_input::Side::Left,
                 })
-                .padding([8, 12]);
+                .padding([6, 11]);
         }
 
         raw.style(move |theme, status| {
@@ -157,21 +158,24 @@ impl<'a, Message: Clone + 'a> From<Input<'a, Message>> for Element<'a, Message> 
     }
 }
 
-/// The ring drawn around a focused (or invalid) control.
+/// The ring drawn around a focused or invalid control
+/// (`focus-visible:ring-3 ring-ring/50`, `aria-invalid:ring-3
+/// ring-destructive/20`).
 pub fn ring(theme: &Theme, status: focus::Status, invalid: bool) -> focus::Style {
     let t = tokens(theme);
 
     focus::Style {
         ring: match (status.focused, invalid) {
-            (true, false) => Some(style::ring(&t, t.radius_md())),
-            (true, true) => Some(style::invalid_outset_ring(&t, t.radius_md())),
-            (false, _) => None,
+            (_, true) => Some(style::invalid_outset_ring(&t, t.radius_lg())),
+            (true, false) => Some(style::ring(&t, t.radius_lg())),
+            (false, false) => None,
         },
         ..focus::Style::default()
     }
 }
 
-/// The style of an input.
+/// The style of an input (`rounded-lg border border-input bg-transparent
+/// dark:bg-input/30`).
 pub fn style(theme: &Theme, status: Status, invalid: bool) -> Style {
     let t = tokens(theme);
     let p = &t.palette;
@@ -181,29 +185,34 @@ pub fn style(theme: &Theme, status: Status, invalid: bool) -> Style {
     let disabled = status == Status::Disabled;
 
     let border_color = if invalid {
-        p.destructive
+        // `aria-invalid:border-destructive dark:aria-invalid:border-destructive/50`
+        alpha(p.destructive, if dark { 0.5 } else { 1.0 })
     } else if focused {
         p.ring
     } else {
         p.input
     };
 
+    // `disabled:opacity-50 disabled:bg-input/50 dark:disabled:bg-input/80`
     let opacity = if disabled {
         style::DISABLED_OPACITY
     } else {
         1.0
     };
 
+    let background = match (dark, disabled) {
+        (false, false) => Color::TRANSPARENT,
+        (true, false) => alpha(p.input, 0.3),
+        (false, true) => alpha(p.input, 0.5 * opacity),
+        (true, true) => alpha(p.input, 0.8 * opacity),
+    };
+
     Style {
-        background: Background::Color(if dark {
-            alpha(p.input, 0.3 * opacity)
-        } else {
-            Color::TRANSPARENT
-        }),
+        background: Background::Color(background),
         border: Border {
             color: alpha(border_color, opacity),
             width: 1.0,
-            radius: border::radius(t.radius_md()),
+            radius: border::radius(t.radius_lg()),
         },
         icon: alpha(p.muted_foreground, opacity),
         placeholder: alpha(p.muted_foreground, opacity),

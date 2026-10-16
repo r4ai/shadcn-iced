@@ -11,17 +11,20 @@
 //! ```
 use super::button::{self, Button, Variant};
 
-use iced_ui_core::icon::lucide;
-use iced_ui_core::{Element, tokens};
+use iced_ui_core::icon::{Icon, lucide};
+use iced_ui_core::primitive::Pressable;
+use iced_ui_core::{Element, font, tokens};
 
 use iced::widget::{Row, container, text};
-use iced::{Alignment, Theme};
+use iced::{Alignment, Length, Padding, Theme};
 
 /// A pagination. See the [module documentation](self).
 pub struct Pagination<'a, Message> {
     current: usize,
     total: usize,
     siblings: usize,
+    numbers: bool,
+    controls: bool,
     on_change: Box<dyn Fn(usize) -> Message + 'a>,
 }
 
@@ -36,6 +39,8 @@ pub fn pagination<'a, Message: Clone + 'a>(
         current: current.clamp(1, total.max(1)),
         total: total.max(1),
         siblings: 1,
+        numbers: true,
+        controls: true,
         on_change: Box::new(on_change),
     }
 }
@@ -44,6 +49,19 @@ impl<'a, Message: Clone + 'a> Pagination<'a, Message> {
     /// Sets how many pages are shown around the current one.
     pub fn siblings(mut self, siblings: usize) -> Self {
         self.siblings = siblings;
+        self
+    }
+
+    /// Shows the page numbers. Without them, only the previous and next
+    /// buttons are shown.
+    pub fn numbers(mut self, numbers: bool) -> Self {
+        self.numbers = numbers;
+        self
+    }
+
+    /// Shows the previous and next buttons.
+    pub fn controls(mut self, controls: bool) -> Self {
+        self.controls = controls;
         self
     }
 }
@@ -75,26 +93,79 @@ pub fn pages(current: usize, total: usize, siblings: usize) -> Vec<Option<usize>
     pages
 }
 
+/// `PaginationPrevious` / `PaginationNext`: a ghost button of the default
+/// size, with `pl-1.5!` / `pr-1.5!` on the side of the chevron.
+fn step<'a, Message: Clone + 'a>(
+    label: &'static str,
+    icon: Icon,
+    previous: bool,
+    on_press: Option<Message>,
+) -> Element<'a, Message> {
+    let size = button::Size::Default;
+    let icon = icon.sized(size.icon_size());
+    let label = text(label)
+        .size(size.text_size())
+        .font(font::MEDIUM)
+        .wrapping(text::Wrapping::None);
+
+    let content = if previous {
+        Row::new().push(icon).push(label)
+    } else {
+        Row::new().push(label).push(icon)
+    };
+
+    Pressable::new(
+        content
+            .spacing(6)
+            .align_y(Alignment::Center)
+            .height(Length::Fill),
+    )
+    .disabled(on_press.is_none())
+    .on_press_maybe(on_press)
+    .height(size.height())
+    .padding(Padding {
+        left: if previous { 6.0 } else { 10.0 },
+        right: if previous { 10.0 } else { 6.0 },
+        ..Padding::ZERO
+    })
+    .press_offset(1.0)
+    .style(move |theme, status| {
+        let mut style = button::style(theme, status, Variant::Ghost);
+        style.border.radius = size.radius(&tokens(theme)).into();
+        style
+    })
+    .into()
+}
+
 impl<'a, Message: Clone + 'a> From<Pagination<'a, Message>> for Element<'a, Message> {
     fn from(pagination: Pagination<'a, Message>) -> Self {
         let current = pagination.current;
         let total = pagination.total;
         let on_change = &pagination.on_change;
 
-        let mut row = Row::new().spacing(4).align_y(Alignment::Center);
+        // `gap-0.5`
+        let mut row = Row::new().spacing(2).align_y(Alignment::Center);
 
-        row = row.push(
-            button::button("Previous")
-                .icon(lucide::CHEVRON_LEFT)
-                .variant(Variant::Ghost)
-                .disabled(current == 1)
-                .on_press_maybe((current > 1).then(|| on_change(current - 1))),
-        );
+        if pagination.controls {
+            row = row.push(step(
+                "Previous",
+                lucide::CHEVRON_LEFT,
+                true,
+                (current > 1).then(|| on_change(current - 1)),
+            ));
+        }
 
-        for page in pages(current, total, pagination.siblings) {
-            row = row.push(match page {
-                Some(page) => Element::from(
-                    Button::new(text(page.to_string()).size(14))
+        if pagination.numbers {
+            for page in pages(current, total, pagination.siblings) {
+                row = row.push(match page {
+                    // `PaginationLink`: an icon button, outlined when active.
+                    Some(page) => Element::from(
+                        Button::new(
+                            text(page.to_string())
+                                .size(14)
+                                .font(font::MEDIUM)
+                                .wrapping(text::Wrapping::None),
+                        )
                         .variant(if page == current {
                             Variant::Outline
                         } else {
@@ -102,26 +173,27 @@ impl<'a, Message: Clone + 'a> From<Pagination<'a, Message>> for Element<'a, Mess
                         })
                         .size(button::Size::Icon)
                         .on_press(on_change(page)),
-                ),
-                None => container(
-                    lucide::ELLIPSIS
-                        .sized(16)
-                        .style(|theme: &Theme| text::Style {
+                    ),
+                    // `size-8 [&_svg:not([class*='size-'])]:size-4`
+                    None => container(lucide::ELLIPSIS.sized(16).style(|theme: &Theme| {
+                        iced::widget::text::Style {
                             color: Some(tokens(theme).palette.foreground),
-                        }),
-                )
-                .center(36)
-                .into(),
-            });
+                        }
+                    }))
+                    .center(32)
+                    .into(),
+                });
+            }
         }
 
-        row = row.push(
-            button::button("Next")
-                .trailing_icon(lucide::CHEVRON_RIGHT)
-                .variant(Variant::Ghost)
-                .disabled(current == total)
-                .on_press_maybe((current < total).then(|| on_change(current + 1))),
-        );
+        if pagination.controls {
+            row = row.push(step(
+                "Next",
+                lucide::CHEVRON_RIGHT,
+                false,
+                (current < total).then(|| on_change(current + 1)),
+            ));
+        }
 
         row.into()
     }

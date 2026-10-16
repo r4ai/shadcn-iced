@@ -1,45 +1,64 @@
 //! Displays a badge or a component that looks like a badge.
 //!
 //! Port of <https://ui.shadcn.com/docs/components/badge>.
+//!
+//! ```no_run
+//! # use iced_ui::badge::{badge, Variant};
+//! # use iced_ui::prelude::lucide;
+//! # fn view<'a>() -> iced::Element<'a, ()> {
+//! badge("Verified")
+//!     .icon(lucide::BADGE_CHECK)
+//!     .variant(Variant::Secondary)
+//!     .into()
+//! # }
+//! ```
 use iced_ui_core::icon::Icon;
+use iced_ui_core::primitive::Pressable;
 use iced_ui_core::theme::{alpha, tokens};
 use iced_ui_core::{Element, font, style};
 
+use iced::widget::button;
 use iced::widget::{Row, container, text};
-use iced::{Alignment, Background, Border, Color, Theme, border};
+use iced::{Alignment, Background, Border, Color, Padding, Theme, border};
 
 /// The visual style of a [`Badge`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Variant {
-    /// Primary color.
+    /// `bg-primary text-primary-foreground`
     #[default]
     Default,
-    /// Secondary color.
+    /// `bg-secondary text-secondary-foreground`
     Secondary,
-    /// Destructive color.
+    /// `bg-destructive/10 text-destructive` (`/20` in dark mode)
     Destructive,
-    /// Bordered.
+    /// `border-border text-foreground`
     Outline,
-    /// Transparent.
+    /// Transparent, `hover:bg-muted` when it is a link.
     Ghost,
-    /// Looks like a link.
+    /// `text-primary underline-offset-4`
     Link,
 }
+
+/// The height of a badge (`h-5`).
+pub const HEIGHT: f32 = 20.0;
 
 /// A badge. See the [module documentation](self).
 pub struct Badge<'a, Message> {
     content: Element<'a, Message>,
-    icon: Option<Icon>,
+    leading: Option<Element<'a, Message>>,
+    trailing: Option<Element<'a, Message>>,
     variant: Variant,
+    on_press: Option<Message>,
 }
 
-/// Creates a [`Badge`] with a text label.
+/// Creates a [`Badge`] with a text label (`text-xs font-medium`).
 pub fn badge<'a, Message: 'a>(label: impl text::IntoFragment<'a>) -> Badge<'a, Message> {
     Badge::new(
         text(label)
             .size(style::text::XS)
             .font(font::MEDIUM)
-            .line_height(iced::Pixels(16.0)),
+            .line_height(iced::Pixels(16.0))
+            .wrapping(text::Wrapping::None),
     )
 }
 
@@ -48,8 +67,10 @@ impl<'a, Message: 'a> Badge<'a, Message> {
     pub fn new(content: impl Into<Element<'a, Message>>) -> Self {
         Self {
             content: content.into(),
-            icon: None,
+            leading: None,
+            trailing: None,
             variant: Variant::Default,
+            on_press: None,
         }
     }
 
@@ -59,63 +80,153 @@ impl<'a, Message: 'a> Badge<'a, Message> {
         self
     }
 
-    /// Adds a leading icon.
-    pub fn icon(mut self, icon: Icon) -> Self {
-        self.icon = Some(icon);
+    /// Adds a leading icon (`data-icon="inline-start"`, `size-3`).
+    pub fn icon(self, icon: Icon) -> Self {
+        self.leading(icon.sized(12))
+    }
+
+    /// Adds a trailing icon (`data-icon="inline-end"`, `size-3`).
+    pub fn trailing_icon(self, icon: Icon) -> Self {
+        self.trailing(icon.sized(12))
+    }
+
+    /// Adds a leading element, e.g. a 12px [`spinner`](super::spinner).
+    pub fn leading(mut self, element: impl Into<Element<'a, Message>>) -> Self {
+        self.leading = Some(element.into());
+        self
+    }
+
+    /// Adds a trailing element, e.g. a 12px [`spinner`](super::spinner).
+    pub fn trailing(mut self, element: impl Into<Element<'a, Message>>) -> Self {
+        self.trailing = Some(element.into());
+        self
+    }
+
+    /// Makes the badge a link (`render={<a />}`), with a hover style.
+    pub fn on_press(mut self, message: Message) -> Self {
+        self.on_press = Some(message);
         self
     }
 }
 
-impl<'a, Message: 'a> From<Badge<'a, Message>> for Element<'a, Message> {
+impl<'a, Message: Clone + 'a> From<Badge<'a, Message>> for Element<'a, Message> {
     fn from(badge: Badge<'a, Message>) -> Self {
         let variant = badge.variant;
 
-        container(
-            Row::new()
-                .push(badge.icon.map(|icon| icon.sized(12)))
-                .push(badge.content)
-                .spacing(4)
-                .align_y(Alignment::Center),
-        )
-        .padding([3, 9])
-        .style(move |theme| self::style(theme, variant))
-        .into()
+        // `px-2`, `pl-1.5` / `pr-1.5` next to an icon, plus the 1px border.
+        let padding = Padding {
+            left: if badge.leading.is_some() { 7.0 } else { 9.0 },
+            right: if badge.trailing.is_some() { 7.0 } else { 9.0 },
+            ..Padding::ZERO
+        };
+
+        let content = Row::new()
+            .push(badge.leading)
+            .push(badge.content)
+            .push(badge.trailing)
+            .spacing(4)
+            .align_y(Alignment::Center);
+
+        match badge.on_press {
+            Some(on_press) => Pressable::new(container(content).center_y(iced::Length::Fill))
+                .on_press(on_press)
+                .height(HEIGHT)
+                .padding(padding)
+                .style(move |theme, status| {
+                    let hovered =
+                        matches!(status, button::Status::Hovered | button::Status::Pressed);
+                    let style = self::style_with(theme, variant, hovered);
+
+                    button::Style {
+                        background: style.background,
+                        text_color: style.text_color.unwrap_or(Color::BLACK),
+                        border: style.border,
+                        ..button::Style::default()
+                    }
+                })
+                .into(),
+            None => container(content)
+                .height(HEIGHT)
+                .center_y(HEIGHT)
+                .padding(padding)
+                .style(move |theme| self::style(theme, variant))
+                .into(),
+        }
     }
 }
 
 /// The style of a [`Badge`] of the given variant.
 pub fn style(theme: &Theme, variant: Variant) -> container::Style {
+    style_with(theme, variant, false)
+}
+
+/// The style of a [`Badge`] of the given variant, hovered or not. Only
+/// links (`[a]:hover:`) have a hover style.
+pub fn style_with(theme: &Theme, variant: Variant, hovered: bool) -> container::Style {
     let t = tokens(theme);
     let p = &t.palette;
+    let dark = t.is_dark();
 
     let (background, text_color, border_color) = match variant {
-        Variant::Default => (Some(p.primary), p.primary_foreground, Color::TRANSPARENT),
+        Variant::Default => (
+            Some(if hovered {
+                alpha(p.primary, 0.8)
+            } else {
+                p.primary
+            }),
+            p.primary_foreground,
+            Color::TRANSPARENT,
+        ),
         Variant::Secondary => (
-            Some(p.secondary),
+            Some(if hovered {
+                alpha(p.secondary, 0.8)
+            } else {
+                p.secondary
+            }),
             p.secondary_foreground,
             Color::TRANSPARENT,
         ),
         Variant::Destructive => (
-            Some(if t.is_dark() {
-                alpha(p.destructive, 0.6)
-            } else {
-                p.destructive
-            }),
-            Color::WHITE,
+            Some(alpha(
+                p.destructive,
+                match (dark, hovered) {
+                    (false, false) => 0.1,
+                    (false, true) | (true, false) => 0.2,
+                    (true, true) => 0.3,
+                },
+            )),
+            p.destructive,
             Color::TRANSPARENT,
         ),
-        Variant::Outline => (None, p.foreground, p.border),
-        Variant::Ghost => (None, p.foreground, Color::TRANSPARENT),
+        Variant::Outline => (
+            hovered.then_some(p.muted),
+            if hovered {
+                p.muted_foreground
+            } else {
+                p.foreground
+            },
+            p.border,
+        ),
+        Variant::Ghost => (
+            hovered.then(|| if dark { alpha(p.muted, 0.5) } else { p.muted }),
+            if hovered {
+                p.muted_foreground
+            } else {
+                p.foreground
+            },
+            Color::TRANSPARENT,
+        ),
         Variant::Link => (None, p.primary, Color::TRANSPARENT),
     };
 
     container::Style {
         background: background.map(Background::Color),
         text_color: Some(text_color),
+        // `rounded-4xl`, a pill at this height.
         border: Border {
             color: border_color,
             width: 1.0,
-            radius: border::radius(f32::MAX),
+            radius: border::radius(t.radius_4xl()),
         },
         ..container::Style::default()
     }

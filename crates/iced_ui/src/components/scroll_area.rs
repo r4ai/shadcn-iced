@@ -38,12 +38,13 @@ pub fn both_scroll_area<'a, Message: 'a>(
         .style(style)
 }
 
-/// The scrollbar of a scroll area (`w-2.5 p-px`).
+/// The scrollbar of a scroll area (`w-2.5 p-px border-l
+/// border-l-transparent`): a 7px thumb in a 10px track.
 pub fn scrollbar() -> Scrollbar {
-    Scrollbar::new().width(10).scroller_width(8).margin(1)
+    Scrollbar::new().width(7).scroller_width(7).margin(1.5)
 }
 
-/// The style of a scroll area.
+/// The style of a scroll area (`bg-border rounded-full` thumb).
 pub fn style(theme: &Theme, status: Status) -> Style {
     let p = tokens(theme).palette;
     let base = scrollable::default(theme, status);

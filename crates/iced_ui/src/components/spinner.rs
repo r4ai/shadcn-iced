@@ -17,13 +17,15 @@ static START: LazyLock<Instant> = LazyLock::new(Instant::now);
 pub struct Spinner {
     size: f32,
     color: Option<Color>,
+    style: Option<fn(&Theme) -> Color>,
 }
 
-/// Creates a 16x16 [`Spinner`] (`size-4`).
+/// Creates a 16x16 [`Spinner`] (`size-4 animate-spin`).
 pub fn spinner() -> Spinner {
     Spinner {
         size: 16.0,
         color: None,
+        style: None,
     }
 }
 
@@ -37,6 +39,13 @@ impl Spinner {
     /// Sets the color. Defaults to the foreground color.
     pub fn color(mut self, color: Color) -> Self {
         self.color = Some(color);
+        self
+    }
+
+    /// Sets the color from the theme, e.g. to match the text of the badge
+    /// or button around it (`currentColor`).
+    pub fn style(mut self, style: fn(&Theme) -> Color) -> Self {
+        self.style = Some(style);
         self
     }
 }
@@ -73,7 +82,8 @@ impl<Message> canvas::Program<Message> for Spinner {
                 center,
                 radius: 9.0 * scale,
                 start_angle: Radians(rotation),
-                end_angle: Radians(rotation + std::f32::consts::PI * 1.5),
+                // `M21 12a9 9 0 1 1-6.219-8.56`: a 288° arc.
+                end_angle: Radians(rotation + std::f32::consts::PI * 1.6),
             });
         });
 
@@ -81,7 +91,11 @@ impl<Message> canvas::Program<Message> for Spinner {
             &arc,
             Stroke::default()
                 .with_width(2.0 * scale)
-                .with_color(self.color.unwrap_or(tokens(theme).palette.foreground))
+                .with_color(self.color.unwrap_or_else(|| {
+                    self.style
+                        .map(|style| style(theme))
+                        .unwrap_or(tokens(theme).palette.foreground)
+                }))
                 .with_line_cap(canvas::LineCap::Round),
         );
 

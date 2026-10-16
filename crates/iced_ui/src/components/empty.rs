@@ -1,11 +1,23 @@
 //! Use the Empty component to display an empty state.
 //!
 //! Port of <https://ui.shadcn.com/docs/components/empty>.
+//!
+//! ```no_run
+//! # use iced_ui::empty::empty;
+//! # use iced_ui::prelude::lucide;
+//! # fn view<'a>() -> iced::Element<'a, ()> {
+//! empty("No Projects Yet")
+//!     .icon(lucide::FOLDER_CODE)
+//!     .description("You haven't created any projects yet.")
+//!     .into()
+//! # }
+//! ```
 use iced_ui_core::icon::Icon;
+use iced_ui_core::theme::alpha;
 use iced_ui_core::{Element, font, style, tokens};
 
 use iced::widget::{Column, container, text};
-use iced::{Alignment, Background, Length, Theme, border};
+use iced::{Alignment, Background, Length, Padding, Theme, border};
 
 /// An empty state. See the [module documentation](self).
 pub struct Empty<'a, Message> {
@@ -14,7 +26,9 @@ pub struct Empty<'a, Message> {
     title: Option<String>,
     description: Option<String>,
     content: Option<Element<'a, Message>>,
+    extra: Vec<Element<'a, Message>>,
     bordered: bool,
+    muted: bool,
 }
 
 /// Creates an [`Empty`] state with a title.
@@ -25,18 +39,21 @@ pub fn empty<'a, Message: 'a>(title: impl Into<String>) -> Empty<'a, Message> {
         title: Some(title.into()),
         description: None,
         content: None,
+        extra: Vec::new(),
         bordered: false,
+        muted: false,
     }
 }
 
 impl<'a, Message: 'a> Empty<'a, Message> {
-    /// Shows an icon in a muted square (`variant="icon"`).
+    /// Shows an icon in a muted square (`EmptyMedia variant="icon"`).
     pub fn icon(mut self, icon: Icon) -> Self {
         self.icon = Some(icon);
         self
     }
 
-    /// Shows custom media (e.g. an avatar) above the title.
+    /// Shows custom media (e.g. an avatar) above the title
+    /// (`EmptyMedia variant="default"`).
     pub fn media(mut self, media: impl Into<Element<'a, Message>>) -> Self {
         self.media = Some(media.into());
         self
@@ -48,23 +65,38 @@ impl<'a, Message: 'a> Empty<'a, Message> {
         self
     }
 
-    /// Sets the content displayed below the header, usually actions.
+    /// Sets the content displayed below the header, usually actions
+    /// (`EmptyContent`).
     pub fn content(mut self, content: impl Into<Element<'a, Message>>) -> Self {
         self.content = Some(content.into());
         self
     }
 
-    /// Draws a dashed-looking border around the empty state.
+    /// Appends an element below the content, e.g. a "Learn More" link.
+    pub fn extra(mut self, element: impl Into<Element<'a, Message>>) -> Self {
+        self.extra.push(element.into());
+        self
+    }
+
+    /// Draws a border around the empty state (`border border-dashed`,
+    /// drawn solid).
     pub fn bordered(mut self, bordered: bool) -> Self {
         self.bordered = bordered;
+        self
+    }
+
+    /// Fills the empty state with a muted background (`bg-muted/30`).
+    pub fn muted(mut self, muted: bool) -> Self {
+        self.muted = muted;
         self
     }
 }
 
 impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
     fn from(empty: Empty<'a, Message>) -> Self {
+        // `bg-muted text-foreground size-8 rounded-lg [&_svg]:size-4`
         let icon = empty.icon.map(|icon| {
-            container(icon.sized(24)).center(40).style(|theme: &Theme| {
+            container(icon.sized(16)).center(32).style(|theme: &Theme| {
                 let t = tokens(theme);
                 container::Style {
                     background: Some(Background::Color(t.palette.muted)),
@@ -75,15 +107,26 @@ impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
             })
         });
 
+        // `mb-2`
+        let media = icon
+            .map(Element::from)
+            .or(empty.media)
+            .map(|media| container(media).padding(Padding::ZERO.bottom(8)));
+
+        // `flex max-w-sm flex-col items-center gap-2`
         let header = Column::new()
-            .push(icon)
-            .push(empty.media)
-            .push(
-                empty
-                    .title
-                    .map(|title| text(title).size(style::text::LG).font(font::MEDIUM)),
-            )
+            .push(media)
+            .push(empty.title.map(|title| {
+                // `text-sm font-medium tracking-tight`
+                text(title)
+                    .size(style::text::SM)
+                    // font-heading
+                    .font(font::MEDIUM)
+                    .line_height(iced::Pixels(20.0))
+                    .align_x(iced::alignment::Horizontal::Center)
+            }))
             .push(empty.description.map(|description| {
+                // `text-sm/relaxed text-muted-foreground`
                 text(description)
                     .size(style::text::SM)
                     .line_height(1.625)
@@ -97,23 +140,31 @@ impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
             .align_x(Alignment::Center);
 
         let bordered = empty.bordered;
+        let muted = empty.muted;
 
+        // `gap-4 p-6`, plus the 1px border.
         container(
             Column::new()
                 .push(header)
-                .push(empty.content)
-                .spacing(24)
+                .push(
+                    empty
+                        .content
+                        .map(|content| container(content).max_width(384).center_x(Length::Shrink)),
+                )
+                .extend(empty.extra)
+                .spacing(16)
                 .align_x(Alignment::Center),
         )
-        .padding(48)
+        .padding(if bordered { 25 } else { 24 })
         .center_x(Length::Fill)
         .style(move |theme: &Theme| {
             let t = tokens(theme);
             container::Style {
+                background: muted.then(|| Background::Color(alpha(t.palette.muted, 0.3))),
                 border: if bordered {
-                    style::border(t.palette.border, t.radius_lg())
+                    style::border(t.palette.border, t.radius_xl())
                 } else {
-                    style::rounded(t.radius_lg())
+                    style::rounded(t.radius_xl())
                 },
                 ..container::Style::default()
             }
