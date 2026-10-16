@@ -104,7 +104,11 @@ impl<'a, Message: 'a> From<Alert<'a, Message>> for Element<'a, Message> {
             .width(Length::Fill);
 
         let content = Row::new()
-            .push(alert.icon.map(|icon| container(icon.sized(16)).padding([2, 0])))
+            .push(
+                alert
+                    .icon
+                    .map(|icon| container(icon.sized(16)).padding([2, 0])),
+            )
             .push(body)
             .spacing(12);
 

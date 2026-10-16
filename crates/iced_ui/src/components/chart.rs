@@ -109,7 +109,10 @@ pub fn area(categories: impl IntoIterator<Item = impl Into<String>>) -> Chart {
 }
 
 /// Creates a pie chart of a single series: one slice per category.
-pub fn pie(categories: impl IntoIterator<Item = impl Into<String>>, values: impl IntoIterator<Item = f32>) -> Chart {
+pub fn pie(
+    categories: impl IntoIterator<Item = impl Into<String>>,
+    values: impl IntoIterator<Item = f32>,
+) -> Chart {
     let mut chart = chart(Kind::Pie, categories);
     chart.series.push(Series::new("", values));
     chart.grid = false;
@@ -170,13 +173,20 @@ impl Chart {
             return tokens.palette.chart[index % 5];
         }
 
-        self.series[index].color.unwrap_or(tokens.palette.chart[index % 5])
+        self.series[index]
+            .color
+            .unwrap_or(tokens.palette.chart[index % 5])
     }
 
     fn max(&self) -> f32 {
         let max = if self.stacked {
             (0..self.categories.len())
-                .map(|i| self.series.iter().map(|s| s.values.get(i).copied().unwrap_or(0.0)).sum::<f32>())
+                .map(|i| {
+                    self.series
+                        .iter()
+                        .map(|s| s.values.get(i).copied().unwrap_or(0.0))
+                        .sum::<f32>()
+                })
                 .fold(0.0, f32::max)
         } else {
             self.series
@@ -336,12 +346,18 @@ impl<Message> canvas::Program<Message> for Chart {
                 for step in 0..=4 {
                     let line_y = plot.y + plot.height * step as f32 / 4.0;
                     frame.stroke(
-                        &Path::line(Point::new(plot.x, line_y), Point::new(plot.x + plot.width, line_y)),
+                        &Path::line(
+                            Point::new(plot.x, line_y),
+                            Point::new(plot.x + plot.width, line_y),
+                        ),
                         Stroke {
                             line_dash: if step == 4 {
                                 canvas::LineDash::default()
                             } else {
-                                canvas::LineDash { segments: &[3.0, 3.0], offset: 0 }
+                                canvas::LineDash {
+                                    segments: &[3.0, 3.0],
+                                    offset: 0,
+                                }
                             },
                             ..Stroke::default()
                                 .with_color(alpha(p.border, if step == 4 { 1.0 } else { 0.8 }))
@@ -370,10 +386,15 @@ impl<Message> canvas::Program<Message> for Chart {
 
             match self.kind {
                 Kind::Bar => {
-                    let groups = if self.stacked { 1 } else { self.series.len().max(1) };
+                    let groups = if self.stacked {
+                        1
+                    } else {
+                        self.series.len().max(1)
+                    };
                     let gap = 4.0;
                     let inner = band * 0.8;
-                    let bar_width = ((inner - gap * (groups as f32 - 1.0)) / groups as f32).max(1.0);
+                    let bar_width =
+                        ((inner - gap * (groups as f32 - 1.0)) / groups as f32).max(1.0);
 
                     for category in 0..count {
                         let mut base = 0.0;
@@ -381,14 +402,27 @@ impl<Message> canvas::Program<Message> for Chart {
                         for (index, series) in self.series.iter().enumerate() {
                             let value = series.values.get(category).copied().unwrap_or(0.0);
                             let slot = if self.stacked { 0 } else { index };
-                            let x = plot.x + band * category as f32 + (band - inner) / 2.0
+                            let x = plot.x
+                                + band * category as f32
+                                + (band - inner) / 2.0
                                 + slot as f32 * (bar_width + gap);
                             let top = y(base + value);
                             let bottom = y(base);
-                            let radius = if self.stacked && index + 1 < self.series.len() { 0.0 } else { 4.0 };
+                            let radius = if self.stacked && index + 1 < self.series.len() {
+                                0.0
+                            } else {
+                                4.0
+                            };
 
                             let rect = Path::new(|builder| {
-                                rounded_top(builder, Rectangle::new(Point::new(x, top), Size::new(bar_width, bottom - top)), radius);
+                                rounded_top(
+                                    builder,
+                                    Rectangle::new(
+                                        Point::new(x, top),
+                                        Size::new(bar_width, bottom - top),
+                                    ),
+                                    radius,
+                                );
                             });
                             frame.fill(&rect, self.color(&t, index));
 
@@ -406,14 +440,23 @@ impl<Message> canvas::Program<Message> for Chart {
                         let points: Vec<Point> = (0..count)
                             .map(|i| {
                                 let value = series.values.get(i).copied().unwrap_or(0.0);
-                                let base = if self.stacked && self.kind == Kind::Area { bases[i] } else { 0.0 };
+                                let base = if self.stacked && self.kind == Kind::Area {
+                                    bases[i]
+                                } else {
+                                    0.0
+                                };
                                 Point::new(plot.x + band * (i as f32 + 0.5), y(base + value))
                             })
                             .collect();
 
                         if self.kind == Kind::Area {
                             let lower: Vec<Point> = (0..count)
-                                .map(|i| Point::new(plot.x + band * (i as f32 + 0.5), y(if self.stacked { bases[i] } else { 0.0 })))
+                                .map(|i| {
+                                    Point::new(
+                                        plot.x + band * (i as f32 + 0.5),
+                                        y(if self.stacked { bases[i] } else { 0.0 }),
+                                    )
+                                })
                                 .collect();
 
                             let fill = Path::new(|builder| {
@@ -455,7 +498,9 @@ impl<Message> canvas::Program<Message> for Chart {
             }
 
             // X axis labels (`tickLine={false} axisLine={false}`).
-            let skip = ((count as f32 * 48.0) / plot.width.max(1.0)).ceil().max(1.0) as usize;
+            let skip = ((count as f32 * 48.0) / plot.width.max(1.0))
+                .ceil()
+                .max(1.0) as usize;
 
             for (index, category) in self.categories.iter().enumerate() {
                 if index % skip != 0 {
@@ -464,7 +509,10 @@ impl<Message> canvas::Program<Message> for Chart {
 
                 frame.fill_text(Text {
                     content: category.chars().take(3).collect(),
-                    position: Point::new(plot.x + band * (index as f32 + 0.5), plot.y + plot.height + 8.0),
+                    position: Point::new(
+                        plot.x + band * (index as f32 + 0.5),
+                        plot.y + plot.height + 8.0,
+                    ),
                     color: p.muted_foreground,
                     size: Pixels(12.0),
                     font: font::SANS,
@@ -486,7 +534,12 @@ impl<Message> canvas::Program<Message> for Chart {
         vec![frame.into_geometry()]
     }
 
-    fn mouse_interaction(&self, _state: &State, _bounds: Rectangle, _cursor: mouse::Cursor) -> mouse::Interaction {
+    fn mouse_interaction(
+        &self,
+        _state: &State,
+        _bounds: Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> mouse::Interaction {
         mouse::Interaction::default()
     }
 }
@@ -495,14 +548,22 @@ impl Chart {
     fn legend_entries(&self) -> Vec<String> {
         match self.kind {
             Kind::Pie => self.categories.clone(),
-            _ => self.series.iter().map(|series| series.label.clone()).collect(),
+            _ => self
+                .series
+                .iter()
+                .map(|series| series.label.clone())
+                .collect(),
         }
     }
 
     fn draw_legend(&self, frame: &mut Frame, t: &Tokens, size: Size) {
         let entries = self.legend_entries();
-        let widths: Vec<f32> = entries.iter().map(|label| 8.0 + 6.0 + text_width(label, 12.0)).collect();
-        let total: f32 = widths.iter().sum::<f32>() + 16.0 * (widths.len().saturating_sub(1)) as f32;
+        let widths: Vec<f32> = entries
+            .iter()
+            .map(|label| 8.0 + 6.0 + text_width(label, 12.0))
+            .collect();
+        let total: f32 =
+            widths.iter().sum::<f32>() + 16.0 * (widths.len().saturating_sub(1)) as f32;
         let mut x = (size.width - total) / 2.0;
         let y = size.height - LEGEND / 2.0;
 
@@ -524,7 +585,14 @@ impl Chart {
         }
     }
 
-    fn draw_tooltip(&self, frame: &mut Frame, t: &Tokens, hovered: usize, cursor: Point, size: Size) {
+    fn draw_tooltip(
+        &self,
+        frame: &mut Frame,
+        t: &Tokens,
+        hovered: usize,
+        cursor: Point,
+        size: Size,
+    ) {
         let p = t.palette;
         let title = self.categories.get(hovered).cloned().unwrap_or_default();
 
@@ -549,13 +617,20 @@ impl Chart {
         };
 
         let show_title = self.kind != Kind::Pie;
-        let label_width = rows.iter().map(|(label, _, _)| text_width(label, 12.0)).fold(0.0, f32::max);
-        let value_width = rows.iter().map(|(_, value, _)| text_width(value, 12.0)).fold(0.0, f32::max);
+        let label_width = rows
+            .iter()
+            .map(|(label, _, _)| text_width(label, 12.0))
+            .fold(0.0, f32::max);
+        let value_width = rows
+            .iter()
+            .map(|(_, value, _)| text_width(value, 12.0))
+            .fold(0.0, f32::max);
         let width = (10.0 + 8.0 + label_width + 24.0 + value_width + 20.0)
             .max(text_width(&title, 12.0) + 20.0)
             .max(128.0);
         let row_height = 18.0;
-        let height = 12.0 + if show_title { row_height + 6.0 } else { 0.0 } + rows.len() as f32 * row_height;
+        let height =
+            12.0 + if show_title { row_height + 6.0 } else { 0.0 } + rows.len() as f32 * row_height;
 
         let mut origin = cursor + Vector::new(12.0, 12.0);
         if origin.x + width > size.width {
@@ -567,11 +642,20 @@ impl Chart {
 
         let panel = Path::rounded_rectangle(origin, Size::new(width, height), 8.0.into());
         frame.fill(
-            &Path::rounded_rectangle(origin + Vector::new(0.0, 4.0), Size::new(width, height), 8.0.into()),
+            &Path::rounded_rectangle(
+                origin + Vector::new(0.0, 4.0),
+                Size::new(width, height),
+                8.0.into(),
+            ),
             Color::from_rgba(0.0, 0.0, 0.0, 0.08),
         );
         frame.fill(&panel, p.background);
-        frame.stroke(&panel, Stroke::default().with_color(alpha(p.border, 0.5)).with_width(1.0));
+        frame.stroke(
+            &panel,
+            Stroke::default()
+                .with_color(alpha(p.border, 0.5))
+                .with_width(1.0),
+        );
 
         let mut y = origin.y + 6.0;
 
@@ -592,7 +676,11 @@ impl Chart {
             let center = y + row_height / 2.0;
 
             frame.fill(
-                &Path::rounded_rectangle(Point::new(origin.x + 10.0, center - 5.0), Size::new(10.0, 10.0), 2.0.into()),
+                &Path::rounded_rectangle(
+                    Point::new(origin.x + 10.0, center - 5.0),
+                    Size::new(10.0, 10.0),
+                    2.0.into(),
+                ),
                 color,
             );
             frame.fill_text(Text {
@@ -622,7 +710,9 @@ impl Chart {
     }
 
     fn draw_pie(&self, frame: &mut Frame, t: &Tokens, plot: Rectangle, hovered: Option<usize>) {
-        let Some(series) = self.series.first() else { return };
+        let Some(series) = self.series.first() else {
+            return;
+        };
         let total: f32 = series.values.iter().sum();
 
         if total <= 0.0 {
@@ -636,12 +726,19 @@ impl Chart {
 
         for (index, value) in series.values.iter().enumerate() {
             let sweep = value / total * std::f32::consts::TAU;
-            let outer = if hovered == Some(index) { radius + 4.0 } else { radius };
+            let outer = if hovered == Some(index) {
+                radius + 4.0
+            } else {
+                radius
+            };
 
             let slice = Path::new(|builder| {
                 let steps = ((sweep / std::f32::consts::TAU) * 128.0).ceil().max(2.0) as usize;
                 let point = |radius: f32, angle: f32| {
-                    Point::new(center.x + radius * angle.cos(), center.y + radius * angle.sin())
+                    Point::new(
+                        center.x + radius * angle.cos(),
+                        center.y + radius * angle.sin(),
+                    )
                 };
 
                 builder.move_to(point(outer, start));
@@ -662,7 +759,10 @@ impl Chart {
             });
 
             frame.fill(&slice, self.color(t, index));
-            frame.stroke(&slice, Stroke::default().with_color(t.palette.card).with_width(2.0));
+            frame.stroke(
+                &slice,
+                Stroke::default().with_color(t.palette.card).with_width(2.0),
+            );
             start += sweep;
         }
     }
@@ -678,7 +778,11 @@ fn rounded_top(builder: &mut path::Builder, rect: Rectangle, radius: f32) {
 
     builder.move_to(Point::new(rect.x, rect.y + rect.height));
     builder.line_to(Point::new(rect.x, rect.y + radius));
-    builder.arc_to(Point::new(rect.x, rect.y), Point::new(rect.x + radius, rect.y), radius);
+    builder.arc_to(
+        Point::new(rect.x, rect.y),
+        Point::new(rect.x + radius, rect.y),
+        radius,
+    );
     builder.line_to(Point::new(rect.x + rect.width - radius, rect.y));
     builder.arc_to(
         Point::new(rect.x + rect.width, rect.y),

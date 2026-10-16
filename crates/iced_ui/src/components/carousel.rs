@@ -138,7 +138,11 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
         if horizontal {
             Row::new()
                 .push(round(nav(lucide::ARROW_LEFT, previous)))
-                .push(Row::with_children(visible).spacing(carousel.spacing).width(Length::Fill))
+                .push(
+                    Row::with_children(visible)
+                        .spacing(carousel.spacing)
+                        .width(Length::Fill),
+                )
                 .push(round(nav(lucide::ARROW_RIGHT, next)))
                 .spacing(16)
                 .align_y(Alignment::Center)
@@ -156,6 +160,8 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
 }
 
 /// Makes the navigation buttons fully rounded (`rounded-full`).
-fn round<'a, Message: Clone + 'a>(button: super::button::Button<'a, Message>) -> Element<'a, Message> {
+fn round<'a, Message: Clone + 'a>(
+    button: super::button::Button<'a, Message>,
+) -> Element<'a, Message> {
     button.rounded(true).into()
 }

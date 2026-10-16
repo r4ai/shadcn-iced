@@ -190,19 +190,28 @@ where
         operation.container(None, layout.bounds());
         operation.traverse(&mut |operation| {
             if open {
-                self.opened
-                    .as_widget_mut()
-                    .operate(&mut tree.children[1], trigger, renderer, operation);
+                self.opened.as_widget_mut().operate(
+                    &mut tree.children[1],
+                    trigger,
+                    renderer,
+                    operation,
+                );
 
                 if let Some(content) = layout.children().nth(1) {
-                    self.content
-                        .as_widget_mut()
-                        .operate(&mut tree.children[2], content, renderer, operation);
+                    self.content.as_widget_mut().operate(
+                        &mut tree.children[2],
+                        content,
+                        renderer,
+                        operation,
+                    );
                 }
             } else {
-                self.closed
-                    .as_widget_mut()
-                    .operate(&mut tree.children[0], trigger, renderer, operation);
+                self.closed.as_widget_mut().operate(
+                    &mut tree.children[0],
+                    trigger,
+                    renderer,
+                    operation,
+                );
             }
         });
     }
@@ -419,11 +428,13 @@ where
         let mut overlays = Vec::new();
 
         if open {
-            overlays.extend(
-                self.opened
-                    .as_widget_mut()
-                    .overlay(opened, trigger, renderer, viewport, translation),
-            );
+            overlays.extend(self.opened.as_widget_mut().overlay(
+                opened,
+                trigger,
+                renderer,
+                viewport,
+                translation,
+            ));
 
             if let Some(layout) = children.next() {
                 overlays.extend(self.content.as_widget_mut().overlay(
@@ -435,11 +446,13 @@ where
                 ));
             }
         } else {
-            overlays.extend(
-                self.closed
-                    .as_widget_mut()
-                    .overlay(closed, trigger, renderer, viewport, translation),
-            );
+            overlays.extend(self.closed.as_widget_mut().overlay(
+                closed,
+                trigger,
+                renderer,
+                viewport,
+                translation,
+            ));
         }
 
         match overlays.len() {

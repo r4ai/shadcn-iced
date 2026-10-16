@@ -126,9 +126,13 @@ impl<'a, Message: Clone + 'a> From<InputGroup<'a, Message>> for Element<'a, Mess
 
         let addons = |items: Vec<Element<'a, Message>>, padding: Padding| {
             (!items.is_empty()).then(|| {
-                container(Row::with_children(items).spacing(8).align_y(Alignment::Center))
-                    .padding(padding)
-                    .center_y(Length::Fill)
+                container(
+                    Row::with_children(items)
+                        .spacing(8)
+                        .align_y(Alignment::Center),
+                )
+                .padding(padding)
+                .center_y(Length::Fill)
             })
         };
 
@@ -139,9 +143,11 @@ impl<'a, Message: Clone + 'a> From<InputGroup<'a, Message>> for Element<'a, Mess
             .align_y(Alignment::Center)
             .height(36);
 
-        FocusWithin::new(row, move |theme, status| self::style(theme, status, invalid))
-            .width(group.width)
-            .into()
+        FocusWithin::new(row, move |theme, status| {
+            self::style(theme, status, invalid)
+        })
+        .width(group.width)
+        .into()
     }
 }
 

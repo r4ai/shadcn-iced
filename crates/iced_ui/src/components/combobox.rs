@@ -90,7 +90,9 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> Combobox<'a, T, Message
     }
 }
 
-impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Message>> for Element<'a, Message> {
+impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Message>>
+    for Element<'a, Message>
+{
     fn from(combobox: Combobox<'a, T, Message>) -> Self {
         let selected_label = combobox
             .options
@@ -111,9 +113,13 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
                             color: (!has_value).then(|| tokens(theme).palette.muted_foreground),
                         }),
                 )
-                .push(lucide::CHEVRONS_UP_DOWN.sized(16).style(|theme: &Theme| text::Style {
-                    color: Some(alpha(tokens(theme).palette.foreground, 0.5)),
-                }))
+                .push(
+                    lucide::CHEVRONS_UP_DOWN
+                        .sized(16)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(alpha(tokens(theme).palette.foreground, 0.5)),
+                        }),
+                )
                 .spacing(8)
                 .align_y(Alignment::Center),
         )
@@ -140,7 +146,9 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
             .bordered(false)
             .items(items);
 
-        let panel = container(content).width(combobox.width).style(super::popover::style);
+        let panel = container(content)
+            .width(combobox.width)
+            .style(super::popover::style);
 
         Anchored::new(trigger, panel)
             .side(Side::Bottom)

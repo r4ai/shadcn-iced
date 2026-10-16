@@ -44,7 +44,10 @@ pub struct Dialog<'a, Message> {
 ///
 /// `base` is displayed as usual; it is typically the button that opens the
 /// dialog, or the root of your view.
-pub fn dialog<'a, Message: Clone + 'a>(base: impl Into<Element<'a, Message>>, open: bool) -> Dialog<'a, Message> {
+pub fn dialog<'a, Message: Clone + 'a>(
+    base: impl Into<Element<'a, Message>>,
+    open: bool,
+) -> Dialog<'a, Message> {
     Dialog {
         base: base.into(),
         open,
@@ -111,12 +114,20 @@ impl<'a, Message: Clone + 'a> Dialog<'a, Message> {
 }
 
 /// The header of a dialog: a title and a description.
-pub fn header<'a, Message: 'a>(title: Option<String>, description: Option<String>, centered: bool) -> Option<Element<'a, Message>> {
+pub fn header<'a, Message: 'a>(
+    title: Option<String>,
+    description: Option<String>,
+    centered: bool,
+) -> Option<Element<'a, Message>> {
     if title.is_none() && description.is_none() {
         return None;
     }
 
-    let align = if centered { Alignment::Center } else { Alignment::Start };
+    let align = if centered {
+        Alignment::Center
+    } else {
+        Alignment::Start
+    };
 
     Some(
         Column::new()
@@ -156,7 +167,11 @@ pub fn close_button<'a, Message: Clone + 'a>(on_close: Option<Message>) -> Eleme
                 background: None,
                 text_color: alpha(
                     t.palette.foreground,
-                    if matches!(status, Status::Hovered | Status::Pressed) { 1.0 } else { 0.7 },
+                    if matches!(status, Status::Hovered | Status::Pressed) {
+                        1.0
+                    } else {
+                        0.7
+                    },
                 ),
                 border: style::rounded(2.0),
                 ..Style::default()
@@ -196,7 +211,8 @@ impl<'a, Message: Clone + 'a> From<Dialog<'a, Message>> for Element<'a, Message>
             .spacing(16)
             .width(Length::Fill);
 
-        let mut layers = Stack::new().push(container(body).padding(dialog.padding).width(Length::Fill));
+        let mut layers =
+            Stack::new().push(container(body).padding(dialog.padding).width(Length::Fill));
 
         if dialog.close_button {
             layers = layers.push(
@@ -206,7 +222,10 @@ impl<'a, Message: Clone + 'a> From<Dialog<'a, Message>> for Element<'a, Message>
             );
         }
 
-        let panel = container(layers).max_width(dialog.width).width(Length::Fill).style(panel);
+        let panel = container(layers)
+            .max_width(dialog.width)
+            .width(Length::Fill)
+            .style(panel);
 
         Layer::new(dialog.base, panel, dialog.open)
             .padding(Padding::new(16.0))

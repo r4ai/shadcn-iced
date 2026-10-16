@@ -142,14 +142,29 @@ impl<'a, Message: 'a> From<Attachment<'a, Message>> for Element<'a, Message> {
             };
 
             let tile = container(inner)
-                .center(if attachment.vertical { Length::Fill } else { Length::Fixed(media_size) })
-                .height(if attachment.vertical { Length::Fixed(80.0) } else { Length::Fixed(media_size) })
+                .center(if attachment.vertical {
+                    Length::Fill
+                } else {
+                    Length::Fixed(media_size)
+                })
+                .height(if attachment.vertical {
+                    Length::Fixed(80.0)
+                } else {
+                    Length::Fixed(media_size)
+                })
                 .style(move |theme: &Theme| {
                     let t = tokens(theme);
                     container::Style {
                         background: Some(Background::Color(t.palette.muted)),
-                        text_color: Some(alpha(t.palette.foreground, if dimmed { 0.6 } else { 1.0 })),
-                        border: border::rounded(if size == Size::Xs { t.radius_md() } else { t.radius_lg() }),
+                        text_color: Some(alpha(
+                            t.palette.foreground,
+                            if dimmed { 0.6 } else { 1.0 },
+                        )),
+                        border: border::rounded(if size == Size::Xs {
+                            t.radius_md()
+                        } else {
+                            t.radius_lg()
+                        }),
                         ..container::Style::default()
                     }
                 });
@@ -173,17 +188,27 @@ impl<'a, Message: 'a> From<Attachment<'a, Message>> for Element<'a, Message> {
                     .line_height(1.25),
             )
             .push(attachment.description.map(|description| {
-                text(description).size(style::text::XS).wrapping(text::Wrapping::None).style(move |theme: &Theme| {
-                    let p = tokens(theme).palette;
-                    text::Style {
-                        color: Some(if state == State::Error { alpha(p.destructive, 0.8) } else { p.muted_foreground }),
-                    }
-                })
+                text(description)
+                    .size(style::text::XS)
+                    .wrapping(text::Wrapping::None)
+                    .style(move |theme: &Theme| {
+                        let p = tokens(theme).palette;
+                        text::Style {
+                            color: Some(if state == State::Error {
+                                alpha(p.destructive, 0.8)
+                            } else {
+                                p.muted_foreground
+                            }),
+                        }
+                    })
             }))
             .spacing(2);
 
-        let actions = (!attachment.actions.is_empty())
-            .then(|| Row::with_children(attachment.actions).spacing(4).align_y(Alignment::Center));
+        let actions = (!attachment.actions.is_empty()).then(|| {
+            Row::with_children(attachment.actions)
+                .spacing(4)
+                .align_y(Alignment::Center)
+        });
 
         let body: Element<'a, Message> = if attachment.vertical {
             Column::new()
@@ -219,7 +244,11 @@ impl<'a, Message: 'a> From<Attachment<'a, Message>> for Element<'a, Message> {
                             _ => p.border,
                         },
                         width: 1.0,
-                        radius: border::radius(if size == Size::Xs { t.radius_lg() } else { t.radius_xl() }),
+                        radius: border::radius(if size == Size::Xs {
+                            t.radius_lg()
+                        } else {
+                            t.radius_xl()
+                        }),
                     },
                     ..container::Style::default()
                 }
@@ -247,4 +276,3 @@ pub fn remove_action<'a, Message: Clone + 'a>(on_press: Message) -> Element<'a, 
         .on_press(on_press)
         .into()
 }
-

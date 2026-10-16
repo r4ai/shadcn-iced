@@ -29,8 +29,8 @@ pub mod components;
 pub use components::*;
 pub use iced_ui_core as core;
 pub use iced_ui_core::{
-    ApplicationExt, Element, Icon, Mode, Palette, Tokens, font, icon, primitive,
-    style, theme, tokens,
+    ApplicationExt, Element, Icon, Mode, Palette, Tokens, font, icon, primitive, style, theme,
+    tokens,
 };
 
 /// Everything you need to build an interface with iced_ui.

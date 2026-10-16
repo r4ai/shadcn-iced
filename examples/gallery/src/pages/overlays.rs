@@ -26,21 +26,32 @@ pub const DIALOG: Page = Page {
         example(
             "Default",
             dialog(
-                button("Edit Profile").variant(Variant::Outline).on_press(demo(DemoMessage::Dialog(true))),
+                button("Edit Profile")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Dialog(true))),
                 d.dialog,
             )
             .title("Edit profile")
             .description("Make changes to your profile here. Click save when you're done.")
             .content(
                 column![
-                    iced_ui::field::field("Name", input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))),
-                    iced_ui::field::field("Username", input("@peduarte", &d.username).on_input(|v| demo(DemoMessage::Username(v)))),
+                    iced_ui::field::field(
+                        "Name",
+                        input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))
+                    ),
+                    iced_ui::field::field(
+                        "Username",
+                        input("@peduarte", &d.username)
+                            .on_input(|v| demo(DemoMessage::Username(v)))
+                    ),
                 ]
                 .spacing(16),
             )
             .footer(
                 row![
-                    button("Cancel").variant(Variant::Outline).on_press(demo(DemoMessage::Dialog(false))),
+                    button("Cancel")
+                        .variant(Variant::Outline)
+                        .on_press(demo(DemoMessage::Dialog(false))),
                     button("Save changes").on_press(demo(DemoMessage::Dialog(false))),
                 ]
                 .spacing(8),
@@ -83,10 +94,18 @@ pub const SHEET: Page = Page {
             "Sides",
             sheet(
                 row![
-                    button("Top").variant(Variant::Outline).on_press(open(sh::Side::Top)),
-                    button("Right").variant(Variant::Outline).on_press(open(sh::Side::Right)),
-                    button("Bottom").variant(Variant::Outline).on_press(open(sh::Side::Bottom)),
-                    button("Left").variant(Variant::Outline).on_press(open(sh::Side::Left)),
+                    button("Top")
+                        .variant(Variant::Outline)
+                        .on_press(open(sh::Side::Top)),
+                    button("Right")
+                        .variant(Variant::Outline)
+                        .on_press(open(sh::Side::Right)),
+                    button("Bottom")
+                        .variant(Variant::Outline)
+                        .on_press(open(sh::Side::Bottom)),
+                    button("Left")
+                        .variant(Variant::Outline)
+                        .on_press(open(sh::Side::Left)),
                 ]
                 .spacing(8),
                 d.sheet.is_some(),
@@ -96,15 +115,27 @@ pub const SHEET: Page = Page {
             .description("Make changes to your profile here. Click save when you're done.")
             .content(
                 column![
-                    iced_ui::field::field("Name", input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))),
-                    iced_ui::field::field("Username", input("@peduarte", &d.username).on_input(|v| demo(DemoMessage::Username(v)))),
+                    iced_ui::field::field(
+                        "Name",
+                        input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))
+                    ),
+                    iced_ui::field::field(
+                        "Username",
+                        input("@peduarte", &d.username)
+                            .on_input(|v| demo(DemoMessage::Username(v)))
+                    ),
                 ]
                 .spacing(24),
             )
             .footer(
                 column![
-                    button("Save changes").width(Fill).on_press(demo(DemoMessage::Sheet(None))),
-                    button("Close").variant(Variant::Outline).width(Fill).on_press(demo(DemoMessage::Sheet(None))),
+                    button("Save changes")
+                        .width(Fill)
+                        .on_press(demo(DemoMessage::Sheet(None))),
+                    button("Close")
+                        .variant(Variant::Outline)
+                        .width(Fill)
+                        .on_press(demo(DemoMessage::Sheet(None))),
                 ]
                 .spacing(8),
             )
@@ -123,7 +154,9 @@ pub const DRAWER: Page = Page {
         example(
             "Default",
             drawer(
-                button("Open Drawer").variant(Variant::Outline).on_press(demo(DemoMessage::Drawer(true))),
+                button("Open Drawer")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Drawer(true))),
                 gallery.demo.drawer,
             )
             .title("Move Goal")
@@ -150,8 +183,13 @@ pub const DRAWER: Page = Page {
             )
             .footer(
                 column![
-                    button("Submit").width(Fill).on_press(demo(DemoMessage::Drawer(false))),
-                    button("Cancel").variant(Variant::Outline).width(Fill).on_press(demo(DemoMessage::Drawer(false))),
+                    button("Submit")
+                        .width(Fill)
+                        .on_press(demo(DemoMessage::Drawer(false))),
+                    button("Cancel")
+                        .variant(Variant::Outline)
+                        .width(Fill)
+                        .on_press(demo(DemoMessage::Drawer(false))),
                 ]
                 .spacing(8),
             )
@@ -189,7 +227,7 @@ pub const POPOVER: Page = Page {
                     .spacing(8),
                 ]
                 .spacing(16),
-            )
+            ),
         )
     },
 };
@@ -245,10 +283,30 @@ fn account_menu<'a>(gallery: &crate::Gallery) -> iced_ui::menu::Menu<'a, Message
     menu()
         .label("My Account")
         .separator()
-        .item(item("Profile").icon(lucide::USER).shortcut("⇧⌘P").on_select(Message::Noop))
-        .item(item("Billing").icon(lucide::CREDIT_CARD).shortcut("⌘B").on_select(Message::Noop))
-        .item(item("Settings").icon(lucide::SETTINGS).shortcut("⌘S").on_select(Message::Noop))
-        .item(item("Keyboard shortcuts").icon(lucide::KEYBOARD).shortcut("⌘K").on_select(Message::Noop))
+        .item(
+            item("Profile")
+                .icon(lucide::USER)
+                .shortcut("⇧⌘P")
+                .on_select(Message::Noop),
+        )
+        .item(
+            item("Billing")
+                .icon(lucide::CREDIT_CARD)
+                .shortcut("⌘B")
+                .on_select(Message::Noop),
+        )
+        .item(
+            item("Settings")
+                .icon(lucide::SETTINGS)
+                .shortcut("⌘S")
+                .on_select(Message::Noop),
+        )
+        .item(
+            item("Keyboard shortcuts")
+                .icon(lucide::KEYBOARD)
+                .shortcut("⌘K")
+                .on_select(Message::Noop),
+        )
         .separator()
         .item(item("Team").icon(lucide::USERS).on_select(Message::Noop))
         .sub_with_icon(
@@ -256,16 +314,39 @@ fn account_menu<'a>(gallery: &crate::Gallery) -> iced_ui::menu::Menu<'a, Message
             "Invite users",
             menu()
                 .item(item("Email").icon(lucide::MAIL).on_select(Message::Noop))
-                .item(item("Message").icon(lucide::MESSAGE_SQUARE).on_select(Message::Noop))
+                .item(
+                    item("Message")
+                        .icon(lucide::MESSAGE_SQUARE)
+                        .on_select(Message::Noop),
+                )
                 .separator()
-                .item(item("More...").icon(lucide::CIRCLE_PLUS).on_select(Message::Noop)),
+                .item(
+                    item("More...")
+                        .icon(lucide::CIRCLE_PLUS)
+                        .on_select(Message::Noop),
+                ),
         )
-        .item(item("New Team").icon(lucide::PLUS).shortcut("⌘+T").on_select(Message::Noop))
+        .item(
+            item("New Team")
+                .icon(lucide::PLUS)
+                .shortcut("⌘+T")
+                .on_select(Message::Noop),
+        )
         .separator()
-        .checkbox("Status Bar", d.status_bar, demo(DemoMessage::StatusBar(!d.status_bar)))
+        .checkbox(
+            "Status Bar",
+            d.status_bar,
+            demo(DemoMessage::StatusBar(!d.status_bar)),
+        )
         .item(item("API").icon(lucide::CLOUD))
         .separator()
-        .item(item("Log out").icon(lucide::LOG_OUT).shortcut("⇧⌘Q").destructive().on_select(Message::Noop))
+        .item(
+            item("Log out")
+                .icon(lucide::LOG_OUT)
+                .shortcut("⇧⌘Q")
+                .destructive()
+                .on_select(Message::Noop),
+        )
 }
 
 pub const DROPDOWN_MENU: Page = Page {
@@ -276,7 +357,13 @@ pub const DROPDOWN_MENU: Page = Page {
         let d = &gallery.demo;
 
         column![
-            example("Default", dropdown_menu(button("Open").variant(Variant::Outline), account_menu(gallery).min_width(224.0))),
+            example(
+                "Default",
+                dropdown_menu(
+                    button("Open").variant(Variant::Outline),
+                    account_menu(gallery).min_width(224.0)
+                )
+            ),
             example(
                 "Radio group",
                 dropdown_menu(
@@ -318,7 +405,12 @@ pub const CONTEXT_MENU: Page = Page {
                 menu()
                     .item(item("Back").inset().shortcut("⌘[").on_select(Message::Noop))
                     .item(item("Forward").inset().shortcut("⌘]"))
-                    .item(item("Reload").inset().shortcut("⌘R").on_select(Message::Noop))
+                    .item(
+                        item("Reload")
+                            .inset()
+                            .shortcut("⌘R")
+                            .on_select(Message::Noop),
+                    )
                     .sub(
                         "More Tools",
                         menu()
@@ -330,12 +422,24 @@ pub const CONTEXT_MENU: Page = Page {
                             .item(item("Delete").destructive().on_select(Message::Noop)),
                     )
                     .separator()
-                    .checkbox("Show Bookmarks", d.status_bar, demo(DemoMessage::StatusBar(!d.status_bar)))
+                    .checkbox(
+                        "Show Bookmarks",
+                        d.status_bar,
+                        demo(DemoMessage::StatusBar(!d.status_bar)),
+                    )
                     .checkbox("Show Full URLs", false, Message::Noop)
                     .separator()
                     .inset_label("People")
-                    .radio("Pedro Duarte", d.position == 0, demo(DemoMessage::Position(0)))
-                    .radio("Colm Tuite", d.position == 1, demo(DemoMessage::Position(1)))
+                    .radio(
+                        "Pedro Duarte",
+                        d.position == 0,
+                        demo(DemoMessage::Position(0)),
+                    )
+                    .radio(
+                        "Colm Tuite",
+                        d.position == 1,
+                        demo(DemoMessage::Position(1)),
+                    )
                     .min_width(208.0),
             ),
         )
@@ -382,10 +486,19 @@ pub const MENUBAR: Page = Page {
                 .menu(
                     "View",
                     menu()
-                        .checkbox("Always Show Bookmarks Bar", d.status_bar, demo(DemoMessage::StatusBar(!d.status_bar)))
+                        .checkbox(
+                            "Always Show Bookmarks Bar",
+                            d.status_bar,
+                            demo(DemoMessage::StatusBar(!d.status_bar)),
+                        )
                         .checkbox("Always Show Full URLs", true, Message::Noop)
                         .separator()
-                        .item(item("Reload").inset().shortcut("⌘R").on_select(Message::Noop))
+                        .item(
+                            item("Reload")
+                                .inset()
+                                .shortcut("⌘R")
+                                .on_select(Message::Noop),
+                        )
                         .item(item("Force Reload").inset().shortcut("⇧⌘R"))
                         .separator()
                         .item(item("Toggle Fullscreen").inset().on_select(Message::Noop)),
@@ -432,15 +545,20 @@ pub const COMBOBOX: Page = Page {
 
         example(
             "Default",
-            combobox(d.framework, |f| demo(DemoMessage::Framework(f)), &d.query, |q| demo(DemoMessage::Query(q)))
-                .placeholder("Select framework...")
-                .search_placeholder("Search framework...")
-                .empty("No framework found.")
-                .option("next", "Next.js")
-                .option("sveltekit", "SvelteKit")
-                .option("nuxt", "Nuxt.js")
-                .option("remix", "Remix")
-                .option("astro", "Astro"),
+            combobox(
+                d.framework,
+                |f| demo(DemoMessage::Framework(f)),
+                &d.query,
+                |q| demo(DemoMessage::Query(q)),
+            )
+            .placeholder("Select framework...")
+            .search_placeholder("Search framework...")
+            .empty("No framework found.")
+            .option("next", "Next.js")
+            .option("sveltekit", "SvelteKit")
+            .option("nuxt", "Nuxt.js")
+            .option("remix", "Remix")
+            .option("astro", "Astro"),
         )
     },
 };
@@ -457,17 +575,30 @@ pub const COMMAND: Page = Page {
                     .group(
                         "Suggestions",
                         [
-                            command_item("Calendar").icon(lucide::CALENDAR).on_select(Message::Noop),
-                            command_item("Search Emoji").icon(lucide::SMILE).on_select(Message::Noop),
+                            command_item("Calendar")
+                                .icon(lucide::CALENDAR)
+                                .on_select(Message::Noop),
+                            command_item("Search Emoji")
+                                .icon(lucide::SMILE)
+                                .on_select(Message::Noop),
                             command_item("Calculator").icon(lucide::CALCULATOR),
                         ],
                     )
                     .group(
                         "Settings",
                         [
-                            command_item("Profile").icon(lucide::USER).shortcut("⌘P").on_select(Message::Noop),
-                            command_item("Billing").icon(lucide::CREDIT_CARD).shortcut("⌘B").on_select(Message::Noop),
-                            command_item("Settings").icon(lucide::SETTINGS).shortcut("⌘S").on_select(Message::Noop),
+                            command_item("Profile")
+                                .icon(lucide::USER)
+                                .shortcut("⌘P")
+                                .on_select(Message::Noop),
+                            command_item("Billing")
+                                .icon(lucide::CREDIT_CARD)
+                                .shortcut("⌘B")
+                                .on_select(Message::Noop),
+                            command_item("Settings")
+                                .icon(lucide::SETTINGS)
+                                .shortcut("⌘S")
+                                .on_select(Message::Noop),
                         ],
                     ),
             )
@@ -484,12 +615,24 @@ pub const SONNER: Page = Page {
         example(
             "Types",
             row![
-                button("Default").variant(Variant::Outline).on_press(demo(DemoMessage::Toast(Kind::Default))),
-                button("Success").variant(Variant::Outline).on_press(demo(DemoMessage::Toast(Kind::Success))),
-                button("Info").variant(Variant::Outline).on_press(demo(DemoMessage::Toast(Kind::Info))),
-                button("Warning").variant(Variant::Outline).on_press(demo(DemoMessage::Toast(Kind::Warning))),
-                button("Error").variant(Variant::Outline).on_press(demo(DemoMessage::Toast(Kind::Error))),
-                button("Loading").variant(Variant::Outline).on_press(demo(DemoMessage::Toast(Kind::Loading))),
+                button("Default")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Toast(Kind::Default))),
+                button("Success")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Toast(Kind::Success))),
+                button("Info")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Toast(Kind::Info))),
+                button("Warning")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Toast(Kind::Warning))),
+                button("Error")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Toast(Kind::Error))),
+                button("Loading")
+                    .variant(Variant::Outline)
+                    .on_press(demo(DemoMessage::Toast(Kind::Loading))),
             ]
             .spacing(8)
             .wrap(),
@@ -515,7 +658,9 @@ pub const NAVIGATION_MENU: Page = Page {
                                 column![
                                     lucide::BOXES.sized(24),
                                     text("iced-ui").size(18).font(iced_ui::font::MEDIUM),
-                                    text("Beautifully designed components built with iced.").size(14).style(crate::muted),
+                                    text("Beautifully designed components built with iced.")
+                                        .size(14)
+                                        .style(crate::muted),
                                 ]
                                 .spacing(8)
                             )
@@ -531,9 +676,21 @@ pub const NAVIGATION_MENU: Page = Page {
                                 }
                             }),
                             column![
-                                link("Introduction", "Re-usable components built using iced.", Message::Noop),
-                                link("Installation", "How to install dependencies and structure your app.", Message::Noop),
-                                link("Typography", "Styles for headings, paragraphs, lists...etc", Message::Noop),
+                                link(
+                                    "Introduction",
+                                    "Re-usable components built using iced.",
+                                    Message::Noop
+                                ),
+                                link(
+                                    "Installation",
+                                    "How to install dependencies and structure your app.",
+                                    Message::Noop
+                                ),
+                                link(
+                                    "Typography",
+                                    "Styles for headings, paragraphs, lists...etc",
+                                    Message::Noop
+                                ),
                             ]
                             .width(260),
                         ]
@@ -543,9 +700,21 @@ pub const NAVIGATION_MENU: Page = Page {
                     .menu(
                         "Components",
                         column![
-                            link("Alert Dialog", "A modal dialog that interrupts the user.", Message::Noop),
-                            link("Hover Card", "Preview content available behind a link.", Message::Noop),
-                            link("Progress", "Displays the completion progress of a task.", Message::Noop),
+                            link(
+                                "Alert Dialog",
+                                "A modal dialog that interrupts the user.",
+                                Message::Noop
+                            ),
+                            link(
+                                "Hover Card",
+                                "Preview content available behind a link.",
+                                Message::Noop
+                            ),
+                            link(
+                                "Progress",
+                                "Displays the completion progress of a task.",
+                                Message::Noop
+                            ),
                         ]
                         .width(300),
                     )

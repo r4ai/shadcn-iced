@@ -34,12 +34,18 @@ pub struct NavigationMenu<'a, Message> {
 
 /// Creates an empty [`NavigationMenu`].
 pub fn navigation_menu<'a, Message: Clone + 'a>() -> NavigationMenu<'a, Message> {
-    NavigationMenu { entries: Vec::new() }
+    NavigationMenu {
+        entries: Vec::new(),
+    }
 }
 
 impl<'a, Message: Clone + 'a> NavigationMenu<'a, Message> {
     /// Appends a trigger revealing `content` on hover.
-    pub fn menu(mut self, label: impl Into<String>, content: impl Into<Element<'a, Message>>) -> Self {
+    pub fn menu(
+        mut self,
+        label: impl Into<String>,
+        content: impl Into<Element<'a, Message>>,
+    ) -> Self {
         self.entries.push(Entry::Menu(label.into(), content.into()));
         self
     }
@@ -57,8 +63,16 @@ pub fn trigger_style(theme: &Theme, status: Status) -> Style {
     let hovered = matches!(status, Status::Hovered | Status::Pressed);
 
     Style {
-        background: Some(Background::Color(if hovered { t.palette.accent } else { t.palette.background })),
-        text_color: if hovered { t.palette.accent_foreground } else { t.palette.foreground },
+        background: Some(Background::Color(if hovered {
+            t.palette.accent
+        } else {
+            t.palette.background
+        })),
+        text_color: if hovered {
+            t.palette.accent_foreground
+        } else {
+            t.palette.foreground
+        },
         border: border::rounded(t.radius_md()),
         ..Style::default()
     }
@@ -73,7 +87,12 @@ pub fn link<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     Pressable::new(
         Column::new()
-            .push(text(title.into()).size(style::text::SM).font(font::MEDIUM).line_height(1.0))
+            .push(
+                text(title.into())
+                    .size(style::text::SM)
+                    .font(font::MEDIUM)
+                    .line_height(1.0),
+            )
             .push(
                 text(description.into())
                     .size(style::text::SM)
@@ -93,7 +112,11 @@ pub fn link<'a, Message: Clone + 'a>(
 
         Style {
             background: hovered.then_some(Background::Color(t.palette.accent)),
-            text_color: if hovered { t.palette.accent_foreground } else { t.palette.popover_foreground },
+            text_color: if hovered {
+                t.palette.accent_foreground
+            } else {
+                t.palette.popover_foreground
+            },
             border: border::rounded(t.radius_sm()),
             ..Style::default()
         }
@@ -105,18 +128,21 @@ impl<'a, Message: Clone + 'a> From<NavigationMenu<'a, Message>> for Element<'a, 
     fn from(menu: NavigationMenu<'a, Message>) -> Self {
         let items = menu.entries.into_iter().map(|entry| match entry {
             Entry::Menu(label, content) => {
-                let trigger = Pressable::new(
-                    Row::new()
-                        .push(text(label).size(style::text::SM).font(font::MEDIUM))
-                        .push(lucide::CHEVRON_DOWN.sized(12).style(|theme: &Theme| text::Style {
-                            color: Some(alpha(tokens(theme).palette.foreground, 0.8)),
-                        }))
-                        .spacing(4)
-                        .align_y(Alignment::Center),
-                )
-                .padding([8, 16])
-                .height(36)
-                .style(trigger_style);
+                let trigger =
+                    Pressable::new(
+                        Row::new()
+                            .push(text(label).size(style::text::SM).font(font::MEDIUM))
+                            .push(lucide::CHEVRON_DOWN.sized(12).style(|theme: &Theme| {
+                                text::Style {
+                                    color: Some(alpha(tokens(theme).palette.foreground, 0.8)),
+                                }
+                            }))
+                            .spacing(4)
+                            .align_y(Alignment::Center),
+                    )
+                    .padding([8, 16])
+                    .height(36)
+                    .style(trigger_style);
 
                 let panel = container(content).padding(8).style(super::popover::style);
 
@@ -127,14 +153,19 @@ impl<'a, Message: Clone + 'a> From<NavigationMenu<'a, Message>> for Element<'a, 
                     .offset(6.0)
                     .into()
             }
-            Entry::Link(label, on_press) => Pressable::new(text(label).size(style::text::SM).font(font::MEDIUM))
-                .on_press(on_press)
-                .padding([8, 16])
-                .height(36)
-                .style(trigger_style)
-                .into(),
+            Entry::Link(label, on_press) => {
+                Pressable::new(text(label).size(style::text::SM).font(font::MEDIUM))
+                    .on_press(on_press)
+                    .padding([8, 16])
+                    .height(36)
+                    .style(trigger_style)
+                    .into()
+            }
         });
 
-        Row::with_children(items).spacing(4).align_y(Alignment::Center).into()
+        Row::with_children(items)
+            .spacing(4)
+            .align_y(Alignment::Center)
+            .into()
     }
 }

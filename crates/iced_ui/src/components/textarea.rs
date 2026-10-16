@@ -14,8 +14,8 @@
 use iced_ui_core::theme::{alpha, tokens};
 use iced_ui_core::{Element, font, style};
 
-use iced::widget::text_editor::{self, Status, Style};
 use iced::widget::TextEditor;
+use iced::widget::text_editor::{self, Status, Style};
 use iced::{Background, Border, Color, Length, Pixels, Theme, border};
 
 pub use text_editor::{Action, Content};
@@ -93,7 +93,11 @@ pub fn style(theme: &Theme, status: Status, invalid: bool) -> Style {
     let dark = t.is_dark();
 
     let focused = matches!(status, Status::Focused { .. });
-    let opacity = if status == Status::Disabled { style::DISABLED_OPACITY } else { 1.0 };
+    let opacity = if status == Status::Disabled {
+        style::DISABLED_OPACITY
+    } else {
+        1.0
+    };
 
     let border_color = if invalid {
         p.destructive

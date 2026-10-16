@@ -4,12 +4,14 @@
 //! [`Scrollable`] with a thin, rounded scrollbar.
 use iced_ui_core::{Element, tokens};
 
-use iced::widget::scrollable::{self, Direction, Rail, Scrollbar, Scroller, Status, Style};
 use iced::widget::Scrollable;
+use iced::widget::scrollable::{self, Direction, Rail, Scrollbar, Scroller, Status, Style};
 use iced::{Background, Color, Theme, border};
 
 /// Creates a vertical scroll area.
-pub fn scroll_area<'a, Message: 'a>(content: impl Into<Element<'a, Message>>) -> Scrollable<'a, Message> {
+pub fn scroll_area<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+) -> Scrollable<'a, Message> {
     Scrollable::new(content)
         .direction(Direction::Vertical(scrollbar()))
         .style(style)

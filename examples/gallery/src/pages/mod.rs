@@ -1,10 +1,10 @@
 //! One page per component.
 mod basics;
 mod button;
+pub mod chat;
+pub mod extra;
 pub mod interactive;
 pub mod overlays;
-pub mod extra;
-pub mod chat;
 
 use crate::{Gallery, Message};
 
@@ -119,7 +119,10 @@ pub struct Demo {
     pub next_toast: u64,
     pub month: iced_ui::calendar::Month,
     pub date: Option<iced_ui::calendar::Date>,
-    pub range: (Option<iced_ui::calendar::Date>, Option<iced_ui::calendar::Date>),
+    pub range: (
+        Option<iced_ui::calendar::Date>,
+        Option<iced_ui::calendar::Date>,
+    ),
     pub slide: usize,
     pub sidebar_collapsed: bool,
 }
@@ -162,9 +165,15 @@ impl Default for Demo {
             framework: None,
             toasts: Vec::new(),
             next_toast: 0,
-            month: iced_ui::calendar::Month { year: 2026, month: 10 },
+            month: iced_ui::calendar::Month {
+                year: 2026,
+                month: 10,
+            },
             date: iced_ui::calendar::Date::new(2026, 10, 16),
-            range: (iced_ui::calendar::Date::new(2026, 10, 12), iced_ui::calendar::Date::new(2026, 10, 22)),
+            range: (
+                iced_ui::calendar::Date::new(2026, 10, 12),
+                iced_ui::calendar::Date::new(2026, 10, 22),
+            ),
             slide: 0,
             sidebar_collapsed: false,
         }
@@ -221,7 +230,9 @@ impl Demo {
             DemoMessage::Password(value) => self.password = value,
             DemoMessage::Search(value) => self.search = value,
             DemoMessage::Edit(action) => self.message.perform(action),
-            DemoMessage::Progress(delta) => self.progress = (self.progress + delta).clamp(0.0, 100.0),
+            DemoMessage::Progress(delta) => {
+                self.progress = (self.progress + delta).clamp(0.0, 100.0)
+            }
             DemoMessage::Page(page) => self.page = page,
             DemoMessage::Terms(value) => self.terms = value,
             DemoMessage::Notifications(value) => self.notifications = value,

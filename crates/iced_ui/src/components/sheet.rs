@@ -48,7 +48,10 @@ pub struct Sheet<'a, Message> {
 }
 
 /// Creates a [`Sheet`] shown over the whole window when `open`.
-pub fn sheet<'a, Message: Clone + 'a>(base: impl Into<Element<'a, Message>>, open: bool) -> Sheet<'a, Message> {
+pub fn sheet<'a, Message: Clone + 'a>(
+    base: impl Into<Element<'a, Message>>,
+    open: bool,
+) -> Sheet<'a, Message> {
     Sheet {
         base: base.into(),
         open,
@@ -112,22 +115,33 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
 
         let header = (sheet.title.is_some() || sheet.description.is_some()).then(|| {
             Column::new()
-                .push(sheet.title.map(|title| text(title).size(style::text::BASE).font(font::SEMIBOLD)))
+                .push(
+                    sheet
+                        .title
+                        .map(|title| text(title).size(style::text::BASE).font(font::SEMIBOLD)),
+                )
                 .push(sheet.description.map(|description| {
-                    text(description).size(style::text::SM).style(|theme: &Theme| text::Style {
-                        color: Some(tokens(theme).palette.muted_foreground),
-                    })
+                    text(description)
+                        .size(style::text::SM)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(tokens(theme).palette.muted_foreground),
+                        })
                 }))
                 .spacing(6)
                 .padding(16)
         });
 
         let content = Column::with_children(sheet.content.into_iter().map(|element| {
-            container(element).padding([0, 16]).width(Length::Fill).into()
+            container(element)
+                .padding([0, 16])
+                .width(Length::Fill)
+                .into()
         }))
         .spacing(16);
 
-        let footer = sheet.footer.map(|footer| container(footer).padding(16).width(Length::Fill));
+        let footer = sheet
+            .footer
+            .map(|footer| container(footer).padding(16).width(Length::Fill));
 
         let body = Column::new()
             .push(header)
@@ -136,21 +150,31 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
             .push(footer)
             .spacing(16)
             .width(Length::Fill)
-            .height(if vertical { Length::Fill } else { Length::Shrink });
+            .height(if vertical {
+                Length::Fill
+            } else {
+                Length::Shrink
+            });
 
-        let layers = Stack::new()
-            .push(body)
-            .push(
-                container(super::dialog::close_button(sheet.on_close.clone()))
-                    .padding(16)
-                    .align_right(Length::Fill),
-            );
+        let layers = Stack::new().push(body).push(
+            container(super::dialog::close_button(sheet.on_close.clone()))
+                .padding(16)
+                .align_right(Length::Fill),
+        );
 
         let side = sheet.side;
 
         let panel = container(layers)
-            .width(if vertical { Length::Fixed(sheet.size) } else { Length::Fill })
-            .height(if vertical { Length::Fill } else { Length::Shrink })
+            .width(if vertical {
+                Length::Fixed(sheet.size)
+            } else {
+                Length::Fill
+            })
+            .height(if vertical {
+                Length::Fill
+            } else {
+                Length::Shrink
+            })
             .style(move |theme: &Theme| {
                 let t = tokens(theme);
 
@@ -164,10 +188,22 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
             });
 
         let (align_x, align_y) = match side {
-            Side::Top => (iced::alignment::Horizontal::Center, iced::alignment::Vertical::Top),
-            Side::Right => (iced::alignment::Horizontal::Right, iced::alignment::Vertical::Center),
-            Side::Bottom => (iced::alignment::Horizontal::Center, iced::alignment::Vertical::Bottom),
-            Side::Left => (iced::alignment::Horizontal::Left, iced::alignment::Vertical::Center),
+            Side::Top => (
+                iced::alignment::Horizontal::Center,
+                iced::alignment::Vertical::Top,
+            ),
+            Side::Right => (
+                iced::alignment::Horizontal::Right,
+                iced::alignment::Vertical::Center,
+            ),
+            Side::Bottom => (
+                iced::alignment::Horizontal::Center,
+                iced::alignment::Vertical::Bottom,
+            ),
+            Side::Left => (
+                iced::alignment::Horizontal::Left,
+                iced::alignment::Vertical::Center,
+            ),
         };
 
         Layer::new(sheet.base, panel, sheet.open)

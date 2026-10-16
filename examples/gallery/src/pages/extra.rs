@@ -50,9 +50,12 @@ pub const DATE_PICKER: Page = Page {
 
         example(
             "Default",
-            container(
-                date_picker(d.date, |date| demo(DemoMessage::Date(date)), d.month, |m| demo(DemoMessage::Month(m)))
-            )
+            container(date_picker(
+                d.date,
+                |date| demo(DemoMessage::Date(date)),
+                d.month,
+                |m| demo(DemoMessage::Month(m)),
+            ))
             .padding(iced::Padding::ZERO.bottom(320)),
         )
     },
@@ -65,7 +68,11 @@ pub const CAROUSEL: Page = Page {
     view: |gallery| {
         let slide = |n: usize| -> iced::Element<'static, Message> {
             card()
-                .content(container(text(n.to_string()).size(36).font(iced_ui::font::SEMIBOLD)).center_x(Fill).center_y(160))
+                .content(
+                    container(text(n.to_string()).size(36).font(iced_ui::font::SEMIBOLD))
+                        .center_x(Fill)
+                        .center_y(160),
+                )
                 .into()
         };
 
@@ -73,7 +80,8 @@ pub const CAROUSEL: Page = Page {
             example(
                 "Default",
                 container(
-                    carousel(gallery.demo.slide, |i| demo(DemoMessage::Slide(i))).items((1..=5).map(slide))
+                    carousel(gallery.demo.slide, |i| demo(DemoMessage::Slide(i)))
+                        .items((1..=5).map(slide))
                 )
                 .max_width(380)
             ),
@@ -104,15 +112,39 @@ pub const CHART: Page = Page {
         let frame = |content: iced::Element<'static, Message>| card().content(content);
 
         column![
-            example("Bar", frame(chart::bar(MONTHS).series(desktop()).series(mobile()).into())),
-            example("Area (stacked)", frame(chart::area(MONTHS).series(desktop()).series(mobile()).stacked(true).into())),
-            example("Line", frame(chart::line(MONTHS).series(desktop()).series(mobile()).dots(true).into())),
+            example(
+                "Bar",
+                frame(chart::bar(MONTHS).series(desktop()).series(mobile()).into())
+            ),
+            example(
+                "Area (stacked)",
+                frame(
+                    chart::area(MONTHS)
+                        .series(desktop())
+                        .series(mobile())
+                        .stacked(true)
+                        .into()
+                )
+            ),
+            example(
+                "Line",
+                frame(
+                    chart::line(MONTHS)
+                        .series(desktop())
+                        .series(mobile())
+                        .dots(true)
+                        .into()
+                )
+            ),
             example(
                 "Pie",
                 frame(
-                    chart::pie(["Chrome", "Safari", "Firefox", "Edge", "Other"], [275.0, 200.0, 187.0, 173.0, 90.0])
-                        .donut(true)
-                        .into()
+                    chart::pie(
+                        ["Chrome", "Safari", "Firefox", "Edge", "Other"],
+                        [275.0, 200.0, 187.0, 173.0, 90.0]
+                    )
+                    .donut(true)
+                    .into()
                 )
             ),
         ]
@@ -151,17 +183,39 @@ pub const SIDEBAR: Page = Page {
             )
             .group(
                 group("Platform")
-                    .item(item("Playground").icon(lucide::SQUARE_TERMINAL).active(true).on_press(Message::Noop)
-                        .child(item("History").on_press(Message::Noop))
-                        .child(item("Starred").on_press(Message::Noop)))
+                    .item(
+                        item("Playground")
+                            .icon(lucide::SQUARE_TERMINAL)
+                            .active(true)
+                            .on_press(Message::Noop)
+                            .child(item("History").on_press(Message::Noop))
+                            .child(item("Starred").on_press(Message::Noop)),
+                    )
                     .item(item("Models").icon(lucide::BOT).on_press(Message::Noop))
-                    .item(item("Documentation").icon(lucide::BOOK_OPEN).on_press(Message::Noop))
-                    .item(item("Settings").icon(lucide::SETTINGS_2).on_press(Message::Noop)),
+                    .item(
+                        item("Documentation")
+                            .icon(lucide::BOOK_OPEN)
+                            .on_press(Message::Noop),
+                    )
+                    .item(
+                        item("Settings")
+                            .icon(lucide::SETTINGS_2)
+                            .on_press(Message::Noop),
+                    ),
             )
             .group(
                 group("Projects")
-                    .item(item("Design Engineering").icon(lucide::FRAME).badge("12").on_press(Message::Noop))
-                    .item(item("Sales & Marketing").icon(lucide::CHART_PIE).on_press(Message::Noop))
+                    .item(
+                        item("Design Engineering")
+                            .icon(lucide::FRAME)
+                            .badge("12")
+                            .on_press(Message::Noop),
+                    )
+                    .item(
+                        item("Sales & Marketing")
+                            .icon(lucide::CHART_PIE)
+                            .on_press(Message::Noop),
+                    )
                     .item(item("Travel").icon(lucide::MAP).on_press(Message::Noop)),
             )
             .footer(item_footer())
@@ -171,11 +225,18 @@ pub const SIDEBAR: Page = Page {
         let main = column![
             row![
                 iced_ui::sidebar::trigger(demo(DemoMessage::SidebarCollapsed(!collapsed))),
-                breadcrumb().link("Building Your Application", Message::Noop).page("Data Fetching"),
+                breadcrumb()
+                    .link("Building Your Application", Message::Noop)
+                    .page("Data Fetching"),
             ]
             .spacing(8)
             .align_y(Center),
-            row![skeleton(Fill, 100).radius(12.0), skeleton(Fill, 100).radius(12.0), skeleton(Fill, 100).radius(12.0)].spacing(16),
+            row![
+                skeleton(Fill, 100).radius(12.0),
+                skeleton(Fill, 100).radius(12.0),
+                skeleton(Fill, 100).radius(12.0)
+            ]
+            .spacing(16),
             skeleton(Fill, Fill).radius(12.0),
         ]
         .spacing(16)
@@ -200,7 +261,11 @@ pub const SIDEBAR: Page = Page {
 fn item_footer() -> iced::Element<'static, Message> {
     row![
         avatar("CN"),
-        column![text("shadcn").size(14).font(iced_ui::font::SEMIBOLD), text("m@example.com").size(12)].width(Fill),
+        column![
+            text("shadcn").size(14).font(iced_ui::font::SEMIBOLD),
+            text("m@example.com").size(12)
+        ]
+        .width(Fill),
         lucide::CHEVRONS_UP_DOWN.sized(16),
     ]
     .spacing(8)
@@ -208,4 +273,3 @@ fn item_footer() -> iced::Element<'static, Message> {
     .padding(8)
     .into()
 }
-

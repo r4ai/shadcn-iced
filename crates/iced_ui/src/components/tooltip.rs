@@ -22,7 +22,12 @@ pub fn tooltip<'a, Message: Clone + 'a>(
     trigger: impl Into<Element<'a, Message>>,
     content: impl text::IntoFragment<'a>,
 ) -> Anchored<'a, Message> {
-    custom(trigger, text(content).size(style::text::XS).line_height(iced::Pixels(16.0)))
+    custom(
+        trigger,
+        text(content)
+            .size(style::text::XS)
+            .line_height(iced::Pixels(16.0)),
+    )
 }
 
 /// Shows any element as a tooltip.
@@ -30,10 +35,13 @@ pub fn custom<'a, Message: Clone + 'a>(
     trigger: impl Into<Element<'a, Message>>,
     content: impl Into<Element<'a, Message>>,
 ) -> Anchored<'a, Message> {
-    Anchored::new(trigger, container(content).padding([6, 12]).style(self::style))
-        .hover(Duration::ZERO, Duration::ZERO)
-        .side(Side::Top)
-        .offset(6.0)
+    Anchored::new(
+        trigger,
+        container(content).padding([6, 12]).style(self::style),
+    )
+    .hover(Duration::ZERO, Duration::ZERO)
+    .side(Side::Top)
+    .offset(6.0)
 }
 
 /// The style of a tooltip (`bg-foreground text-background`).

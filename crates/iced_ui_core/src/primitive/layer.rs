@@ -11,8 +11,8 @@ use iced::advanced::widget::{self, Operation, Tree, Widget};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
 use iced::{
-    Background, Color, Element, Event, Length, Padding, Point, Rectangle, Size,
-    Vector, alignment, mouse, touch, window,
+    Background, Color, Element, Event, Length, Padding, Point, Rectangle, Size, Vector, alignment,
+    mouse, touch, window,
 };
 
 /// Content displayed on top of the whole window, over a `base` element.
@@ -76,9 +76,8 @@ where
 
     /// Sets the color of the backdrop, or removes it.
     pub fn backdrop(mut self, backdrop: Option<Color>) -> Self {
-        self.backdrop = backdrop.map(|color| {
-            Box::new(move |_: &Theme| color) as Box<dyn Fn(&Theme) -> Color + 'a>
-        });
+        self.backdrop = backdrop
+            .map(|color| Box::new(move |_: &Theme| color) as Box<dyn Fn(&Theme) -> Color + 'a>);
         self
     }
 
@@ -361,9 +360,9 @@ where
         let content = layout.children().next().unwrap();
 
         renderer.with_layer(bounds, |renderer| {
-            self.content.as_widget().draw(
-                self.tree, renderer, theme, style, content, cursor, &bounds,
-            );
+            self.content
+                .as_widget()
+                .draw(self.tree, renderer, theme, style, content, cursor, &bounds);
         });
     }
 

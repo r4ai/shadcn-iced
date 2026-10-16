@@ -75,7 +75,11 @@ impl<'a, Message: 'a> From<Avatar> for Element<'a, Message> {
 
         let fallback = container(
             text(avatar.fallback)
-                .size(if avatar.size == Size::Sm { style::text::XS } else { style::text::SM })
+                .size(if avatar.size == Size::Sm {
+                    style::text::XS
+                } else {
+                    style::text::SM
+                })
                 .font(font::SANS),
         )
         .center(diameter)
@@ -103,7 +107,10 @@ impl<'a, Message: 'a> From<Avatar> for Element<'a, Message> {
                 })
                 .into()
         } else {
-            stack.width(Length::Fixed(diameter)).height(Length::Fixed(diameter)).into()
+            stack
+                .width(Length::Fixed(diameter))
+                .height(Length::Fixed(diameter))
+                .into()
         }
     }
 }
@@ -120,7 +127,9 @@ fn fallback_style(theme: &Theme) -> container::Style {
 }
 
 /// Displays overlapping avatars (`-space-x-2`).
-pub fn avatar_group<'a, Message: 'a>(avatars: impl IntoIterator<Item = Avatar>) -> Element<'a, Message> {
+pub fn avatar_group<'a, Message: 'a>(
+    avatars: impl IntoIterator<Item = Avatar>,
+) -> Element<'a, Message> {
     let mut stack = Stack::new();
     let mut offset = 0.0;
     let mut width: f32 = 0.0;

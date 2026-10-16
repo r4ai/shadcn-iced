@@ -89,7 +89,11 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
             .width(width)
             .height(height)
             .padding(1)
-            .align_x(if checked { Alignment::End } else { Alignment::Start })
+            .align_x(if checked {
+                Alignment::End
+            } else {
+                Alignment::Start
+            })
             .align_y(Alignment::Center)
             .style(move |theme| self::track(theme, checked, disabled));
 
@@ -101,7 +105,11 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
                 .style(move |theme: &Theme| text::Style {
                     color: Some(alpha(
                         tokens(theme).palette.foreground,
-                        if disabled { style::DISABLED_OPACITY } else { 1.0 },
+                        if disabled {
+                            style::DISABLED_OPACITY
+                        } else {
+                            1.0
+                        },
                     )),
                 })
         });
@@ -132,7 +140,11 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
 pub fn track(theme: &Theme, checked: bool, disabled: bool) -> container::Style {
     let t = tokens(theme);
     let p = &t.palette;
-    let opacity = if disabled { style::DISABLED_OPACITY } else { 1.0 };
+    let opacity = if disabled {
+        style::DISABLED_OPACITY
+    } else {
+        1.0
+    };
 
     let background = match (checked, t.is_dark()) {
         (true, _) => p.primary,
@@ -156,7 +168,11 @@ pub fn track(theme: &Theme, checked: bool, disabled: bool) -> container::Style {
 pub fn thumb(theme: &Theme, checked: bool, disabled: bool) -> container::Style {
     let t = tokens(theme);
     let p = &t.palette;
-    let opacity = if disabled { style::DISABLED_OPACITY } else { 1.0 };
+    let opacity = if disabled {
+        style::DISABLED_OPACITY
+    } else {
+        1.0
+    };
 
     let color = match (t.is_dark(), checked) {
         (false, _) => p.background,

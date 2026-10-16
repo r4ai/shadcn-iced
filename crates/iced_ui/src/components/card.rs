@@ -122,7 +122,11 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
         let mut sections: Vec<Element<'a, Message>> = Vec::new();
 
         // Sections stretch to the card, unless the card shrinks to fit them.
-        let inner = if card.width == Length::Shrink { Length::Shrink } else { Length::Fill };
+        let inner = if card.width == Length::Shrink {
+            Length::Shrink
+        } else {
+            Length::Fill
+        };
 
         if card.title.is_some() || card.description.is_some() || card.action.is_some() {
             let titles = Column::new()

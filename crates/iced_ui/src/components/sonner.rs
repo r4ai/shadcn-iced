@@ -24,7 +24,10 @@ use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::time::{Duration, Instant};
 use iced::widget::{Column, Row, container, text};
-use iced::{Alignment, Background, Event, Length, Padding, Rectangle, Size as Bounds, Theme, Vector, mouse, window};
+use iced::{
+    Alignment, Background, Event, Length, Padding, Rectangle, Size as Bounds, Theme, Vector, mouse,
+    window,
+};
 
 use std::collections::HashMap;
 
@@ -170,7 +173,10 @@ impl<'a, Message: Clone + 'a> Toaster<'a, Message> {
     }
 }
 
-fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, dismiss: Option<Message>) -> Element<'a, Message> {
+fn view<'a, Message: Clone + 'a>(
+    toast: &Toast<Message>,
+    dismiss: Option<Message>,
+) -> Element<'a, Message> {
     let icon = toast.kind.icon().map(|icon| {
         let kind = toast.kind;
         container(icon.sized(16).style(move |theme: &Theme| text::Style {
@@ -183,18 +189,27 @@ fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, dismiss: Option<Message
     });
 
     let body = Column::new()
-        .push(text(toast.title.clone()).size(13).font(font::MEDIUM).line_height(1.5))
+        .push(
+            text(toast.title.clone())
+                .size(13)
+                .font(font::MEDIUM)
+                .line_height(1.5),
+        )
         .push(toast.description.clone().map(|description| {
-            text(description).size(13).line_height(1.4).style(|theme: &Theme| text::Style {
-                color: Some(tokens(theme).palette.muted_foreground),
-            })
+            text(description)
+                .size(13)
+                .line_height(1.4)
+                .style(|theme: &Theme| text::Style {
+                    color: Some(tokens(theme).palette.muted_foreground),
+                })
         }))
         .spacing(2)
         .width(Length::Fill);
 
-    let action = toast.action.clone().map(|(label, message)| {
-        button(label).size(Size::Xs).on_press(message)
-    });
+    let action = toast
+        .action
+        .clone()
+        .map(|(label, message)| button(label).size(Size::Xs).on_press(message));
 
     let close = dismiss.map(|dismiss| {
         super::button::icon_button(lucide::X)
@@ -233,14 +248,27 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
         let deadlines: Vec<_> = toaster
             .toasts
             .iter()
-            .map(|toast| (toast.id, (toast.kind != Kind::Loading).then_some(toast.duration)))
+            .map(|toast| {
+                (
+                    toast.id,
+                    (toast.kind != Kind::Loading).then_some(toast.duration),
+                )
+            })
             .collect();
 
-        let top = matches!(toaster.position, Position::TopLeft | Position::TopCenter | Position::TopRight);
+        let top = matches!(
+            toaster.position,
+            Position::TopLeft | Position::TopCenter | Position::TopRight
+        );
         let mut items: Vec<_> = toaster
             .toasts
             .iter()
-            .map(|toast| view(toast, toaster.close_button.then(|| (toaster.on_dismiss)(toast.id))))
+            .map(|toast| {
+                view(
+                    toast,
+                    toaster.close_button.then(|| (toaster.on_dismiss)(toast.id)),
+                )
+            })
             .collect();
 
         if top {
@@ -248,12 +276,30 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
         }
 
         let (align_x, align_y) = match toaster.position {
-            Position::TopLeft => (iced::alignment::Horizontal::Left, iced::alignment::Vertical::Top),
-            Position::TopCenter => (iced::alignment::Horizontal::Center, iced::alignment::Vertical::Top),
-            Position::TopRight => (iced::alignment::Horizontal::Right, iced::alignment::Vertical::Top),
-            Position::BottomLeft => (iced::alignment::Horizontal::Left, iced::alignment::Vertical::Bottom),
-            Position::BottomCenter => (iced::alignment::Horizontal::Center, iced::alignment::Vertical::Bottom),
-            Position::BottomRight => (iced::alignment::Horizontal::Right, iced::alignment::Vertical::Bottom),
+            Position::TopLeft => (
+                iced::alignment::Horizontal::Left,
+                iced::alignment::Vertical::Top,
+            ),
+            Position::TopCenter => (
+                iced::alignment::Horizontal::Center,
+                iced::alignment::Vertical::Top,
+            ),
+            Position::TopRight => (
+                iced::alignment::Horizontal::Right,
+                iced::alignment::Vertical::Top,
+            ),
+            Position::BottomLeft => (
+                iced::alignment::Horizontal::Left,
+                iced::alignment::Vertical::Bottom,
+            ),
+            Position::BottomCenter => (
+                iced::alignment::Horizontal::Center,
+                iced::alignment::Vertical::Bottom,
+            ),
+            Position::BottomRight => (
+                iced::alignment::Horizontal::Right,
+                iced::alignment::Vertical::Bottom,
+            ),
         };
 
         let timer = Timer {
@@ -308,12 +354,27 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         self.content.as_widget().size()
     }
 
-    fn layout(&mut self, tree: &mut Tree, renderer: &iced::Renderer, limits: &layout::Limits) -> layout::Node {
-        self.content.as_widget_mut().layout(&mut tree.children[0], renderer, limits)
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
     }
 
-    fn operate(&mut self, tree: &mut Tree, layout: Layout<'_>, renderer: &iced::Renderer, operation: &mut dyn Operation) {
-        self.content.as_widget_mut().operate(&mut tree.children[0], layout, renderer, operation);
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
     }
 
     fn update(
@@ -343,7 +404,10 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         };
 
         let state = tree.state.downcast_mut::<TimerState>();
-        let delta = state.last.map(|last| now.saturating_duration_since(last)).unwrap_or_default();
+        let delta = state
+            .last
+            .map(|last| now.saturating_duration_since(last))
+            .unwrap_or_default();
         state.last = Some(*now);
 
         let paused = cursor.is_over(layout.bounds());
@@ -388,9 +452,15 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        self.content
-            .as_widget()
-            .draw(&tree.children[0], renderer, theme, style, layout, cursor, viewport);
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
     }
 
     fn mouse_interaction(
@@ -401,9 +471,13 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         viewport: &Rectangle,
         renderer: &iced::Renderer,
     ) -> mouse::Interaction {
-        self.content
-            .as_widget()
-            .mouse_interaction(&tree.children[0], layout, cursor, viewport, renderer)
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
     }
 
     fn overlay<'b>(
@@ -414,8 +488,12 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
-        self.content
-            .as_widget_mut()
-            .overlay(&mut tree.children[0], layout, renderer, viewport, translation)
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
     }
 }

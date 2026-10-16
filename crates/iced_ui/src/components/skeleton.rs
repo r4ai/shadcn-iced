@@ -2,8 +2,8 @@
 //!
 //! Port of <https://ui.shadcn.com/docs/components/skeleton>. Pulses like
 //! Tailwind's `animate-pulse`.
-use iced_ui_core::theme::{alpha, tokens};
 use iced_ui_core::Element;
+use iced_ui_core::theme::{alpha, tokens};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;

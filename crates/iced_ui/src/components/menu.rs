@@ -171,7 +171,12 @@ impl<'a, Message: Clone + 'a> Menu<'a, Message> {
     }
 
     /// Appends a submenu with an icon.
-    pub fn sub_with_icon(mut self, icon: Icon, label: impl Into<String>, menu: Menu<'a, Message>) -> Self {
+    pub fn sub_with_icon(
+        mut self,
+        icon: Icon,
+        label: impl Into<String>,
+        menu: Menu<'a, Message>,
+    ) -> Self {
         self.entries.push(Entry::Sub {
             label: label.into(),
             icon: Some(icon),
@@ -206,7 +211,11 @@ fn label_text<'a>(label: String, disabled: bool, destructive: bool) -> text::Tex
         .wrapping(text::Wrapping::None)
         .style(move |theme: &Theme| {
             let p = tokens(theme).palette;
-            let opacity = if disabled { style::DISABLED_OPACITY } else { 1.0 };
+            let opacity = if disabled {
+                style::DISABLED_OPACITY
+            } else {
+                1.0
+            };
 
             text::Style {
                 color: if destructive {
@@ -253,7 +262,9 @@ pub fn panel(theme: &Theme) -> container::Style {
 }
 
 /// Builds a menu panel from a [`Listbox`](listbox::Listbox).
-pub fn panel_with<'a, Message: Clone + 'a>(list: listbox::Listbox<'a, Message>) -> Element<'a, Message> {
+pub fn panel_with<'a, Message: Clone + 'a>(
+    list: listbox::Listbox<'a, Message>,
+) -> Element<'a, Message> {
     container(list.padding(4)).style(panel).into()
 }
 
@@ -274,7 +285,11 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                                     } else {
                                         tokens(theme).palette.muted_foreground
                                     },
-                                    if disabled { style::DISABLED_OPACITY } else { 1.0 },
+                                    if disabled {
+                                        style::DISABLED_OPACITY
+                                    } else {
+                                        1.0
+                                    },
                                 )),
                             })
                         }))
@@ -323,10 +338,14 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                 } => {
                     let disabled = on_select.is_none();
                     let dot = selected.then(|| {
-                        container(space().width(8).height(8)).style(|theme: &Theme| container::Style {
-                            background: Some(Background::Color(tokens(theme).palette.popover_foreground)),
-                            border: border::rounded(f32::MAX),
-                            ..container::Style::default()
+                        container(space().width(8).height(8)).style(|theme: &Theme| {
+                            container::Style {
+                                background: Some(Background::Color(
+                                    tokens(theme).palette.popover_foreground,
+                                )),
+                                border: border::rounded(f32::MAX),
+                                ..container::Style::default()
+                            }
                         })
                     });
 
@@ -345,16 +364,20 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                             .font(font::MEDIUM)
                             .line_height(iced::Pixels(20.0)),
                     )
-                    .padding(if inset { ITEM_PADDING.left(32) } else { ITEM_PADDING }),
+                    .padding(if inset {
+                        ITEM_PADDING.left(32)
+                    } else {
+                        ITEM_PADDING
+                    }),
                 ),
-                Entry::Separator => list.push(
-                    container(super::separator::separator()).padding(Padding {
+                Entry::Separator => {
+                    list.push(container(super::separator::separator()).padding(Padding {
                         top: 4.0,
                         bottom: 4.0,
                         left: -4.0,
                         right: -4.0,
-                    }),
-                ),
+                    }))
+                }
                 Entry::Sub { label, icon, menu } => {
                     let trigger = Row::new()
                         .push(icon.map(|icon| icon.sized(16).style(muted)))
@@ -364,15 +387,16 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
 
                     list.passive(
                         Anchored::new(
-                            listbox::row(trigger, Some(lucide::CHEVRON_RIGHT.sized(16).into())).padding(ITEM_PADDING),
+                            listbox::row(trigger, Some(lucide::CHEVRON_RIGHT.sized(16).into()))
+                                .padding(ITEM_PADDING),
                             menu,
                         )
-                            .hover(Duration::ZERO, Duration::from_millis(150))
-                            .side(Side::Right)
-                            .align(Align::Start)
-                            .offset(8.0)
-                            .align_offset(-5.0)
-                            .close_on_select(true),
+                        .hover(Duration::ZERO, Duration::from_millis(150))
+                        .side(Side::Right)
+                        .align(Align::Start)
+                        .offset(8.0)
+                        .align_offset(-5.0)
+                        .close_on_select(true),
                     )
                 }
                 Entry::Custom(element) => list.push(element),

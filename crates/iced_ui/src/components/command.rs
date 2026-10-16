@@ -76,7 +76,10 @@ impl<Message> Item<Message> {
 
         query.is_empty()
             || self.label.to_lowercase().contains(&query)
-            || self.keywords.iter().any(|keyword| keyword.to_lowercase().contains(&query))
+            || self
+                .keywords
+                .iter()
+                .any(|keyword| keyword.to_lowercase().contains(&query))
     }
 }
 
@@ -111,8 +114,13 @@ pub fn command<'a, Message: Clone + 'a>(
 
 impl<'a, Message: Clone + 'a> Command<'a, Message> {
     /// Appends a group of items with a heading.
-    pub fn group(mut self, heading: impl Into<String>, items: impl IntoIterator<Item = Item<Message>>) -> Self {
-        self.groups.push((Some(heading.into()), items.into_iter().collect()));
+    pub fn group(
+        mut self,
+        heading: impl Into<String>,
+        items: impl IntoIterator<Item = Item<Message>>,
+    ) -> Self {
+        self.groups
+            .push((Some(heading.into()), items.into_iter().collect()));
         self
     }
 
@@ -181,7 +189,10 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
         let mut visible_groups = 0;
 
         for (heading, items) in command.groups {
-            let items: Vec<_> = items.into_iter().filter(|item| item.matches(&query)).collect();
+            let items: Vec<_> = items
+                .into_iter()
+                .filter(|item| item.matches(&query))
+                .collect();
 
             if items.is_empty() {
                 continue;
@@ -195,11 +206,14 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
 
             if let Some(heading) = heading {
                 list = list.push(
-                    container(text(heading).size(style::text::XS).font(font::MEDIUM).style(|theme: &Theme| {
-                        text::Style {
-                            color: Some(tokens(theme).palette.muted_foreground),
-                        }
-                    }))
+                    container(
+                        text(heading)
+                            .size(style::text::XS)
+                            .font(font::MEDIUM)
+                            .style(|theme: &Theme| text::Style {
+                                color: Some(tokens(theme).palette.muted_foreground),
+                            }),
+                    )
                     .padding([6, 8]),
                 );
             }
@@ -219,7 +233,10 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                             .line_height(iced::Pixels(20.0))
                             .style(move |theme: &Theme| text::Style {
                                 color: disabled.then(|| {
-                                    alpha(tokens(theme).palette.popover_foreground, style::DISABLED_OPACITY)
+                                    alpha(
+                                        tokens(theme).palette.popover_foreground,
+                                        style::DISABLED_OPACITY,
+                                    )
                                 }),
                             }),
                     )
@@ -247,7 +264,9 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
         } else {
             container(
                 scrollable(list.padding(4))
-                    .direction(scrollable::Direction::Vertical(super::scroll_area::scrollbar()))
+                    .direction(scrollable::Direction::Vertical(
+                        super::scroll_area::scrollbar(),
+                    ))
                     .style(super::scroll_area::style),
             )
             .max_height(300)
@@ -275,7 +294,11 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                 } else {
                     style::rounded(t.radius_md())
                 },
-                shadow: if bordered { style::shadow_md() } else { iced::Shadow::default() },
+                shadow: if bordered {
+                    style::shadow_md()
+                } else {
+                    iced::Shadow::default()
+                },
                 ..container::Style::default()
             }
         })

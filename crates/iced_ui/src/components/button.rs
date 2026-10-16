@@ -76,7 +76,10 @@ impl Size {
 
     /// Whether the size is a square meant for icon-only buttons.
     pub fn is_icon(self) -> bool {
-        matches!(self, Size::Icon | Size::IconXs | Size::IconSm | Size::IconLg)
+        matches!(
+            self,
+            Size::Icon | Size::IconXs | Size::IconSm | Size::IconLg
+        )
     }
 
     fn padding_x(self, has_icon: bool) -> f32 {
@@ -287,7 +290,11 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             .padding([0.0, size.padding_x(has_icon)])
             .style(move |theme, status| {
                 let mut style = self::style(theme, status, variant);
-                let radius = if rounded { f32::MAX } else { tokens(theme).radius_md() };
+                let radius = if rounded {
+                    f32::MAX
+                } else {
+                    tokens(theme).radius_md()
+                };
 
                 style.border.radius = if vertical {
                     position.vertical_radius(radius)
@@ -363,10 +370,13 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
             ..Style::default()
         },
         Variant::Ghost => Style {
-            background: hovered.then(|| {
-                Background::Color(if dark { alpha(p.accent, 0.5) } else { p.accent })
-            }),
-            text_color: if hovered { p.accent_foreground } else { p.foreground },
+            background: hovered
+                .then(|| Background::Color(if dark { alpha(p.accent, 0.5) } else { p.accent })),
+            text_color: if hovered {
+                p.accent_foreground
+            } else {
+                p.foreground
+            },
             border: style::rounded(radius),
             ..Style::default()
         },
@@ -390,7 +400,9 @@ pub fn disabled(style: Style) -> Style {
     let opacity = style::DISABLED_OPACITY;
 
     Style {
-        background: style.background.map(|background| background.scale_alpha(opacity)),
+        background: style
+            .background
+            .map(|background| background.scale_alpha(opacity)),
         text_color: alpha(style.text_color, opacity),
         border: iced::Border {
             color: alpha(style.border.color, opacity),

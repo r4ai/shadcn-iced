@@ -78,9 +78,11 @@ impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
         let header = Column::new()
             .push(icon)
             .push(empty.media)
-            .push(empty.title.map(|title| {
-                text(title).size(style::text::LG).font(font::MEDIUM)
-            }))
+            .push(
+                empty
+                    .title
+                    .map(|title| text(title).size(style::text::LG).font(font::MEDIUM)),
+            )
             .push(empty.description.map(|description| {
                 text(description)
                     .size(style::text::SM)

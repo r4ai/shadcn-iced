@@ -35,7 +35,12 @@ pub struct Badge<'a, Message> {
 
 /// Creates a [`Badge`] with a text label.
 pub fn badge<'a, Message: 'a>(label: impl text::IntoFragment<'a>) -> Badge<'a, Message> {
-    Badge::new(text(label).size(style::text::XS).font(font::MEDIUM).line_height(iced::Pixels(16.0)))
+    Badge::new(
+        text(label)
+            .size(style::text::XS)
+            .font(font::MEDIUM)
+            .line_height(iced::Pixels(16.0)),
+    )
 }
 
 impl<'a, Message: 'a> Badge<'a, Message> {
@@ -85,9 +90,17 @@ pub fn style(theme: &Theme, variant: Variant) -> container::Style {
 
     let (background, text_color, border_color) = match variant {
         Variant::Default => (Some(p.primary), p.primary_foreground, Color::TRANSPARENT),
-        Variant::Secondary => (Some(p.secondary), p.secondary_foreground, Color::TRANSPARENT),
+        Variant::Secondary => (
+            Some(p.secondary),
+            p.secondary_foreground,
+            Color::TRANSPARENT,
+        ),
         Variant::Destructive => (
-            Some(if t.is_dark() { alpha(p.destructive, 0.6) } else { p.destructive }),
+            Some(if t.is_dark() {
+                alpha(p.destructive, 0.6)
+            } else {
+                p.destructive
+            }),
             Color::WHITE,
             Color::TRANSPARENT,
         ),

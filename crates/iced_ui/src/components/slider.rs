@@ -66,8 +66,11 @@ pub fn style(theme: &Theme, status: Status) -> Style {
             shape: HandleShape::Circle { radius: 8.0 },
             background: Background::Color(Color::WHITE),
             border_width: if active { 4.0 } else { 1.0 },
-            border_color: if active { alpha(p.ring, 0.5) } else { p.primary },
+            border_color: if active {
+                alpha(p.ring, 0.5)
+            } else {
+                p.primary
+            },
         },
     }
 }
-

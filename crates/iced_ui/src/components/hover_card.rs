@@ -21,8 +21,11 @@ pub fn hover_card<'a, Message: Clone + 'a>(
     trigger: impl Into<Element<'a, Message>>,
     content: impl Into<Element<'a, Message>>,
 ) -> Anchored<'a, Message> {
-    Anchored::new(trigger, super::popover::panel(content, Length::Fixed(256.0)))
-        .hover(Duration::from_millis(700), Duration::from_millis(300))
-        .side(Side::Bottom)
-        .offset(4.0)
+    Anchored::new(
+        trigger,
+        super::popover::panel(content, Length::Fixed(256.0)),
+    )
+    .hover(Duration::from_millis(700), Duration::from_millis(300))
+    .side(Side::Bottom)
+    .offset(4.0)
 }

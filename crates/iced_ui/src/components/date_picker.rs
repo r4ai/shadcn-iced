@@ -76,7 +76,9 @@ impl<'a, Message: Clone + 'a> DatePicker<'a, Message> {
 impl<'a, Message: Clone + 'a> From<DatePicker<'a, Message>> for Element<'a, Message> {
     fn from(picker: DatePicker<'a, Message>) -> Self {
         let has_value = picker.selected.is_some();
-        let label = picker.selected.map_or(picker.placeholder.clone(), |date| date.to_string());
+        let label = picker
+            .selected
+            .map_or(picker.placeholder.clone(), |date| date.to_string());
 
         let trigger = Button::new(
             Row::new()

@@ -116,12 +116,17 @@ impl<'a, Message: Clone + 'a> Table<'a, Message> {
     }
 
     /// Sets the footer row.
-    pub fn footer<T: Into<Cell<'a, Message>>>(mut self, cells: impl IntoIterator<Item = T>) -> Self {
+    pub fn footer<T: Into<Cell<'a, Message>>>(
+        mut self,
+        cells: impl IntoIterator<Item = T>,
+    ) -> Self {
         self.footer = Some(
             cells
                 .into_iter()
                 .map(|c| match c.into() {
-                    Cell::Text(value) => text(value).size(style::text::SM).font(font::MEDIUM).into(),
+                    Cell::Text(value) => {
+                        text(value).size(style::text::SM).font(font::MEDIUM).into()
+                    }
                     Cell::Element(element) => element,
                 })
                 .collect(),
@@ -161,7 +166,12 @@ fn layout_row<'a, Message: 'a>(
         let mut cell = container(content)
             .padding(padding)
             .width(widths.get(index).copied().unwrap_or(Length::Fill))
-            .align_x(align.get(index).copied().unwrap_or(alignment::Horizontal::Left))
+            .align_x(
+                align
+                    .get(index)
+                    .copied()
+                    .unwrap_or(alignment::Horizontal::Left),
+            )
             .align_y(alignment::Vertical::Center);
 
         if let Some(height) = height {
@@ -192,7 +202,13 @@ impl<'a, Message: Clone + 'a> From<Table<'a, Message>> for Element<'a, Message> 
     fn from(table: Table<'a, Message>) -> Self {
         let mut column = Column::new();
 
-        column = column.push(layout_row(table.headers, &table.widths, &table.align, Some(40.0), [0.0, 8.0]));
+        column = column.push(layout_row(
+            table.headers,
+            &table.widths,
+            &table.align,
+            Some(40.0),
+            [0.0, 8.0],
+        ));
         column = column.push(super::separator::separator());
 
         let count = table.rows.len();
@@ -214,22 +230,31 @@ impl<'a, Message: Clone + 'a> From<Table<'a, Message>> for Element<'a, Message> 
 
         if let Some(footer) = table.footer {
             column = column.push(
-                container(layout_row(footer, &table.widths, &table.align, None, [8.0, 8.0]))
-                    .style(|theme: &Theme| container::Style {
-                        background: Some(Background::Color(alpha(tokens(theme).palette.muted, 0.5))),
-                        ..container::Style::default()
-                    }),
+                container(layout_row(
+                    footer,
+                    &table.widths,
+                    &table.align,
+                    None,
+                    [8.0, 8.0],
+                ))
+                .style(|theme: &Theme| container::Style {
+                    background: Some(Background::Color(alpha(tokens(theme).palette.muted, 0.5))),
+                    ..container::Style::default()
+                }),
             );
         }
 
         if let Some(caption) = table.caption {
-            column = column.push(
-                container(text(caption).size(style::text::SM).style(|theme: &Theme| text::Style {
-                    color: Some(tokens(theme).palette.muted_foreground),
-                }))
-                .padding(iced::Padding::ZERO.top(16))
-                .center_x(Length::Fill),
-            );
+            column =
+                column.push(
+                    container(text(caption).size(style::text::SM).style(|theme: &Theme| {
+                        text::Style {
+                            color: Some(tokens(theme).palette.muted_foreground),
+                        }
+                    }))
+                    .padding(iced::Padding::ZERO.top(16))
+                    .center_x(Length::Fill),
+                );
         }
 
         column.width(Length::Fill).into()

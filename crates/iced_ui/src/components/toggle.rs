@@ -189,7 +189,13 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
 }
 
 /// The style of a toggle.
-pub fn style(theme: &Theme, status: Status, on: bool, variant: Variant, position: Position) -> Style {
+pub fn style(
+    theme: &Theme,
+    status: Status,
+    on: bool,
+    variant: Variant,
+    position: Position,
+) -> Style {
     let t = tokens(theme);
     let p = &t.palette;
     let hovered = matches!(status, Status::Hovered | Status::Pressed);

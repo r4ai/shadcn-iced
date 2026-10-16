@@ -30,17 +30,31 @@ pub fn popover<'a, Message: Clone + 'a>(
 }
 
 /// Wraps content in a popover panel of the given width.
-pub fn panel<'a, Message: 'a>(content: impl Into<Element<'a, Message>>, width: Length) -> Element<'a, Message> {
-    container(content).padding(16).width(width).style(style).into()
+pub fn panel<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+    width: Length,
+) -> Element<'a, Message> {
+    container(content)
+        .padding(16)
+        .width(width)
+        .style(style)
+        .into()
 }
 
 /// A title and a description (`PopoverHeader`).
-pub fn header<'a, Message: 'a>(title: impl Into<String>, description: impl Into<String>) -> Element<'a, Message> {
+pub fn header<'a, Message: 'a>(
+    title: impl Into<String>,
+    description: impl Into<String>,
+) -> Element<'a, Message> {
     Column::new()
         .push(text(title.into()).size(style::text::SM).font(font::MEDIUM))
-        .push(text(description.into()).size(style::text::SM).style(|theme: &Theme| text::Style {
-            color: Some(tokens(theme).palette.muted_foreground),
-        }))
+        .push(
+            text(description.into())
+                .size(style::text::SM)
+                .style(|theme: &Theme| text::Style {
+                    color: Some(tokens(theme).palette.muted_foreground),
+                }),
+        )
         .spacing(4)
         .into()
 }

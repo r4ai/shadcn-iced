@@ -135,7 +135,10 @@ pub fn ring(tokens: &Tokens, radius: f32) -> crate::primitive::focus::Ring {
 /// (`ring-destructive/20`, `/40` in dark mode).
 pub fn invalid_outset_ring(tokens: &Tokens, radius: f32) -> crate::primitive::focus::Ring {
     crate::primitive::focus::Ring {
-        color: alpha(tokens.palette.destructive, if tokens.is_dark() { 0.4 } else { 0.2 }),
+        color: alpha(
+            tokens.palette.destructive,
+            if tokens.is_dark() { 0.4 } else { 0.2 },
+        ),
         width: 3.0,
         radius,
     }

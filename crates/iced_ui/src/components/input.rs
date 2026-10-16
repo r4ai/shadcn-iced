@@ -188,7 +188,11 @@ pub fn style(theme: &Theme, status: Status, invalid: bool) -> Style {
         p.input
     };
 
-    let opacity = if disabled { style::DISABLED_OPACITY } else { 1.0 };
+    let opacity = if disabled {
+        style::DISABLED_OPACITY
+    } else {
+        1.0
+    };
 
     Style {
         background: Background::Color(if dark {

@@ -93,4 +93,3 @@ pub fn menu_style(theme: &Theme) -> menu::Style {
         shadow: style::shadow_md(),
     }
 }
-

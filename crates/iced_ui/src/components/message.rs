@@ -82,11 +82,14 @@ impl<'a, M: 'a> Message<'a, M> {
 }
 
 fn caption<'a, M: 'a>(content: String, align: Align) -> Element<'a, M> {
-    let caption = container(text(content).size(style::text::XS).font(font::MEDIUM).style(|theme: &Theme| {
-        text::Style {
-            color: Some(tokens(theme).palette.muted_foreground),
-        }
-    }))
+    let caption = container(
+        text(content)
+            .size(style::text::XS)
+            .font(font::MEDIUM)
+            .style(|theme: &Theme| text::Style {
+                color: Some(tokens(theme).palette.muted_foreground),
+            }),
+    )
     .padding([0, 12])
     .width(Length::Fill);
 
@@ -111,18 +114,28 @@ impl<'a, M: 'a> From<Message<'a, M>> for Element<'a, M> {
                 Align::End => Alignment::End,
             });
 
-        let avatar = message.avatar.map(|avatar| container(avatar).align_bottom(Length::Shrink));
+        let avatar = message
+            .avatar
+            .map(|avatar| container(avatar).align_bottom(Length::Shrink));
 
         let row = match align {
             Align::Start => Row::new().push(avatar).push(content),
             Align::End => Row::new().push(content).push(avatar),
         };
 
-        row.spacing(8).align_y(Alignment::End).width(Length::Fill).into()
+        row.spacing(8)
+            .align_y(Alignment::End)
+            .width(Length::Fill)
+            .into()
     }
 }
 
 /// Stacks messages (`MessageGroup`).
-pub fn message_group<'a, M: 'a>(messages: impl IntoIterator<Item = Element<'a, M>>) -> Element<'a, M> {
-    Column::with_children(messages).spacing(8).width(Length::Fill).into()
+pub fn message_group<'a, M: 'a>(
+    messages: impl IntoIterator<Item = Element<'a, M>>,
+) -> Element<'a, M> {
+    Column::with_children(messages)
+        .spacing(8)
+        .width(Length::Fill)
+        .into()
 }

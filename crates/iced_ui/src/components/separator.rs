@@ -3,8 +3,8 @@
 //! Port of <https://ui.shadcn.com/docs/components/separator>.
 use iced_ui_core::tokens;
 
-use iced::widget::{Rule, rule};
 use iced::Theme;
+use iced::widget::{Rule, rule};
 
 /// A horizontal separator (`h-px w-full bg-border`).
 pub fn separator<'a>() -> Rule<'a> {

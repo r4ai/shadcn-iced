@@ -17,10 +17,7 @@ use iced::advanced::widget::{self, Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
 use iced::time::{Duration, Instant};
-use iced::{
-    Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch,
-    window,
-};
+use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch, window};
 
 use std::sync::atomic::{self, AtomicU64};
 
@@ -85,8 +82,7 @@ enum Trigger<Message> {
 }
 
 /// Floating content anchored to another element.
-pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
-{
+pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     anchor: Element<'a, Message, Theme, Renderer>,
     content: Element<'a, Message, Theme, Renderer>,
     trigger: Trigger<Message>,
@@ -371,12 +367,9 @@ where
         renderer: &Renderer,
         operation: &mut dyn Operation,
     ) {
-        self.anchor.as_widget_mut().operate(
-            &mut tree.children[0],
-            layout,
-            renderer,
-            operation,
-        );
+        self.anchor
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
     }
 
     fn update(
@@ -423,8 +416,7 @@ where
                 }
             }
             Trigger::ContextMenu => {
-                if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) =
-                    event
+                if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) = event
                     && let Some(position) = cursor.position_over(bounds)
                 {
                     let was_open = state.open;
@@ -445,9 +437,7 @@ where
                 open_delay,
                 close_delay,
             } => {
-                if let Event::Mouse(_) | Event::Window(window::Event::RedrawRequested(_)) =
-                    event
-                {
+                if let Event::Mouse(_) | Event::Window(window::Event::RedrawRequested(_)) = event {
                     state.anchor_hovered = cursor.is_over(bounds);
                     state.tick(*open_delay, *close_delay, shell);
                 }
@@ -546,9 +536,9 @@ where
         match (anchor, floating) {
             (None, None) => None,
             (Some(overlay), None) | (None, Some(overlay)) => Some(overlay),
-            (Some(anchor), Some(floating)) => Some(
-                overlay::Group::with_children(vec![anchor, floating]).overlay(),
-            ),
+            (Some(anchor), Some(floating)) => {
+                Some(overlay::Group::with_children(vec![anchor, floating]).overlay())
+            }
         }
     }
 }
@@ -753,9 +743,9 @@ where
     ) {
         let bounds = layout.bounds();
 
-        self.content.as_widget().draw(
-            self.tree, renderer, theme, style, layout, cursor, &bounds,
-        );
+        self.content
+            .as_widget()
+            .draw(self.tree, renderer, theme, style, layout, cursor, &bounds);
     }
 
     fn operate(
@@ -799,8 +789,7 @@ where
             open_delay,
             close_delay,
         } = *self.trigger
-            && let Event::Mouse(_) | Event::Window(window::Event::RedrawRequested(_)) =
-                event
+            && let Event::Mouse(_) | Event::Window(window::Event::RedrawRequested(_)) = event
         {
             self.state.content_hovered = cursor.is_over(bounds);
             self.state.tick(open_delay, close_delay, shell);
@@ -818,8 +807,7 @@ where
             | Event::Touch(touch::Event::FingerPressed { .. })
                 if !captured_by_content && !cursor.is_over(bounds) =>
             {
-                let over_anchor =
-                    self.point.is_none() && cursor.is_over(self.anchor_bounds);
+                let over_anchor = self.point.is_none() && cursor.is_over(self.anchor_bounds);
 
                 if matches!(self.trigger, Trigger::Hover { .. }) {
                     if !over_anchor {
@@ -874,13 +862,9 @@ where
     ) -> Option<overlay::Element<'c, Message, Theme, Renderer>> {
         let bounds = layout.bounds();
 
-        self.content.as_widget_mut().overlay(
-            self.tree,
-            layout,
-            renderer,
-            &bounds,
-            Vector::ZERO,
-        )
+        self.content
+            .as_widget_mut()
+            .overlay(self.tree, layout, renderer, &bounds, Vector::ZERO)
     }
 }
 

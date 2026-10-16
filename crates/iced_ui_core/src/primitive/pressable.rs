@@ -16,13 +16,11 @@ use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::widget::button::{Status, Style};
 use iced::{
-    Background, Color, Element, Event, Length, Padding, Rectangle, Size,
-    Vector, mouse, touch,
+    Background, Color, Element, Event, Length, Padding, Rectangle, Size, Vector, mouse, touch,
 };
 
 /// A clickable surface.
-pub struct Pressable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
-{
+pub struct Pressable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
     on_press: Option<OnPress<'a, Message>>,
     disabled: bool,
@@ -297,10 +295,7 @@ where
 
         let style = (self.style)(theme, status);
 
-        if style.background.is_some()
-            || style.border.width > 0.0
-            || style.shadow.color.a > 0.0
-        {
+        if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0 {
             renderer.fill_quad(
                 renderer::Quad {
                     bounds,
@@ -403,4 +398,3 @@ where
 {
     Pressable::new(content)
 }
-

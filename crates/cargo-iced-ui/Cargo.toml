@@ -1,0 +1,15 @@
+[package]
+name = "cargo-iced-ui"
+description = "Copy iced_ui components into your project, shadcn/ui style"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "cargo-iced-ui"
+path = "src/main.rs"
+
+[lints]
+workspace = true

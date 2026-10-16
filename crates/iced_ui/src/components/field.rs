@@ -108,20 +108,29 @@ impl<'a, Message: 'a> From<Field<'a, Message>> for Element<'a, Message> {
                     text::Style {
                         color: Some(iced_ui_core::theme::alpha(
                             if invalid { p.destructive } else { p.foreground },
-                            if disabled { style::DISABLED_OPACITY } else { 1.0 },
+                            if disabled {
+                                style::DISABLED_OPACITY
+                            } else {
+                                1.0
+                            },
                         )),
                     }
                 })
         });
 
-        let description = field
-            .description
-            .map(|description| text(description).size(style::text::SM).line_height(1.5).style(muted));
+        let description = field.description.map(|description| {
+            text(description)
+                .size(style::text::SM)
+                .line_height(1.5)
+                .style(muted)
+        });
 
         let error = field.error.map(|error| {
-            text(error).size(style::text::SM).style(|theme: &Theme| text::Style {
-                color: Some(tokens(theme).palette.destructive),
-            })
+            text(error)
+                .size(style::text::SM)
+                .style(|theme: &Theme| text::Style {
+                    color: Some(tokens(theme).palette.destructive),
+                })
         });
 
         match field.orientation {
@@ -205,10 +214,12 @@ impl<'a, Message: 'a> From<FieldSet<'a, Message>> for Element<'a, Message> {
     fn from(set: FieldSet<'a, Message>) -> Self {
         let header = Column::new()
             .push(text(set.legend).size(style::text::BASE).font(font::MEDIUM))
-            .push(
-                set.description
-                    .map(|description| text(description).size(style::text::SM).line_height(1.5).style(muted)),
-            )
+            .push(set.description.map(|description| {
+                text(description)
+                    .size(style::text::SM)
+                    .line_height(1.5)
+                    .style(muted)
+            }))
             .spacing(6);
 
         Column::new()
@@ -224,7 +235,9 @@ impl<'a, Message: 'a> From<FieldSet<'a, Message>> for Element<'a, Message> {
 /// (`FieldSeparator`).
 pub fn field_separator<'a, Message: 'a>(label: Option<&str>) -> Element<'a, Message> {
     match label {
-        None => container(super::separator::separator()).padding([10, 0]).into(),
+        None => container(super::separator::separator())
+            .padding([10, 0])
+            .into(),
         Some(label) => Row::new()
             .push(super::separator::separator())
             .push(

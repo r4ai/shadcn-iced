@@ -139,10 +139,14 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> Select<'a, T, Message> 
     }
 }
 
-impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Message>> for Element<'a, Message> {
+impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Message>>
+    for Element<'a, Message>
+{
     fn from(select: Select<'a, T, Message>) -> Self {
         let selected_label = select.entries.iter().find_map(|entry| match entry {
-            Entry::Option(value, label, _) if Some(value) == select.selected.as_ref() => Some(label.clone()),
+            Entry::Option(value, label, _) if Some(value) == select.selected.as_ref() => {
+                Some(label.clone())
+            }
             _ => None,
         });
 
@@ -156,14 +160,22 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                         .size(style::text::SM)
                         .line_height(iced::Pixels(20.0))
                         .wrapping(text::Wrapping::None)
-                        .width(if select.width == Length::Shrink { Length::Shrink } else { Length::Fill })
+                        .width(if select.width == Length::Shrink {
+                            Length::Shrink
+                        } else {
+                            Length::Fill
+                        })
                         .style(move |theme: &Theme| text::Style {
                             color: (!has_value).then(|| tokens(theme).palette.muted_foreground),
                         }),
                 )
-                .push(lucide::CHEVRON_DOWN.sized(16).style(|theme: &Theme| text::Style {
-                    color: Some(alpha(tokens(theme).palette.muted_foreground, 0.5)),
-                }))
+                .push(
+                    lucide::CHEVRON_DOWN
+                        .sized(16)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(alpha(tokens(theme).palette.muted_foreground, 0.5)),
+                        }),
+                )
                 .spacing(8)
                 .align_y(Alignment::Center)
                 .height(Length::Fill),
@@ -190,35 +202,51 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                         .wrapping(text::Wrapping::None)
                         .style(move |theme: &Theme| text::Style {
                             color: disabled.then(|| {
-                                alpha(tokens(theme).palette.popover_foreground, style::DISABLED_OPACITY)
+                                alpha(
+                                    tokens(theme).palette.popover_foreground,
+                                    style::DISABLED_OPACITY,
+                                )
                             }),
                         });
 
-                    let check = container(is_selected.then(|| lucide::CHECK.sized(16))).width(16).into();
+                    let check = container(is_selected.then(|| lucide::CHECK.sized(16)))
+                        .width(16)
+                        .into();
 
                     list.item(
-                        listbox::row(label, Some(check)).spacing(8.0).padding(Padding {
-                            top: 6.0,
-                            bottom: 6.0,
-                            left: 8.0,
-                            right: 8.0,
-                        }),
+                        listbox::row(label, Some(check))
+                            .spacing(8.0)
+                            .padding(Padding {
+                                top: 6.0,
+                                bottom: 6.0,
+                                left: 8.0,
+                                right: 8.0,
+                            }),
                         (!disabled).then(|| (select.on_select)(value)),
                     )
                 }
                 Entry::Label(label) => list.push(
-                    container(text(label).size(style::text::XS).style(|theme: &Theme| text::Style {
-                        color: Some(tokens(theme).palette.muted_foreground),
+                    container(text(label).size(style::text::XS).style(|theme: &Theme| {
+                        text::Style {
+                            color: Some(tokens(theme).palette.muted_foreground),
+                        }
                     }))
                     .padding([6, 8]),
                 ),
-                Entry::Separator => list.push(container(super::separator::separator()).padding([4, 0])),
+                Entry::Separator => {
+                    list.push(container(super::separator::separator()).padding([4, 0]))
+                }
             };
         }
 
-        let content = container(scrollable(list.padding(4)).width(Length::Shrink).direction(scrollable::Direction::Vertical(
-            super::scroll_area::scrollbar(),
-        )).style(super::scroll_area::style))
+        let content = container(
+            scrollable(list.padding(4))
+                .width(Length::Shrink)
+                .direction(scrollable::Direction::Vertical(
+                    super::scroll_area::scrollbar(),
+                ))
+                .style(super::scroll_area::style),
+        )
         .max_height(300)
         .style(menu::panel);
 
@@ -239,7 +267,11 @@ pub fn trigger(theme: &Theme, status: Status, invalid: bool) -> Style {
     let p = &t.palette;
     let dark = t.is_dark();
     let hovered = matches!(status, Status::Hovered | Status::Pressed);
-    let opacity = if status == Status::Disabled { style::DISABLED_OPACITY } else { 1.0 };
+    let opacity = if status == Status::Disabled {
+        style::DISABLED_OPACITY
+    } else {
+        1.0
+    };
 
     Style {
         background: Some(Background::Color(match (dark, hovered) {

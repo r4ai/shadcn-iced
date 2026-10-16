@@ -95,13 +95,21 @@ impl<'a, Message: Clone + 'a> From<Pagination<'a, Message>> for Element<'a, Mess
             row = row.push(match page {
                 Some(page) => Element::from(
                     Button::new(text(page.to_string()).size(14))
-                        .variant(if page == current { Variant::Outline } else { Variant::Ghost })
+                        .variant(if page == current {
+                            Variant::Outline
+                        } else {
+                            Variant::Ghost
+                        })
                         .size(button::Size::Icon)
                         .on_press(on_change(page)),
                 ),
-                None => container(lucide::ELLIPSIS.sized(16).style(|theme: &Theme| text::Style {
-                    color: Some(tokens(theme).palette.foreground),
-                }))
+                None => container(
+                    lucide::ELLIPSIS
+                        .sized(16)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(tokens(theme).palette.foreground),
+                        }),
+                )
                 .center(36)
                 .into(),
             });
@@ -130,6 +138,9 @@ mod tests {
             pages(5, 10, 1),
             vec![Some(1), None, Some(4), Some(5), Some(6), None, Some(10)]
         );
-        assert_eq!(pages(2, 10, 1), vec![Some(1), Some(2), Some(3), None, Some(10)]);
+        assert_eq!(
+            pages(2, 10, 1),
+            vec![Some(1), Some(2), Some(3), None, Some(10)]
+        );
     }
 }

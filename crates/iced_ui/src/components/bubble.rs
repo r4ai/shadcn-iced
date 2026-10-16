@@ -86,22 +86,26 @@ impl<'a, Message: 'a> Bubble<'a, Message> {
     /// (`BubbleReactions`).
     pub fn reactions(mut self, reactions: impl text::IntoFragment<'a>) -> Self {
         self.reactions = Some(
-            container(text(reactions).size(style::text::SM).line_height(iced::Pixels(20.0)))
-                .padding([2, 8])
-                .style(|theme: &Theme| {
-                    let p = tokens(theme).palette;
-                    container::Style {
-                        background: Some(Background::Color(p.muted)),
-                        text_color: Some(p.foreground),
-                        border: Border {
-                            color: p.background,
-                            width: 2.0,
-                            radius: border::radius(f32::MAX),
-                        },
-                        ..container::Style::default()
-                    }
-                })
-                .into(),
+            container(
+                text(reactions)
+                    .size(style::text::SM)
+                    .line_height(iced::Pixels(20.0)),
+            )
+            .padding([2, 8])
+            .style(|theme: &Theme| {
+                let p = tokens(theme).palette;
+                container::Style {
+                    background: Some(Background::Color(p.muted)),
+                    text_color: Some(p.foreground),
+                    border: Border {
+                        color: p.background,
+                        width: 2.0,
+                        radius: border::radius(f32::MAX),
+                    },
+                    ..container::Style::default()
+                }
+            })
+            .into(),
         );
         self
     }
@@ -116,7 +120,11 @@ impl<'a, Message: 'a> Bubble<'a, Message> {
 impl<'a, Message: 'a> From<Bubble<'a, Message>> for Element<'a, Message> {
     fn from(bubble: Bubble<'a, Message>) -> Self {
         let variant = bubble.variant;
-        let padding = if variant == Variant::Ghost { Padding::ZERO } else { Padding::from([8, 12]) };
+        let padding = if variant == Variant::Ghost {
+            Padding::ZERO
+        } else {
+            Padding::from([8, 12])
+        };
 
         let content = container(bubble.content)
             .padding(padding)
@@ -130,7 +138,12 @@ impl<'a, Message: 'a> From<Bubble<'a, Message>> for Element<'a, Message> {
 
         let body: Element<'a, Message> = match bubble.reactions {
             Some(reactions) => Stack::new()
-                .push(Column::new().push(content).push(iced::widget::space().height(14)).align_x(align))
+                .push(
+                    Column::new()
+                        .push(content)
+                        .push(iced::widget::space().height(14))
+                        .align_x(align),
+                )
                 .push(
                     container(reactions)
                         .align_x(align)
@@ -158,10 +171,18 @@ pub fn style(theme: &Theme, variant: Variant) -> container::Style {
 
     let (background, text_color, border_color) = match variant {
         Variant::Default => (Some(p.primary), p.primary_foreground, Color::TRANSPARENT),
-        Variant::Secondary => (Some(p.secondary), p.secondary_foreground, Color::TRANSPARENT),
+        Variant::Secondary => (
+            Some(p.secondary),
+            p.secondary_foreground,
+            Color::TRANSPARENT,
+        ),
         Variant::Muted => (Some(p.muted), p.foreground, Color::TRANSPARENT),
         Variant::Tinted => (
-            Some(if dark { mix(p.primary, Color::BLACK, 0.7) } else { mix(p.primary, Color::WHITE, 0.85) }),
+            Some(if dark {
+                mix(p.primary, Color::BLACK, 0.7)
+            } else {
+                mix(p.primary, Color::WHITE, 0.85)
+            }),
             p.foreground,
             Color::TRANSPARENT,
         ),
@@ -180,7 +201,11 @@ pub fn style(theme: &Theme, variant: Variant) -> container::Style {
         border: Border {
             color: border_color,
             width: 1.0,
-            radius: border::radius(if variant == Variant::Ghost { 0.0 } else { t.radius_xl() }),
+            radius: border::radius(if variant == Variant::Ghost {
+                0.0
+            } else {
+                t.radius_xl()
+            }),
         },
         ..container::Style::default()
     }

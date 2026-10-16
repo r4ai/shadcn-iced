@@ -33,7 +33,10 @@ pub struct Drawer<'a, Message> {
 }
 
 /// Creates a [`Drawer`] shown at the bottom of the window when `open`.
-pub fn drawer<'a, Message: Clone + 'a>(base: impl Into<Element<'a, Message>>, open: bool) -> Drawer<'a, Message> {
+pub fn drawer<'a, Message: Clone + 'a>(
+    base: impl Into<Element<'a, Message>>,
+    open: bool,
+) -> Drawer<'a, Message> {
     Drawer {
         base: base.into(),
         open,
@@ -87,19 +90,26 @@ impl<'a, Message: Clone + 'a> Drawer<'a, Message> {
 
 impl<'a, Message: Clone + 'a> From<Drawer<'a, Message>> for Element<'a, Message> {
     fn from(drawer: Drawer<'a, Message>) -> Self {
-        let handle = container(space().width(100).height(8)).style(|theme: &Theme| container::Style {
-            background: Some(Background::Color(tokens(theme).palette.muted)),
-            border: border::rounded(f32::MAX),
-            ..container::Style::default()
-        });
+        let handle =
+            container(space().width(100).height(8)).style(|theme: &Theme| container::Style {
+                background: Some(Background::Color(tokens(theme).palette.muted)),
+                border: border::rounded(f32::MAX),
+                ..container::Style::default()
+            });
 
         let header = (drawer.title.is_some() || drawer.description.is_some()).then(|| {
             Column::new()
-                .push(drawer.title.map(|title| text(title).size(style::text::BASE).font(font::SEMIBOLD)))
+                .push(
+                    drawer
+                        .title
+                        .map(|title| text(title).size(style::text::BASE).font(font::SEMIBOLD)),
+                )
                 .push(drawer.description.map(|description| {
-                    text(description).size(style::text::SM).style(|theme: &Theme| text::Style {
-                        color: Some(tokens(theme).palette.muted_foreground),
-                    })
+                    text(description)
+                        .size(style::text::SM)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(tokens(theme).palette.muted_foreground),
+                        })
                 }))
                 .spacing(6)
                 .padding(16)
@@ -109,8 +119,17 @@ impl<'a, Message: Clone + 'a> From<Drawer<'a, Message>> for Element<'a, Message>
 
         let body = Column::new()
             .push(header)
-            .extend(drawer.content.into_iter().map(|element| container(element).padding([0, 16]).width(Length::Fill).into()))
-            .push(drawer.footer.map(|footer| container(footer).padding(16).width(Length::Fill)))
+            .extend(drawer.content.into_iter().map(|element| {
+                container(element)
+                    .padding([0, 16])
+                    .width(Length::Fill)
+                    .into()
+            }))
+            .push(
+                drawer
+                    .footer
+                    .map(|footer| container(footer).padding(16).width(Length::Fill)),
+            )
             .max_width(drawer.max_width)
             .width(Length::Fill);
 
@@ -131,7 +150,9 @@ impl<'a, Message: Clone + 'a> From<Drawer<'a, Message>> for Element<'a, Message>
                 border: iced::Border {
                     color: t.palette.border,
                     width: 1.0,
-                    radius: border::radius(0).top_left(t.radius_lg()).top_right(t.radius_lg()),
+                    radius: border::radius(0)
+                        .top_left(t.radius_lg())
+                        .top_right(t.radius_lg()),
                 },
                 ..container::Style::default()
             }

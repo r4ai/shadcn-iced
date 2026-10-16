@@ -55,7 +55,11 @@ impl Date {
     /// The number of days since 1970-01-01.
     pub fn to_days(self) -> i64 {
         // Howard Hinnant's `days_from_civil`.
-        let y = if self.month <= 2 { self.year - 1 } else { self.year } as i64;
+        let y = if self.month <= 2 {
+            self.year - 1
+        } else {
+            self.year
+        } as i64;
         let era = y.div_euclid(400);
         let yoe = y - era * 400;
         let m = self.month as i64;
@@ -103,7 +107,13 @@ impl Date {
 impl fmt::Display for Date {
     /// Formats like `October 16, 2026`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}, {}", MONTHS[self.month as usize - 1], self.day, self.year)
+        write!(
+            f,
+            "{} {}, {}",
+            MONTHS[self.month as usize - 1],
+            self.day,
+            self.year
+        )
     }
 }
 
@@ -125,24 +135,40 @@ impl Month {
     /// The next month.
     pub fn next(self) -> Self {
         if self.month == 12 {
-            Self { year: self.year + 1, month: 1 }
+            Self {
+                year: self.year + 1,
+                month: 1,
+            }
         } else {
-            Self { month: self.month + 1, ..self }
+            Self {
+                month: self.month + 1,
+                ..self
+            }
         }
     }
 
     /// The previous month.
     pub fn previous(self) -> Self {
         if self.month == 1 {
-            Self { year: self.year - 1, month: 12 }
+            Self {
+                year: self.year - 1,
+                month: 12,
+            }
         } else {
-            Self { month: self.month - 1, ..self }
+            Self {
+                month: self.month - 1,
+                ..self
+            }
         }
     }
 
     /// The first day of the month.
     pub fn first(self) -> Date {
-        Date { year: self.year, month: self.month, day: 1 }
+        Date {
+            year: self.year,
+            month: self.month,
+            day: 1,
+        }
     }
 }
 
@@ -154,8 +180,18 @@ impl fmt::Display for Month {
 }
 
 const MONTHS: [&str; 12] = [
-    "January", "February", "March", "April", "May", "June", "July", "August", "September",
-    "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
 ];
 
 const WEEKDAYS: [&str; 7] = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -275,16 +311,32 @@ fn day_style(theme: &Theme, status: Status, kind: DayKind, outside: bool) -> Sty
     let radius = t.radius_md();
 
     let (background, text_color, corners) = match kind {
-        DayKind::Selected => (Some(p.primary), p.primary_foreground, border::radius(radius)),
-        DayKind::RangeStart => (Some(p.primary), p.primary_foreground, border::radius(radius)),
-        DayKind::RangeEnd => (Some(p.primary), p.primary_foreground, border::radius(radius)),
+        DayKind::Selected => (
+            Some(p.primary),
+            p.primary_foreground,
+            border::radius(radius),
+        ),
+        DayKind::RangeStart => (
+            Some(p.primary),
+            p.primary_foreground,
+            border::radius(radius),
+        ),
+        DayKind::RangeEnd => (
+            Some(p.primary),
+            p.primary_foreground,
+            border::radius(radius),
+        ),
         DayKind::RangeMiddle => (Some(p.accent), p.accent_foreground, border::radius(0)),
         DayKind::Today => (Some(p.accent), p.accent_foreground, border::radius(radius)),
         DayKind::Normal if hovered => (Some(p.accent), p.accent_foreground, border::radius(radius)),
         DayKind::Normal => (None, p.foreground, border::radius(radius)),
     };
 
-    let mut text_color = if outside && kind == DayKind::Normal { p.muted_foreground } else { text_color };
+    let mut text_color = if outside && kind == DayKind::Normal {
+        p.muted_foreground
+    } else {
+        text_color
+    };
 
     if status == Status::Disabled {
         text_color = alpha(p.muted_foreground, style::DISABLED_OPACITY);
@@ -301,7 +353,10 @@ fn day_style(theme: &Theme, status: Status, kind: DayKind, outside: bool) -> Sty
     }
 }
 
-fn nav_button<'a, Message: Clone + 'a>(icon: iced_ui_core::Icon, message: Message) -> Element<'a, Message> {
+fn nav_button<'a, Message: Clone + 'a>(
+    icon: iced_ui_core::Icon,
+    message: Message,
+) -> Element<'a, Message> {
     super::button::icon_button(icon)
         .variant(super::button::Variant::Ghost)
         .size(super::button::Size::IconSm)
@@ -351,7 +406,9 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
                     Selection::Range(..) if Some(date) == range_start => DayKind::RangeStart,
                     Selection::Range(..) if Some(date) == range_end => DayKind::RangeEnd,
                     Selection::Range(..)
-                        if range_start.zip(range_end).is_some_and(|(a, b)| date > a && date < b) =>
+                        if range_start
+                            .zip(range_end)
+                            .is_some_and(|(a, b)| date > a && date < b) =>
                     {
                         DayKind::RangeMiddle
                     }
@@ -359,10 +416,15 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
                     _ => DayKind::Normal,
                 };
 
-                let on_select = (!disabled).then(|| self.on_select.as_ref().map(|f| f(date))).flatten();
+                let on_select = (!disabled)
+                    .then(|| self.on_select.as_ref().map(|f| f(date)))
+                    .flatten();
 
                 let label = text(date.day.to_string()).size(style::text::SM).font(
-                    if matches!(kind, DayKind::Selected | DayKind::RangeStart | DayKind::RangeEnd) {
+                    if matches!(
+                        kind,
+                        DayKind::Selected | DayKind::RangeStart | DayKind::RangeEnd
+                    ) {
                         font::MEDIUM
                     } else {
                         font::SANS
@@ -393,16 +455,33 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
         let count = calendar.months;
 
         for index in 0..count {
-            let caption = text(month.to_string()).size(style::text::SM).font(font::MEDIUM);
+            let caption = text(month.to_string())
+                .size(style::text::SM)
+                .font(font::MEDIUM);
 
             let header = Row::new()
-                .push((index == 0).then(|| nav_button(lucide::CHEVRON_LEFT, (calendar.on_navigate)(calendar.month.previous()))))
+                .push((index == 0).then(|| {
+                    nav_button(
+                        lucide::CHEVRON_LEFT,
+                        (calendar.on_navigate)(calendar.month.previous()),
+                    )
+                }))
                 .push(container(caption).center_x(Length::Fill).center_y(32))
-                .push((index + 1 == count).then(|| nav_button(lucide::CHEVRON_RIGHT, (calendar.on_navigate)(calendar.month.next()))))
+                .push((index + 1 == count).then(|| {
+                    nav_button(
+                        lucide::CHEVRON_RIGHT,
+                        (calendar.on_navigate)(calendar.month.next()),
+                    )
+                }))
                 .width(7.0 * 32.0)
                 .align_y(iced::Alignment::Center);
 
-            months = months.push(Column::new().push(header).push(calendar.month_grid(month)).spacing(16));
+            months = months.push(
+                Column::new()
+                    .push(header)
+                    .push(calendar.month_grid(month))
+                    .spacing(16),
+            );
             month = month.next();
         }
 
@@ -419,7 +498,11 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
                     } else {
                         style::rounded(t.radius_md())
                     },
-                    shadow: if bordered { style::shadow_sm() } else { iced::Shadow::default() },
+                    shadow: if bordered {
+                        style::shadow_sm()
+                    } else {
+                        iced::Shadow::default()
+                    },
                     ..container::Style::default()
                 }
             })
@@ -443,15 +526,27 @@ mod tests {
         let date = Date::new(2026, 10, 16).unwrap();
         assert_eq!(date.weekday(), 5); // Friday
         assert_eq!(Date::from_days(0), Date::new(1970, 1, 1).unwrap());
-        assert_eq!(Date::new(2024, 2, 29).map(|d| d.add_days(1)), Date::new(2024, 3, 1));
+        assert_eq!(
+            Date::new(2024, 2, 29).map(|d| d.add_days(1)),
+            Date::new(2024, 3, 1)
+        );
         assert!(Date::new(2023, 2, 29).is_none());
         assert_eq!(date.to_string(), "October 16, 2026");
     }
 
     #[test]
     fn month_navigation() {
-        let month = Month { year: 2026, month: 12 };
-        assert_eq!(month.next(), Month { year: 2027, month: 1 });
+        let month = Month {
+            year: 2026,
+            month: 12,
+        };
+        assert_eq!(
+            month.next(),
+            Month {
+                year: 2027,
+                month: 1
+            }
+        );
         assert_eq!(month.next().previous(), month);
     }
 }

@@ -509,11 +509,13 @@ where
             .as_widget_mut()
             .overlay(&mut a[0], first, renderer, viewport, translation)
             .into_iter()
-            .chain(
-                self.second
-                    .as_widget_mut()
-                    .overlay(&mut b[0], second, renderer, viewport, translation),
-            )
+            .chain(self.second.as_widget_mut().overlay(
+                &mut b[0],
+                second,
+                renderer,
+                viewport,
+                translation,
+            ))
             .collect();
 
         (!overlays.is_empty()).then(|| overlay::Group::with_children(overlays).overlay())

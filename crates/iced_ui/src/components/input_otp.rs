@@ -47,7 +47,15 @@ pub fn input_otp<'a, Message: Clone + 'a>(
 
     InputOtp {
         input: TextInput::new("", &value)
-            .on_input(move |value| on_input(value.chars().filter(|c| !c.is_whitespace()).take(length).collect()))
+            .on_input(move |value| {
+                on_input(
+                    value
+                        .chars()
+                        .filter(|c| !c.is_whitespace())
+                        .take(length)
+                        .collect(),
+                )
+            })
             .size(1)
             .padding(0)
             .style(|_, _| text_input::Style {
@@ -138,7 +146,12 @@ impl Operation for FocusQuery {
         operate(self);
     }
 
-    fn focusable(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn operation::Focusable) {
+    fn focusable(
+        &mut self,
+        _id: Option<&Id>,
+        _bounds: Rectangle,
+        state: &mut dyn operation::Focusable,
+    ) {
         self.0 |= state.is_focused();
     }
 }
@@ -156,7 +169,9 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
     }
 
     fn children(&self) -> Vec<Tree> {
-        vec![Tree::new(&self.input as &dyn Widget<Message, Theme, iced::Renderer>)]
+        vec![Tree::new(
+            &self.input as &dyn Widget<Message, Theme, iced::Renderer>,
+        )]
     }
 
     fn diff(&self, tree: &mut Tree) {
@@ -167,7 +182,12 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
         Size::new(Length::Shrink, Length::Shrink)
     }
 
-    fn layout(&mut self, tree: &mut Tree, renderer: &iced::Renderer, _limits: &layout::Limits) -> layout::Node {
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        _limits: &layout::Limits,
+    ) -> layout::Node {
         let size = Size::new(self.width(), SLOT);
         let input = Widget::<Message, Theme, iced::Renderer>::layout(
             &mut self.input,
@@ -261,7 +281,9 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
         let radius = t.radius_md();
         let slots = self.slots();
         let chars: Vec<char> = self.value.chars().collect();
-        let active = state.focused.then(|| chars.len().min(self.length.saturating_sub(1)));
+        let active = state
+            .focused
+            .then(|| chars.len().min(self.length.saturating_sub(1)));
 
         let mut groups = Vec::new();
         let mut index = 0;
@@ -302,10 +324,26 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
                             color: ring.color,
                             width: ring.width,
                             radius: border::Radius {
-                                top_left: if corners.top_left > 0.0 { corners.top_left + ring.width } else { 0.0 },
-                                top_right: if corners.top_right > 0.0 { corners.top_right + ring.width } else { 0.0 },
-                                bottom_right: if corners.bottom_right > 0.0 { corners.bottom_right + ring.width } else { 0.0 },
-                                bottom_left: if corners.bottom_left > 0.0 { corners.bottom_left + ring.width } else { 0.0 },
+                                top_left: if corners.top_left > 0.0 {
+                                    corners.top_left + ring.width
+                                } else {
+                                    0.0
+                                },
+                                top_right: if corners.top_right > 0.0 {
+                                    corners.top_right + ring.width
+                                } else {
+                                    0.0
+                                },
+                                bottom_right: if corners.bottom_right > 0.0 {
+                                    corners.bottom_right + ring.width
+                                } else {
+                                    0.0
+                                },
+                                bottom_left: if corners.bottom_left > 0.0 {
+                                    corners.bottom_left + ring.width
+                                } else {
+                                    0.0
+                                },
                             },
                         },
                         ..renderer::Quad::default()
@@ -330,7 +368,11 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
                     },
                     ..renderer::Quad::default()
                 },
-                Background::Color(if t.is_dark() { alpha(p.input, 0.3) } else { p.background }),
+                Background::Color(if t.is_dark() {
+                    alpha(p.input, 0.3)
+                } else {
+                    p.background
+                }),
             );
 
             if let Some(c) = chars.get(i) {
@@ -355,7 +397,10 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
 
                 renderer.fill_quad(
                     renderer::Quad {
-                        bounds: Rectangle::new(Point::new(center.x - 0.5, center.y - 8.0), Size::new(1.0, 16.0)),
+                        bounds: Rectangle::new(
+                            Point::new(center.x - 0.5, center.y - 8.0),
+                            Size::new(1.0, 16.0),
+                        ),
                         ..renderer::Quad::default()
                     },
                     Background::Color(p.foreground),
@@ -380,11 +425,17 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
             }
 
             let previous = slots[end - 1] + (origin - Point::ORIGIN);
-            let center = Point::new(previous.x + previous.width + SEPARATOR / 2.0, previous.center_y());
+            let center = Point::new(
+                previous.x + previous.width + SEPARATOR / 2.0,
+                previous.center_y(),
+            );
 
             renderer.fill_quad(
                 renderer::Quad {
-                    bounds: Rectangle::new(Point::new(center.x - 5.0, center.y - 1.0), Size::new(10.0, 2.0)),
+                    bounds: Rectangle::new(
+                        Point::new(center.x - 5.0, center.y - 1.0),
+                        Size::new(10.0, 2.0),
+                    ),
                     border: border::rounded(1),
                     ..renderer::Quad::default()
                 },

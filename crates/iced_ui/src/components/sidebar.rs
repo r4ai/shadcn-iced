@@ -217,13 +217,21 @@ pub fn button_style(theme: &Theme, status: Status, active: bool) -> Style {
 
     Style {
         background: (active || hovered).then_some(Background::Color(p.sidebar_accent)),
-        text_color: if active || hovered { p.sidebar_accent_foreground } else { p.sidebar_foreground },
+        text_color: if active || hovered {
+            p.sidebar_accent_foreground
+        } else {
+            p.sidebar_foreground
+        },
         border: border::rounded(t.radius_md()),
         ..Style::default()
     }
 }
 
-fn menu_button<'a, Message: Clone + 'a>(item: Item<'a, Message>, collapsed: bool, sub: bool) -> Element<'a, Message> {
+fn menu_button<'a, Message: Clone + 'a>(
+    item: Item<'a, Message>,
+    collapsed: bool,
+    sub: bool,
+) -> Element<'a, Message> {
     let active = item.active;
     let label = item.label.clone();
 
@@ -258,14 +266,21 @@ fn menu_button<'a, Message: Clone + 'a>(item: Item<'a, Message>, collapsed: bool
 
     let button: Element<'a, Message> = Pressable::new(container(content).center_y(Length::Fill))
         .on_press_maybe(item.on_press)
-        .width(if collapsed { Length::Fixed(32.0) } else { Length::Fill })
+        .width(if collapsed {
+            Length::Fixed(32.0)
+        } else {
+            Length::Fill
+        })
         .height(if sub { 28 } else { 32 })
         .padding([0, 8])
         .style(move |theme, status| button_style(theme, status, active))
         .into();
 
     let button = if collapsed {
-        super::tooltip::tooltip(button, label).side(Side::Right).offset(8.0).into()
+        super::tooltip::tooltip(button, label)
+            .side(Side::Right)
+            .offset(8.0)
+            .into()
     } else {
         button
     };
@@ -274,20 +289,28 @@ fn menu_button<'a, Message: Clone + 'a>(item: Item<'a, Message>, collapsed: bool
         return button;
     }
 
-    let children = Column::with_children(item.children.into_iter().map(|child| menu_button(child, false, true)))
-        .spacing(4)
-        .padding(iced::Padding::ZERO.left(11).top(2).bottom(2));
+    let children = Column::with_children(
+        item.children
+            .into_iter()
+            .map(|child| menu_button(child, false, true)),
+    )
+    .spacing(4)
+    .padding(iced::Padding::ZERO.left(11).top(2).bottom(2));
 
-    let line = container(space().width(1).height(Length::Fill)).style(|theme: &Theme| container::Style {
-        background: Some(Background::Color(tokens(theme).palette.sidebar_border)),
-        ..container::Style::default()
-    });
+    let line =
+        container(space().width(1).height(Length::Fill)).style(|theme: &Theme| container::Style {
+            background: Some(Background::Color(tokens(theme).palette.sidebar_border)),
+            ..container::Style::default()
+        });
 
     // The guide line spans the nested items: a `Stack` sizes itself after its
     // first layer, so the line can fill its height.
     Column::new()
         .push(button)
-        .push(container(iced::widget::Stack::new().push(children).push(line)).padding(iced::Padding::ZERO.left(14)))
+        .push(
+            container(iced::widget::Stack::new().push(children).push(line))
+                .padding(iced::Padding::ZERO.left(14)),
+        )
         .spacing(4)
         .into()
 }
@@ -298,11 +321,11 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
 
         let groups = sidebar.groups.into_iter().map(|group| {
             let label = group.label.filter(|_| !collapsed).map(|label| {
-                container(text(label).size(style::text::XS).font(font::MEDIUM).style(|theme: &Theme| {
-                    text::Style {
+                container(text(label).size(style::text::XS).font(font::MEDIUM).style(
+                    |theme: &Theme| text::Style {
                         color: Some(alpha(tokens(theme).palette.sidebar_foreground, 0.7)),
-                    }
-                }))
+                    },
+                ))
                 .padding([0, 8])
                 .center_y(32)
             });
@@ -310,8 +333,13 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
             Column::new()
                 .push(label)
                 .push(
-                    Column::with_children(group.items.into_iter().map(|item| menu_button(item, collapsed, false)))
-                        .spacing(4),
+                    Column::with_children(
+                        group
+                            .items
+                            .into_iter()
+                            .map(|item| menu_button(item, collapsed, false)),
+                    )
+                    .spacing(4),
                 )
                 .padding(8)
                 .width(Length::Fill)
@@ -319,42 +347,58 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
         });
 
         let body = Column::new()
-            .push(sidebar.header.map(|header| container(header).padding(8).width(Length::Fill)))
-            .push(super::scroll_area::scroll_area(Column::with_children(groups)).height(Length::Fill))
-            .push(sidebar.footer.map(|footer| container(footer).padding(8).width(Length::Fill)))
+            .push(
+                sidebar
+                    .header
+                    .map(|header| container(header).padding(8).width(Length::Fill)),
+            )
+            .push(
+                super::scroll_area::scroll_area(Column::with_children(groups)).height(Length::Fill),
+            )
+            .push(
+                sidebar
+                    .footer
+                    .map(|footer| container(footer).padding(8).width(Length::Fill)),
+            )
             .height(Length::Fill);
 
         let variant = sidebar.variant;
         let width = if collapsed { WIDTH_ICON } else { sidebar.width };
 
-        let panel = container(body)
-            .width(width)
-            .height(Length::Fill)
-            .style(move |theme: &Theme| {
-                let t = tokens(theme);
-                let p = &t.palette;
+        let panel =
+            container(body)
+                .width(width)
+                .height(Length::Fill)
+                .style(move |theme: &Theme| {
+                    let t = tokens(theme);
+                    let p = &t.palette;
 
-                container::Style {
-                    background: Some(Background::Color(p.sidebar)),
-                    text_color: Some(p.sidebar_foreground),
-                    border: match variant {
-                        Variant::Floating => style::border(p.sidebar_border, t.radius_lg()),
-                        _ => border::rounded(0),
-                    },
-                    shadow: if variant == Variant::Floating { style::shadow_sm() } else { iced::Shadow::default() },
-                    ..container::Style::default()
-                }
-            });
+                    container::Style {
+                        background: Some(Background::Color(p.sidebar)),
+                        text_color: Some(p.sidebar_foreground),
+                        border: match variant {
+                            Variant::Floating => style::border(p.sidebar_border, t.radius_lg()),
+                            _ => border::rounded(0),
+                        },
+                        shadow: if variant == Variant::Floating {
+                            style::shadow_sm()
+                        } else {
+                            iced::Shadow::default()
+                        },
+                        ..container::Style::default()
+                    }
+                });
 
         match variant {
             Variant::Sidebar => {
                 let rule = super::separator::vertical_separator();
-                let rule = iced::widget::Rule::style(rule, |theme: &Theme| iced::widget::rule::Style {
-                    color: tokens(theme).palette.sidebar_border,
-                    radius: 0.0.into(),
-                    fill_mode: iced::widget::rule::FillMode::Full,
-                    snap: true,
-                });
+                let rule =
+                    iced::widget::Rule::style(rule, |theme: &Theme| iced::widget::rule::Style {
+                        color: tokens(theme).palette.sidebar_border,
+                        radius: 0.0.into(),
+                        fill_mode: iced::widget::rule::FillMode::Full,
+                        snap: true,
+                    });
 
                 if sidebar.side == Side::Right {
                     Row::new().push(rule).push(panel).into()
@@ -362,7 +406,9 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
                     Row::new().push(panel).push(rule).into()
                 }
             }
-            Variant::Floating | Variant::Inset => container(panel).padding(8).height(Length::Fill).into(),
+            Variant::Floating | Variant::Inset => {
+                container(panel).padding(8).height(Length::Fill).into()
+            }
         }
     }
 }
@@ -376,23 +422,32 @@ pub fn layout<'a, Message: Clone + 'a>(
     let variant = sidebar.variant;
     let side = sidebar.side;
 
-    let main = container(content).width(Length::Fill).height(Length::Fill).style(move |theme: &Theme| {
-        let t = tokens(theme);
+    let main = container(content)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(move |theme: &Theme| {
+            let t = tokens(theme);
 
-        container::Style {
-            background: Some(Background::Color(t.palette.background)),
-            border: if variant == Variant::Inset {
-                border::rounded(t.radius_xl())
-            } else {
-                border::rounded(0)
-            },
-            shadow: if variant == Variant::Inset { style::shadow_sm() } else { iced::Shadow::default() },
-            ..container::Style::default()
-        }
-    });
+            container::Style {
+                background: Some(Background::Color(t.palette.background)),
+                border: if variant == Variant::Inset {
+                    border::rounded(t.radius_xl())
+                } else {
+                    border::rounded(0)
+                },
+                shadow: if variant == Variant::Inset {
+                    style::shadow_sm()
+                } else {
+                    iced::Shadow::default()
+                },
+                ..container::Style::default()
+            }
+        });
 
     let main: Element<'a, Message> = if variant == Variant::Inset {
-        container(main).padding(iced::Padding::new(8.0).left(0)).into()
+        container(main)
+            .padding(iced::Padding::new(8.0).left(0))
+            .into()
     } else {
         main.into()
     };
@@ -405,7 +460,8 @@ pub fn layout<'a, Message: Clone + 'a>(
 
     container(row.height(Length::Fill))
         .style(move |theme: &Theme| container::Style {
-            background: (variant != Variant::Sidebar).then(|| Background::Color(tokens(theme).palette.sidebar)),
+            background: (variant != Variant::Sidebar)
+                .then(|| Background::Color(tokens(theme).palette.sidebar)),
             ..container::Style::default()
         })
         .into()

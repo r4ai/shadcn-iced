@@ -504,18 +504,18 @@ thread_local! {
 pub fn tokens(theme: &Theme) -> Tokens {
     if let Theme::Custom(custom) = theme {
         let cached = LAST.with_borrow(|last| {
-            last.as_ref().and_then(|(theme, tokens)| {
-                Arc::ptr_eq(theme, custom).then_some(*tokens)
-            })
+            last.as_ref()
+                .and_then(|(theme, tokens)| Arc::ptr_eq(theme, custom).then_some(*tokens))
         });
 
         if let Some(tokens) = cached {
             return tokens;
         }
 
-        let registered = REGISTRY.read().ok().and_then(|registry| {
-            registry.get(&custom.to_string()).copied()
-        });
+        let registered = REGISTRY
+            .read()
+            .ok()
+            .and_then(|registry| registry.get(&custom.to_string()).copied());
 
         if let Some(tokens) = registered {
             LAST.with_borrow_mut(|last| {
@@ -545,10 +545,8 @@ fn extended(base: iced::theme::Palette, tokens: &Tokens) -> Extended {
     extended.background.strongest = pair(p.muted_foreground, p.background);
 
     extended.primary.base = pair(p.primary, p.primary_foreground);
-    extended.primary.weak =
-        pair(mix(p.primary, p.background, 0.4), p.primary_foreground);
-    extended.primary.strong =
-        pair(mix(p.primary, p.background, 0.1), p.primary_foreground);
+    extended.primary.weak = pair(mix(p.primary, p.background, 0.4), p.primary_foreground);
+    extended.primary.strong = pair(mix(p.primary, p.background, 0.1), p.primary_foreground);
 
     extended.secondary.base = pair(p.secondary, p.secondary_foreground);
     extended.secondary.weak = pair(p.muted, p.muted_foreground);

@@ -150,7 +150,11 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
             .push(list)
             .push(tabs.content)
             .spacing(8)
-            .width(if fill || has_content { Length::Fill } else { Length::Shrink })
+            .width(if fill || has_content {
+                Length::Fill
+            } else {
+                Length::Shrink
+            })
             .into()
     }
 }
@@ -191,15 +195,27 @@ pub fn trigger(theme: &Theme, status: Status, active: bool, variant: Variant) ->
     let mut style = match variant {
         Variant::Default => Style {
             background: active.then(|| {
-                Background::Color(if dark { alpha(p.input, 0.3) } else { p.background })
+                Background::Color(if dark {
+                    alpha(p.input, 0.3)
+                } else {
+                    p.background
+                })
             }),
             text_color,
             border: Border {
-                color: if active && dark { p.input } else { Color::TRANSPARENT },
+                color: if active && dark {
+                    p.input
+                } else {
+                    Color::TRANSPARENT
+                },
                 width: 1.0,
                 radius: border::radius(t.radius_md()),
             },
-            shadow: if active && !dark { style::shadow_sm() } else { iced::Shadow::default() },
+            shadow: if active && !dark {
+                style::shadow_sm()
+            } else {
+                iced::Shadow::default()
+            },
             ..Style::default()
         },
         Variant::Line => Style {

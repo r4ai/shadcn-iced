@@ -46,7 +46,11 @@ fn trigger_style(theme: &Theme, status: Status) -> Style {
 
     Style {
         background: hovered.then_some(Background::Color(t.palette.accent)),
-        text_color: if hovered { t.palette.accent_foreground } else { t.palette.foreground },
+        text_color: if hovered {
+            t.palette.accent_foreground
+        } else {
+            t.palette.foreground
+        },
         border: border::rounded(t.radius_sm()),
         ..Style::default()
     }

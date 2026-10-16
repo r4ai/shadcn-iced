@@ -63,7 +63,9 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for AspectRatio<'_, Message
         let child = self.content.as_widget_mut().layout(
             &mut tree.children[0],
             renderer,
-            &layout::Limits::new(Size::ZERO, size).width(size.width).height(size.height),
+            &layout::Limits::new(Size::ZERO, size)
+                .width(size.width)
+                .height(size.height),
         );
 
         layout::Node::with_children(size, vec![child])

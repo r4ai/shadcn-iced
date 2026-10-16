@@ -93,31 +93,33 @@ impl<'a, Message: Clone + 'a> From<Checkbox<'a, Message>> for Element<'a, Messag
                         .style(move |theme: &Theme| text::Style {
                             color: Some(alpha(
                                 tokens(theme).palette.foreground,
-                                if disabled { style::DISABLED_OPACITY } else { 1.0 },
+                                if disabled {
+                                    style::DISABLED_OPACITY
+                                } else {
+                                    1.0
+                                },
                             )),
                         })
                 }))
                 .push(checkbox.description.map(|description| {
-                    text(description).size(style::text::SM).style(|theme: &Theme| text::Style {
-                        color: Some(tokens(theme).palette.muted_foreground),
-                    })
+                    text(description)
+                        .size(style::text::SM)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(tokens(theme).palette.muted_foreground),
+                        })
                 }))
                 .spacing(8)
         });
 
         let on_press = checkbox.on_toggle.map(|f| f(!checked));
 
-        Pressable::new(
-            Row::new()
-                .push(indicator)
-                .push(labels)
-                .spacing(8)
-                .align_y(if has_description {
-                    Alignment::Start
-                } else {
-                    Alignment::Center
-                }),
-        )
+        Pressable::new(Row::new().push(indicator).push(labels).spacing(8).align_y(
+            if has_description {
+                Alignment::Start
+            } else {
+                Alignment::Center
+            },
+        ))
         .on_press_maybe(if disabled { None } else { on_press })
         .disabled(disabled)
         .interaction(if disabled {
@@ -134,13 +136,21 @@ impl<'a, Message: Clone + 'a> From<Checkbox<'a, Message>> for Element<'a, Messag
 pub fn indicator(theme: &Theme, checked: bool, disabled: bool, invalid: bool) -> container::Style {
     let t = tokens(theme);
     let p = &t.palette;
-    let opacity = if disabled { style::DISABLED_OPACITY } else { 1.0 };
+    let opacity = if disabled {
+        style::DISABLED_OPACITY
+    } else {
+        1.0
+    };
 
     let (background, border) = if checked {
         (p.primary, p.primary)
     } else {
         (
-            if t.is_dark() { alpha(p.input, 0.3) } else { Color::TRANSPARENT },
+            if t.is_dark() {
+                alpha(p.input, 0.3)
+            } else {
+                Color::TRANSPARENT
+            },
             if invalid { p.destructive } else { p.input },
         )
     };

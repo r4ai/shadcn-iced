@@ -7,8 +7,8 @@ use iced_ui::bubble::{Align, Variant};
 use iced_ui::marker::Variant as MarkerVariant;
 use iced_ui::prelude::*;
 
-use iced::widget::{column, container, row};
 use iced::Fill;
+use iced::widget::{column, container, row};
 
 pub const BUBBLE: Page = Page {
     id: "bubble",
@@ -20,12 +20,18 @@ pub const BUBBLE: Page = Page {
             column![
                 bubble("Default bubble"),
                 bubble("Secondary bubble").variant(Variant::Secondary),
-                bubble("Muted bubble").variant(Variant::Muted).align(Align::End),
+                bubble("Muted bubble")
+                    .variant(Variant::Muted)
+                    .align(Align::End),
                 bubble("Tinted bubble").variant(Variant::Tinted),
-                bubble("Outline bubble").variant(Variant::Outline).align(Align::End),
+                bubble("Outline bubble")
+                    .variant(Variant::Outline)
+                    .align(Align::End),
                 bubble("Ghost bubble: no background, no padding.").variant(Variant::Ghost),
                 bubble("Something went wrong.").variant(Variant::Destructive),
-                bubble("Nice work on the release!").variant(Variant::Muted).reactions("🎉 3"),
+                bubble("Nice work on the release!")
+                    .variant(Variant::Muted)
+                    .reactions("🎉 3"),
             ]
             .spacing(12)
             .max_width(520),
@@ -39,7 +45,10 @@ fn conversation<'a>() -> Vec<iced::Element<'a, Message>> {
         message()
             .avatar(avatar("OM"))
             .header("Olivia Martin")
-            .bubble(bubble("Hey! Did you get a chance to look at the new components?").variant(Variant::Muted))
+            .bubble(
+                bubble("Hey! Did you get a chance to look at the new components?")
+                    .variant(Variant::Muted),
+            )
             .bubble(bubble("The overlays feel really snappy now.").variant(Variant::Muted))
             .into(),
         message()
@@ -55,7 +64,11 @@ fn conversation<'a>() -> Vec<iced::Element<'a, Message>> {
         marker("Olivia joined the call").icon(lucide::PHONE).into(),
         message()
             .avatar(avatar("OM"))
-            .bubble(bubble("Amazing, ship it! 🚀").variant(Variant::Muted).reactions("❤️ 1"))
+            .bubble(
+                bubble("Amazing, ship it! 🚀")
+                    .variant(Variant::Muted)
+                    .reactions("❤️ 1"),
+            )
             .into(),
     ]
 }
@@ -65,7 +78,10 @@ pub const MESSAGE: Page = Page {
     title: "Message",
     description: "A chat message with an avatar, a header, bubbles and a footer.",
     view: |_| {
-        example("Conversation", container(column(conversation()).spacing(24)).max_width(560))
+        example(
+            "Conversation",
+            container(column(conversation()).spacing(24)).max_width(560),
+        )
     },
 };
 
@@ -96,10 +112,18 @@ pub const ATTACHMENT: Page = Page {
             example(
                 "States",
                 row![
-                    attachment("report.pdf").icon(lucide::FILE_TEXT).description("2.4 MB")
+                    attachment("report.pdf")
+                        .icon(lucide::FILE_TEXT)
+                        .description("2.4 MB")
                         .action(attachment::remove_action(Message::Noop)),
-                    attachment("photo.jpg").icon(lucide::IMAGE).description("Uploading… 45%").state(State::Uploading),
-                    attachment("data.csv").icon(lucide::FILE_SPREADSHEET).description("Upload failed").state(State::Error),
+                    attachment("photo.jpg")
+                        .icon(lucide::IMAGE)
+                        .description("Uploading… 45%")
+                        .state(State::Uploading),
+                    attachment("data.csv")
+                        .icon(lucide::FILE_SPREADSHEET)
+                        .description("Upload failed")
+                        .state(State::Error),
                 ]
                 .spacing(12)
                 .wrap()
@@ -107,9 +131,16 @@ pub const ATTACHMENT: Page = Page {
             example(
                 "Sizes and orientation",
                 row![
-                    attachment::<Message>("notes.md").icon(lucide::FILE).size(attachment::Size::Sm),
-                    attachment::<Message>("notes.md").icon(lucide::FILE).size(attachment::Size::Xs),
-                    attachment::<Message>("design.fig").icon(lucide::FILE_IMAGE).description("8 MB").vertical(true),
+                    attachment::<Message>("notes.md")
+                        .icon(lucide::FILE)
+                        .size(attachment::Size::Sm),
+                    attachment::<Message>("notes.md")
+                        .icon(lucide::FILE)
+                        .size(attachment::Size::Xs),
+                    attachment::<Message>("design.fig")
+                        .icon(lucide::FILE_IMAGE)
+                        .description("8 MB")
+                        .vertical(true),
                 ]
                 .spacing(12)
                 .align_y(iced::Center)

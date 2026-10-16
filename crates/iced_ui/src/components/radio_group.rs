@@ -68,7 +68,8 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> RadioGroup<'a, T, Messag
         label: impl Into<String>,
         description: impl Into<String>,
     ) -> Self {
-        self.options.push((value, label.into(), Some(description.into()), false));
+        self.options
+            .push((value, label.into(), Some(description.into()), false));
         self
     }
 
@@ -112,7 +113,11 @@ fn item<'a, Message: Clone + 'a>(
         container(space().width(8).height(8)).style(move |theme: &Theme| container::Style {
             background: Some(Background::Color(alpha(
                 tokens(theme).palette.primary,
-                if disabled { style::DISABLED_OPACITY } else { 1.0 },
+                if disabled {
+                    style::DISABLED_OPACITY
+                } else {
+                    1.0
+                },
             ))),
             border: border::rounded(f32::MAX),
             ..container::Style::default()
@@ -134,24 +139,30 @@ fn item<'a, Message: Clone + 'a>(
                 .style(move |theme: &Theme| text::Style {
                     color: Some(alpha(
                         tokens(theme).palette.foreground,
-                        if disabled { style::DISABLED_OPACITY } else { 1.0 },
+                        if disabled {
+                            style::DISABLED_OPACITY
+                        } else {
+                            1.0
+                        },
                     )),
                 }),
         )
         .push(description.map(|description| {
-            text(description).size(style::text::SM).style(|theme: &Theme| text::Style {
-                color: Some(tokens(theme).palette.muted_foreground),
-            })
+            text(description)
+                .size(style::text::SM)
+                .style(|theme: &Theme| text::Style {
+                    color: Some(tokens(theme).palette.muted_foreground),
+                })
         }))
         .spacing(6);
 
-    Pressable::new(
-        Row::new()
-            .push(indicator)
-            .push(labels)
-            .spacing(12)
-            .align_y(if has_description { Alignment::Start } else { Alignment::Center }),
-    )
+    Pressable::new(Row::new().push(indicator).push(labels).spacing(12).align_y(
+        if has_description {
+            Alignment::Start
+        } else {
+            Alignment::Center
+        },
+    ))
     .on_press_maybe(on_select)
     .disabled(disabled)
     .interaction(if disabled {
@@ -167,11 +178,14 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<RadioGroup<'a, T, M
     for Element<'a, Message>
 {
     fn from(group: RadioGroup<'a, T, Message>) -> Self {
-        let items = group.options.into_iter().map(|(value, label, description, disabled)| {
-            let on_select = (!disabled && !group.disabled).then(|| (group.on_select)(value));
+        let items = group
+            .options
+            .into_iter()
+            .map(|(value, label, description, disabled)| {
+                let on_select = (!disabled && !group.disabled).then(|| (group.on_select)(value));
 
-            item(group.selected == Some(value), label, description, on_select)
-        });
+                item(group.selected == Some(value), label, description, on_select)
+            });
 
         match group.orientation {
             Orientation::Vertical => Column::with_children(items).spacing(12).into(),
@@ -184,7 +198,11 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<RadioGroup<'a, T, M
 pub fn indicator(theme: &Theme, disabled: bool) -> container::Style {
     let t = tokens(theme);
     let p = &t.palette;
-    let opacity = if disabled { style::DISABLED_OPACITY } else { 1.0 };
+    let opacity = if disabled {
+        style::DISABLED_OPACITY
+    } else {
+        1.0
+    };
 
     container::Style {
         background: Some(Background::Color(if t.is_dark() {

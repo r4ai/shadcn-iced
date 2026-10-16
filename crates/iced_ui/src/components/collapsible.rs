@@ -27,7 +27,12 @@ pub fn collapsible<'a, Message: Clone + 'a>(
 
     let header = |title: String| -> Element<'a, Message> {
         Row::new()
-            .push(text(title).size(style::text::SM).font(font::SEMIBOLD).width(Length::Fill))
+            .push(
+                text(title)
+                    .size(style::text::SM)
+                    .font(font::SEMIBOLD)
+                    .width(Length::Fill),
+            )
             .push(
                 icon_button::<Message>(lucide::CHEVRONS_UP_DOWN)
                     .variant(Variant::Ghost)

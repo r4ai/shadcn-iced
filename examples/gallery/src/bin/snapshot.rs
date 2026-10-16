@@ -107,12 +107,18 @@ fn main() {
             }
             "--base" => {
                 let name = args.next().expect("base color");
-                base = iced_ui::theme::BaseColor::ALL.iter().copied().find(|b| b.name() == name);
+                base = iced_ui::theme::BaseColor::ALL
+                    .iter()
+                    .copied()
+                    .find(|b| b.name() == name);
                 None
             }
             "--accent" => {
                 let name = args.next().expect("accent");
-                accent = iced_ui::theme::Accent::ALL.iter().copied().find(|a| a.name() == name);
+                accent = iced_ui::theme::Accent::ALL
+                    .iter()
+                    .copied()
+                    .find(|a| a.name() == name);
                 None
             }
             "--suffix" => {
@@ -126,7 +132,11 @@ fn main() {
         };
 
         if let Some(action) = action {
-            if is_live { live.push(action) } else { before.push(action) }
+            if is_live {
+                live.push(action)
+            } else {
+                before.push(action)
+            }
         }
     }
 
@@ -188,7 +198,9 @@ fn main() {
             let name = format!("{id}{suffix}-{mode}");
             let written = out.join(format!("{name}-tiny-skia.png"));
             let _ = std::fs::remove_file(&written);
-            snapshot.matches_image(out.join(format!("{name}.png"))).expect("write snapshot");
+            snapshot
+                .matches_image(out.join(format!("{name}.png")))
+                .expect("write snapshot");
             println!("{}", written.display());
         }
     }

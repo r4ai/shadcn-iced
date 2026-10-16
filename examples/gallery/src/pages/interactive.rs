@@ -35,13 +35,17 @@ pub const CHECKBOX: Page = Page {
         example(
             "Default",
             column![
-                checkbox(d.terms).label("Accept terms and conditions").on_toggle(|v| demo(DemoMessage::Terms(v))),
+                checkbox(d.terms)
+                    .label("Accept terms and conditions")
+                    .on_toggle(|v| demo(DemoMessage::Terms(v))),
                 checkbox(d.notifications)
                     .label("Enable notifications")
                     .description("You can enable or disable notifications at any time.")
                     .on_toggle(|v| demo(DemoMessage::Notifications(v))),
                 checkbox::<Message>(false).label("Disabled").disabled(true),
-                checkbox::<Message>(true).label("Checked and disabled").disabled(true),
+                checkbox::<Message>(true)
+                    .label("Checked and disabled")
+                    .disabled(true),
             ]
             .spacing(24),
         )
@@ -58,18 +62,24 @@ pub const SWITCH: Page = Page {
         column![
             example(
                 "Default",
-                switch(d.airplane).label("Airplane Mode").on_toggle(|v| demo(DemoMessage::Airplane(v)))
+                switch(d.airplane)
+                    .label("Airplane Mode")
+                    .on_toggle(|v| demo(DemoMessage::Airplane(v)))
             ),
             example(
                 "States",
                 column![
-                    switch(d.notifications).label("Notifications").on_toggle(|v| demo(DemoMessage::Notifications(v))),
+                    switch(d.notifications)
+                        .label("Notifications")
+                        .on_toggle(|v| demo(DemoMessage::Notifications(v))),
                     switch(d.airplane)
                         .size(iced_ui::switch::Size::Sm)
                         .label("Small")
                         .on_toggle(|v| demo(DemoMessage::Airplane(v))),
                     switch::<Message>(false).label("Disabled").disabled(true),
-                    switch::<Message>(true).label("Checked and disabled").disabled(true),
+                    switch::<Message>(true)
+                        .label("Checked and disabled")
+                        .disabled(true),
                 ]
                 .spacing(16)
             ),
@@ -86,18 +96,22 @@ pub const RADIO_GROUP: Page = Page {
         column![
             example(
                 "Default",
-                radio_group(Some(gallery.demo.density), |v| demo(DemoMessage::Density(v)))
-                    .option(0, "Default")
-                    .option(1, "Comfortable")
-                    .option(2, "Compact")
+                radio_group(Some(gallery.demo.density), |v| demo(DemoMessage::Density(
+                    v
+                )))
+                .option(0, "Default")
+                .option(1, "Comfortable")
+                .option(2, "Compact")
             ),
             example(
                 "With description",
                 container(
-                    radio_group(Some(gallery.demo.density), |v| demo(DemoMessage::Density(v)))
-                        .option_with_description(0, "Default", "Standard spacing for most use cases.")
-                        .option_with_description(1, "Comfortable", "More space between elements.")
-                        .disabled_option(2, "Compact (disabled)")
+                    radio_group(Some(gallery.demo.density), |v| demo(DemoMessage::Density(
+                        v
+                    )))
+                    .option_with_description(0, "Default", "Standard spacing for most use cases.")
+                    .option_with_description(1, "Comfortable", "More space between elements.")
+                    .disabled_option(2, "Compact (disabled)")
                 )
                 .max_width(360)
             ),
@@ -114,8 +128,13 @@ pub const SLIDER: Page = Page {
         example(
             "Default",
             column![
-                container(slider(0.0..=100.0, gallery.demo.volume, |v| demo(DemoMessage::Volume(v)))).max_width(360),
-                text(format!("{:.0}", gallery.demo.volume)).size(14).style(crate::muted),
+                container(slider(0.0..=100.0, gallery.demo.volume, |v| demo(
+                    DemoMessage::Volume(v)
+                )))
+                .max_width(360),
+                text(format!("{:.0}", gallery.demo.volume))
+                    .size(14)
+                    .style(crate::muted),
             ]
             .spacing(16)
             .align_x(Center),
@@ -134,7 +153,9 @@ pub const TOGGLE: Page = Page {
             example(
                 "Default",
                 row![
-                    toggle(has(Format::Bold)).icon(lucide::BOLD).on_toggle(|_| demo(DemoMessage::Format(Format::Bold))),
+                    toggle(has(Format::Bold))
+                        .icon(lucide::BOLD)
+                        .on_toggle(|_| demo(DemoMessage::Format(Format::Bold))),
                     toggle(has(Format::Italic))
                         .icon(lucide::ITALIC)
                         .variant(toggle::Variant::Outline)
@@ -151,9 +172,20 @@ pub const TOGGLE: Page = Page {
             example(
                 "Sizes",
                 row![
-                    toggle(has(Format::Italic)).icon(lucide::ITALIC).size(toggle::Size::Sm).variant(toggle::Variant::Outline).on_toggle(|_| demo(DemoMessage::Format(Format::Italic))),
-                    toggle(has(Format::Italic)).icon(lucide::ITALIC).variant(toggle::Variant::Outline).on_toggle(|_| demo(DemoMessage::Format(Format::Italic))),
-                    toggle(has(Format::Italic)).icon(lucide::ITALIC).size(toggle::Size::Lg).variant(toggle::Variant::Outline).on_toggle(|_| demo(DemoMessage::Format(Format::Italic))),
+                    toggle(has(Format::Italic))
+                        .icon(lucide::ITALIC)
+                        .size(toggle::Size::Sm)
+                        .variant(toggle::Variant::Outline)
+                        .on_toggle(|_| demo(DemoMessage::Format(Format::Italic))),
+                    toggle(has(Format::Italic))
+                        .icon(lucide::ITALIC)
+                        .variant(toggle::Variant::Outline)
+                        .on_toggle(|_| demo(DemoMessage::Format(Format::Italic))),
+                    toggle(has(Format::Italic))
+                        .icon(lucide::ITALIC)
+                        .size(toggle::Size::Lg)
+                        .variant(toggle::Variant::Outline)
+                        .on_toggle(|_| demo(DemoMessage::Format(Format::Italic))),
                 ]
                 .spacing(8)
                 .align_y(Center)
@@ -194,7 +226,11 @@ pub const TOGGLE_GROUP: Page = Page {
                     .spacing(8.0)
                     .item(Format::Bold, Some(lucide::BOLD), Some("Bold".into()))
                     .item(Format::Italic, Some(lucide::ITALIC), Some("Italic".into()))
-                    .item(Format::Underline, Some(lucide::UNDERLINE), Some("Underline".into()))
+                    .item(
+                        Format::Underline,
+                        Some(lucide::UNDERLINE),
+                        Some("Underline".into())
+                    )
             ),
         ]
         .into()
@@ -214,8 +250,15 @@ pub const TABS: Page = Page {
                 .description("Make changes to your account here. Click save when you're done.")
                 .content(
                     column![
-                        field("Name", input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))),
-                        field("Username", input("@peduarte", &d.username).on_input(|v| demo(DemoMessage::Username(v)))),
+                        field(
+                            "Name",
+                            input("Pedro Duarte", &d.name).on_input(|v| demo(DemoMessage::Name(v)))
+                        ),
+                        field(
+                            "Username",
+                            input("@peduarte", &d.username)
+                                .on_input(|v| demo(DemoMessage::Username(v)))
+                        ),
                     ]
                     .spacing(24),
                 )
@@ -225,7 +268,12 @@ pub const TABS: Page = Page {
                 .description("Change your password here. After saving, you'll be logged out.")
                 .content(
                     column![
-                        field("Current password", input("", &d.password).secure(true).on_input(|v| demo(DemoMessage::Password(v)))),
+                        field(
+                            "Current password",
+                            input("", &d.password)
+                                .secure(true)
+                                .on_input(|v| demo(DemoMessage::Password(v)))
+                        ),
                         field("New password", input("", "").secure(true)),
                     ]
                     .spacing(24),
@@ -312,12 +360,10 @@ pub const COLLAPSIBLE: Page = Page {
         example(
             "Default",
             container(
-                column![
-                    collapsible(
-                        "@peduarte starred 3 repositories",
-                        column![repo("@radix-ui/colors"), repo("@stitches/react")].spacing(8)
-                    ),
-                ]
+                column![collapsible(
+                    "@peduarte starred 3 repositories",
+                    column![repo("@radix-ui/colors"), repo("@stitches/react")].spacing(8)
+                ),]
                 .spacing(8),
             )
             .max_width(350),
@@ -336,10 +382,21 @@ pub const BUTTON_GROUP: Page = Page {
             example(
                 "Default",
                 row![
-                    button_group([button::button("Archive").variant(Outline).on_press(Message::Noop), button::button("Report").variant(Outline).on_press(Message::Noop)]),
                     button_group([
-                        button::button("Snooze").variant(Outline).on_press(Message::Noop),
-                        button::icon_button(lucide::ELLIPSIS).variant(Outline).on_press(Message::Noop),
+                        button::button("Archive")
+                            .variant(Outline)
+                            .on_press(Message::Noop),
+                        button::button("Report")
+                            .variant(Outline)
+                            .on_press(Message::Noop)
+                    ]),
+                    button_group([
+                        button::button("Snooze")
+                            .variant(Outline)
+                            .on_press(Message::Noop),
+                        button::icon_button(lucide::ELLIPSIS)
+                            .variant(Outline)
+                            .on_press(Message::Noop),
                     ]),
                 ]
                 .spacing(8)
@@ -347,8 +404,14 @@ pub const BUTTON_GROUP: Page = Page {
             example(
                 "Vertical",
                 button_group([
-                    button::icon_button(lucide::PLUS).variant(Outline).size(button::Size::IconSm).on_press(Message::Noop),
-                    button::icon_button(lucide::MINUS).variant(Outline).size(button::Size::IconSm).on_press(Message::Noop),
+                    button::icon_button(lucide::PLUS)
+                        .variant(Outline)
+                        .size(button::Size::IconSm)
+                        .on_press(Message::Noop),
+                    button::icon_button(lucide::MINUS)
+                        .variant(Outline)
+                        .size(button::Size::IconSm)
+                        .on_press(Message::Noop),
                 ])
                 .orientation(iced_ui::button_group::Orientation::Vertical)
             ),
@@ -368,18 +431,25 @@ pub const INPUT_GROUP: Page = Page {
             "Addons",
             container(
                 column![
-                    input_group(input("Search...", &d.search).on_input(|v| demo(DemoMessage::Search(v))))
-                        .leading_icon(lucide::SEARCH)
-                        .trailing_text("12 results"),
-                    input_group(input("example.com", &d.url).on_input(|v| demo(DemoMessage::Url(v))))
-                        .leading_text("https://")
-                        .trailing_icon(lucide::INFO),
-                    input_group(input("Enter your message", &d.chat).on_input(|v| demo(DemoMessage::Chat(v))))
-                        .trailing(
-                            button::icon_button(lucide::ARROW_UP)
-                                .size(button::Size::IconXs)
-                                .on_press(Message::Noop)
-                        ),
+                    input_group(
+                        input("Search...", &d.search).on_input(|v| demo(DemoMessage::Search(v)))
+                    )
+                    .leading_icon(lucide::SEARCH)
+                    .trailing_text("12 results"),
+                    input_group(
+                        input("example.com", &d.url).on_input(|v| demo(DemoMessage::Url(v)))
+                    )
+                    .leading_text("https://")
+                    .trailing_icon(lucide::INFO),
+                    input_group(
+                        input("Enter your message", &d.chat)
+                            .on_input(|v| demo(DemoMessage::Chat(v)))
+                    )
+                    .trailing(
+                        button::icon_button(lucide::ARROW_UP)
+                            .size(button::Size::IconXs)
+                            .on_press(Message::Noop)
+                    ),
                 ]
                 .spacing(16),
             )
@@ -400,23 +470,38 @@ pub const FIELD: Page = Page {
             container(
                 field_set("Payment Method")
                     .description("All transactions are secure and encrypted")
+                    .push(field(
+                        "Name on Card",
+                        input("Evil Rabbit", &d.name).on_input(|v| demo(DemoMessage::Name(v))),
+                    ))
                     .push(
-                        field("Name on Card", input("Evil Rabbit", &d.name).on_input(|v| demo(DemoMessage::Name(v))))
-                    )
-                    .push(
-                        field("Card Number", input("1234 5678 9012 3456", &d.card).on_input(|v| demo(DemoMessage::Card(v))))
-                            .description("Enter your 16-digit card number")
-                            .error_maybe((!d.card.is_empty() && d.card.len() < 16).then(|| "Card number is too short.".to_owned()))
+                        field(
+                            "Card Number",
+                            input("1234 5678 9012 3456", &d.card)
+                                .on_input(|v| demo(DemoMessage::Card(v))),
+                        )
+                        .description("Enter your 16-digit card number")
+                        .error_maybe(
+                            (!d.card.is_empty() && d.card.len() < 16)
+                                .then(|| "Card number is too short.".to_owned()),
+                        ),
                     )
                     .push(field_separator::<Message>(Some("Or")))
                     .push(
-                        field("Same as shipping address", checkbox(d.terms).on_toggle(|v| demo(DemoMessage::Terms(v))))
-                            .orientation(field::Orientation::Horizontal)
+                        field(
+                            "Same as shipping address",
+                            checkbox(d.terms).on_toggle(|v| demo(DemoMessage::Terms(v))),
+                        )
+                        .orientation(field::Orientation::Horizontal),
                     )
                     .push(
-                        field("Marketing emails", switch(d.notifications).on_toggle(|v| demo(DemoMessage::Notifications(v))))
-                            .description("Receive emails about new products, features, and more.")
-                            .orientation(field::Orientation::Responsive)
+                        field(
+                            "Marketing emails",
+                            switch(d.notifications)
+                                .on_toggle(|v| demo(DemoMessage::Notifications(v))),
+                        )
+                        .description("Receive emails about new products, features, and more.")
+                        .orientation(field::Orientation::Responsive),
                     ),
             )
             .max_width(420),
@@ -432,9 +517,11 @@ pub const NATIVE_SELECT: Page = Page {
         example(
             "Default",
             container(
-                native_select(&super::FRUITS[..], gallery.demo.fruit, |f| demo(DemoMessage::Fruit(f)))
-                    .placeholder("Select a fruit")
-                    .width(Fill),
+                native_select(&super::FRUITS[..], gallery.demo.fruit, |f| {
+                    demo(DemoMessage::Fruit(f))
+                })
+                .placeholder("Select a fruit")
+                .width(Fill),
             )
             .max_width(240),
         )
@@ -469,7 +556,9 @@ pub const RESIZABLE: Page = Page {
     title: "Resizable",
     description: "Accessible resizable panel groups and layouts with keyboard support.",
     view: |_| {
-        let panel = |label: &'static str| container(text(label).size(14).font(iced_ui::font::SEMIBOLD)).center(Fill);
+        let panel = |label: &'static str| {
+            container(text(label).size(14).font(iced_ui::font::SEMIBOLD)).center(Fill)
+        };
 
         example(
             "Default",

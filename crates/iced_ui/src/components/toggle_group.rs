@@ -19,11 +19,11 @@
 //! ```
 use super::toggle::{self, Position, Size, Variant};
 
-use iced_ui_core::icon::Icon;
 use iced_ui_core::Element;
+use iced_ui_core::icon::Icon;
 
-use iced::widget::Row;
 use iced::Length;
+use iced::widget::Row;
 
 /// A toggle group. See the [module documentation](self).
 pub struct ToggleGroup<'a, T, Message> {
@@ -112,39 +112,51 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<ToggleGroup<'a, T, 
         let fill = group.width != Length::Shrink;
         let variant = group.variant;
 
-        let items = group
-            .items
-            .into_iter()
-            .enumerate()
-            .map(|(index, (value, icon, label, disabled))| {
-                let on = group.selected.contains(&value);
-                let message = (group.on_toggle)(value);
+        let items =
+            group
+                .items
+                .into_iter()
+                .enumerate()
+                .map(|(index, (value, icon, label, disabled))| {
+                    let on = group.selected.contains(&value);
+                    let message = (group.on_toggle)(value);
 
-                let mut toggle = toggle::toggle(on)
-                    .variant(group.variant)
-                    .size(group.size)
-                    .position(if joined { Position::of(index, count) } else { Position::Alone })
-                    .disabled(disabled)
-                    .on_toggle(move |_| message.clone());
+                    let mut toggle = toggle::toggle(on)
+                        .variant(group.variant)
+                        .size(group.size)
+                        .position(if joined {
+                            Position::of(index, count)
+                        } else {
+                            Position::Alone
+                        })
+                        .disabled(disabled)
+                        .on_toggle(move |_| message.clone());
 
-                if let Some(icon) = icon {
-                    toggle = toggle.icon(icon);
-                }
+                    if let Some(icon) = icon {
+                        toggle = toggle.icon(icon);
+                    }
 
-                if let Some(label) = label {
-                    toggle = toggle.label(label);
-                }
+                    if let Some(label) = label {
+                        toggle = toggle.label(label);
+                    }
 
-                if fill {
-                    toggle = toggle.width(Length::Fill);
-                }
+                    if fill {
+                        toggle = toggle.width(Length::Fill);
+                    }
 
-                Element::from(toggle)
-            });
+                    Element::from(toggle)
+                });
 
         // Joined outline toggles share their borders, like `border-l-0`.
-        let spacing = if joined && variant == Variant::Outline { -1.0 } else { group.spacing };
+        let spacing = if joined && variant == Variant::Outline {
+            -1.0
+        } else {
+            group.spacing
+        };
 
-        Row::with_children(items).spacing(spacing).width(group.width).into()
+        Row::with_children(items)
+            .spacing(spacing)
+            .width(group.width)
+            .into()
     }
 }

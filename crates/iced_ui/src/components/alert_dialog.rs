@@ -49,7 +49,10 @@ pub struct AlertDialog<'a, Message> {
 }
 
 /// Creates an [`AlertDialog`] shown over the whole window when `open`.
-pub fn alert_dialog<'a, Message: Clone + 'a>(base: impl Into<Element<'a, Message>>, open: bool) -> AlertDialog<'a, Message> {
+pub fn alert_dialog<'a, Message: Clone + 'a>(
+    base: impl Into<Element<'a, Message>>,
+    open: bool,
+) -> AlertDialog<'a, Message> {
     AlertDialog {
         base: base.into(),
         open,
@@ -95,7 +98,11 @@ impl<'a, Message: Clone + 'a> AlertDialog<'a, Message> {
 
     /// Sets a destructive action button.
     pub fn destructive_action(mut self, label: impl Into<String>, message: Message) -> Self {
-        self.action = Some(button(label).variant(Variant::Destructive).on_press(message));
+        self.action = Some(
+            button(label)
+                .variant(Variant::Destructive)
+                .on_press(message),
+        );
         self
     }
 
@@ -122,11 +129,17 @@ impl<'a, Message: Clone + 'a> From<AlertDialog<'a, Message>> for Element<'a, Mes
             })
         });
 
-        let fill = |button: Button<'a, Message>| if small { button.width(Length::Fill) } else { button };
+        let fill = |button: Button<'a, Message>| {
+            if small {
+                button.width(Length::Fill)
+            } else {
+                button
+            }
+        };
 
-        let cancel = alert
-            .cancel
-            .map(|(label, message)| fill(button(label).variant(Variant::Outline).on_press(message)));
+        let cancel = alert.cancel.map(|(label, message)| {
+            fill(button(label).variant(Variant::Outline).on_press(message))
+        });
 
         let buttons = Row::new()
             .push((!small).then(space::horizontal))
@@ -140,7 +153,11 @@ impl<'a, Message: Clone + 'a> From<AlertDialog<'a, Message>> for Element<'a, Mes
             .push(super::dialog::header(alert.title, alert.description, small))
             .push(buttons)
             .spacing(16)
-            .align_x(if small { Alignment::Center } else { Alignment::Start })
+            .align_x(if small {
+                Alignment::Center
+            } else {
+                Alignment::Start
+            })
             .width(Length::Fill);
 
         let panel = container(body)

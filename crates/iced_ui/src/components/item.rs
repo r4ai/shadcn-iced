@@ -143,7 +143,9 @@ impl<'a, Message: Clone + 'a> From<Item<'a, Message>> for Element<'a, Message> {
             .push(item.media)
             .push(content)
             .push((!item.actions.is_empty()).then(|| {
-                Row::with_children(item.actions).spacing(8).align_y(Alignment::Center)
+                Row::with_children(item.actions)
+                    .spacing(8)
+                    .align_y(Alignment::Center)
             }))
             .spacing(gap)
             .align_y(Alignment::Center);

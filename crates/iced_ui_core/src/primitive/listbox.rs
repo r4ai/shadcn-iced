@@ -12,7 +12,10 @@ use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
-use iced::{Background, Border, Color, Element, Event, Length, Padding, Point, Rectangle, Size, Vector, mouse, touch};
+use iced::{
+    Background, Border, Color, Element, Event, Length, Padding, Point, Rectangle, Size, Vector,
+    mouse, touch,
+};
 
 /// The look of the highlighted item of a [`Listbox`].
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -160,7 +163,9 @@ struct State {
 impl<Message, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
     fn active(&self, state: &State) -> Option<usize> {
         let active = state.active.filter(|index| {
-            self.children.get(*index).is_some_and(|child| child.selectable)
+            self.children
+                .get(*index)
+                .is_some_and(|child| child.selectable)
         });
 
         if active.is_none() && self.highlight_first && !state.touched {
@@ -197,7 +202,8 @@ impl<Message, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
     }
 }
 
-impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Listbox<'a, Message, Theme, Renderer>
+impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
+    for Listbox<'a, Message, Theme, Renderer>
 where
     Message: Clone + 'a,
     Renderer: iced::advanced::Renderer + 'a,
@@ -211,18 +217,32 @@ where
     }
 
     fn children(&self) -> Vec<Tree> {
-        self.children.iter().map(|child| Tree::new(&child.content)).collect()
+        self.children
+            .iter()
+            .map(|child| Tree::new(&child.content))
+            .collect()
     }
 
     fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(&self.children.iter().map(|child| &child.content).collect::<Vec<_>>());
+        tree.diff_children(
+            &self
+                .children
+                .iter()
+                .map(|child| &child.content)
+                .collect::<Vec<_>>(),
+        );
     }
 
     fn size(&self) -> Size<Length> {
         Size::new(self.width, Length::Shrink)
     }
 
-    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
         let limits = limits.width(self.width).shrink(self.padding);
         let max_width = limits.max().width;
 
@@ -245,7 +265,10 @@ where
         }
 
         let width = if self.width == Length::Shrink {
-            width.max(limits.min().width).max(self.min_width).min(max_width)
+            width
+                .max(limits.min().width)
+                .max(self.min_width)
+                .min(max_width)
         } else {
             max_width
         };
@@ -275,16 +298,33 @@ where
         }
 
         layout::Node::with_children(
-            Size::new(width + self.padding.left + self.padding.right, y + self.padding.bottom),
+            Size::new(
+                width + self.padding.left + self.padding.right,
+                y + self.padding.bottom,
+            ),
             children,
         )
     }
 
-    fn operate(&mut self, tree: &mut Tree, layout: Layout<'_>, renderer: &Renderer, operation: &mut dyn Operation) {
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
         operation.container(None, layout.bounds());
         operation.traverse(&mut |operation| {
-            for ((child, tree), layout) in self.children.iter_mut().zip(&mut tree.children).zip(layout.children()) {
-                child.content.as_widget_mut().operate(tree, layout, renderer, operation);
+            for ((child, tree), layout) in self
+                .children
+                .iter_mut()
+                .zip(&mut tree.children)
+                .zip(layout.children())
+            {
+                child
+                    .content
+                    .as_widget_mut()
+                    .operate(tree, layout, renderer, operation);
             }
         });
     }
@@ -300,11 +340,15 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        for ((child, tree), layout) in self.children.iter_mut().zip(&mut tree.children).zip(layout.children()) {
-            child
-                .content
-                .as_widget_mut()
-                .update(tree, event, layout, cursor, renderer, clipboard, shell, viewport);
+        for ((child, tree), layout) in self
+            .children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+        {
+            child.content.as_widget_mut().update(
+                tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+            );
         }
 
         if shell.is_event_captured() {
@@ -322,7 +366,8 @@ where
         let state = tree.state.downcast_mut::<State>();
 
         match event {
-            Event::Mouse(mouse::Event::CursorMoved { .. }) | Event::Touch(touch::Event::FingerMoved { .. }) => {
+            Event::Mouse(mouse::Event::CursorMoved { .. })
+            | Event::Touch(touch::Event::FingerMoved { .. }) => {
                 let next = match hovered {
                     Some(index) => Some(index),
                     None if self.clear_on_leave => None,
@@ -353,37 +398,38 @@ where
             | Event::Touch(touch::Event::FingerLifted { .. }) => {
                 if let Some(pressed) = state.pressed.take()
                     && hovered == Some(pressed)
-                        && let Some(message) = &self.children[pressed].on_select
-                    {
-                        shell.publish(message.clone());
-                        shell.capture_event();
-                    }
-            }
-            Event::Keyboard(keyboard::Event::KeyPressed { key: keyboard::Key::Named(named), .. })
-                if self.keyboard =>
-            {
-                match named {
-                    key::Named::ArrowDown | key::Named::ArrowUp => {
-                        state.active = self.step(active, *named == key::Named::ArrowDown);
-                        state.touched = true;
-                        shell.request_redraw();
-                        shell.capture_event();
-                    }
-                    key::Named::Home | key::Named::End => {
-                        state.active = self.step(None, *named == key::Named::Home);
-                        state.touched = true;
-                        shell.request_redraw();
-                        shell.capture_event();
-                    }
-                    key::Named::Enter => {
-                        if let Some(message) = active.and_then(|index| self.children[index].on_select.clone()) {
-                            shell.publish(message);
-                            shell.capture_event();
-                        }
-                    }
-                    _ => {}
+                    && let Some(message) = &self.children[pressed].on_select
+                {
+                    shell.publish(message.clone());
+                    shell.capture_event();
                 }
             }
+            Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(named),
+                ..
+            }) if self.keyboard => match named {
+                key::Named::ArrowDown | key::Named::ArrowUp => {
+                    state.active = self.step(active, *named == key::Named::ArrowDown);
+                    state.touched = true;
+                    shell.request_redraw();
+                    shell.capture_event();
+                }
+                key::Named::Home | key::Named::End => {
+                    state.active = self.step(None, *named == key::Named::Home);
+                    state.touched = true;
+                    shell.request_redraw();
+                    shell.capture_event();
+                }
+                key::Named::Enter => {
+                    if let Some(message) =
+                        active.and_then(|index| self.children[index].on_select.clone())
+                    {
+                        shell.publish(message);
+                        shell.capture_event();
+                    }
+                }
+                _ => {}
+            },
             _ => {}
         }
     }
@@ -401,7 +447,13 @@ where
         let active = self.active(tree.state.downcast_ref::<State>());
         let highlight = (self.style)(theme);
 
-        for (index, ((child, tree), layout)) in self.children.iter().zip(&tree.children).zip(layout.children()).enumerate() {
+        for (index, ((child, tree), layout)) in self
+            .children
+            .iter()
+            .zip(&tree.children)
+            .zip(layout.children())
+            .enumerate()
+        {
             let is_active = active == Some(index);
 
             if is_active {
@@ -420,7 +472,11 @@ where
                 renderer,
                 theme,
                 &renderer::Style {
-                    text_color: if is_active { highlight.text_color } else { style.text_color },
+                    text_color: if is_active {
+                        highlight.text_color
+                    } else {
+                        style.text_color
+                    },
                 },
                 layout,
                 cursor,
@@ -442,7 +498,10 @@ where
             .zip(&tree.children)
             .zip(layout.children())
             .map(|((child, tree), layout)| {
-                let interaction = child.content.as_widget().mouse_interaction(tree, layout, cursor, viewport, renderer);
+                let interaction = child
+                    .content
+                    .as_widget()
+                    .mouse_interaction(tree, layout, cursor, viewport, renderer);
 
                 if interaction == mouse::Interaction::None && cursor.is_over(layout.bounds()) {
                     if child.on_select.is_some() {
@@ -472,7 +531,10 @@ where
             .zip(&mut tree.children)
             .zip(layout.children())
             .filter_map(|((child, tree), layout)| {
-                child.content.as_widget_mut().overlay(tree, layout, renderer, viewport, translation)
+                child
+                    .content
+                    .as_widget_mut()
+                    .overlay(tree, layout, renderer, viewport, translation)
             })
             .collect();
 
@@ -480,7 +542,8 @@ where
     }
 }
 
-impl<'a, Message, Theme, Renderer> From<Listbox<'a, Message, Theme, Renderer>> for Element<'a, Message, Theme, Renderer>
+impl<'a, Message, Theme, Renderer> From<Listbox<'a, Message, Theme, Renderer>>
+    for Element<'a, Message, Theme, Renderer>
 where
     Message: Clone + 'a,
     Theme: 'a,
@@ -533,7 +596,8 @@ impl<'a, Message, Theme, Renderer> ItemRow<'a, Message, Theme, Renderer> {
     }
 }
 
-impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer> for ItemRow<'a, Message, Theme, Renderer>
+impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
+    for ItemRow<'a, Message, Theme, Renderer>
 where
     Renderer: iced::advanced::Renderer + 'a,
 {
@@ -553,23 +617,34 @@ where
         Size::new(Length::Shrink, Length::Shrink)
     }
 
-    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
         let limits = limits.shrink(self.padding);
         let loose = layout::Limits::new(Size::ZERO, limits.max());
 
-        let mut trailing = self
-            .trailing
-            .as_mut()
-            .map(|trailing| trailing.as_widget_mut().layout(&mut tree.children[1], renderer, &loose));
+        let mut trailing = self.trailing.as_mut().map(|trailing| {
+            trailing
+                .as_widget_mut()
+                .layout(&mut tree.children[1], renderer, &loose)
+        });
 
-        let trailing_width = trailing.as_ref().map_or(0.0, |node| node.size().width + self.spacing);
+        let trailing_width = trailing
+            .as_ref()
+            .map_or(0.0, |node| node.size().width + self.spacing);
 
         let content = self.content.as_widget_mut().layout(
             &mut tree.children[0],
             renderer,
             &layout::Limits::new(
                 Size::ZERO,
-                Size::new((limits.max().width - trailing_width).max(0.0), limits.max().height),
+                Size::new(
+                    (limits.max().width - trailing_width).max(0.0),
+                    limits.max().height,
+                ),
             ),
         );
 
@@ -605,14 +680,24 @@ where
         )
     }
 
-    fn operate(&mut self, tree: &mut Tree, layout: Layout<'_>, renderer: &Renderer, operation: &mut dyn Operation) {
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
         let mut layouts = layout.children();
         let content = layouts.next().unwrap();
 
-        self.content.as_widget_mut().operate(&mut tree.children[0], content, renderer, operation);
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], content, renderer, operation);
 
         if let (Some(trailing), Some(layout)) = (self.trailing.as_mut(), layouts.next()) {
-            trailing.as_widget_mut().operate(&mut tree.children[1], layout, renderer, operation);
+            trailing
+                .as_widget_mut()
+                .operate(&mut tree.children[1], layout, renderer, operation);
         }
     }
 
@@ -668,14 +753,26 @@ where
         let mut layouts = layout.children();
         let content = layouts.next().unwrap();
 
-        self.content
-            .as_widget()
-            .draw(&tree.children[0], renderer, theme, style, content, cursor, viewport);
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            content,
+            cursor,
+            viewport,
+        );
 
         if let (Some(trailing), Some(layout)) = (self.trailing.as_ref(), layouts.next()) {
-            trailing
-                .as_widget()
-                .draw(&tree.children[1], renderer, theme, style, layout, cursor, viewport);
+            trailing.as_widget().draw(
+                &tree.children[1],
+                renderer,
+                theme,
+                style,
+                layout,
+                cursor,
+                viewport,
+            );
         }
     }
 
@@ -690,17 +787,24 @@ where
         let mut layouts = layout.children();
         let content = layouts.next().unwrap();
 
-        let interaction = self
-            .content
-            .as_widget()
-            .mouse_interaction(&tree.children[0], content, cursor, viewport, renderer);
+        let interaction = self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            content,
+            cursor,
+            viewport,
+            renderer,
+        );
 
         match (self.trailing.as_ref(), layouts.next()) {
-            (Some(trailing), Some(layout)) => interaction.max(
-                trailing
-                    .as_widget()
-                    .mouse_interaction(&tree.children[1], layout, cursor, viewport, renderer),
-            ),
+            (Some(trailing), Some(layout)) => {
+                interaction.max(trailing.as_widget().mouse_interaction(
+                    &tree.children[1],
+                    layout,
+                    cursor,
+                    viewport,
+                    renderer,
+                ))
+            }
             _ => interaction,
         }
     }
@@ -725,14 +829,21 @@ where
             .collect();
 
         if let (Some(trailing), Some(layout)) = (self.trailing.as_mut(), layouts.next()) {
-            overlays.extend(trailing.as_widget_mut().overlay(&mut rest[0], layout, renderer, viewport, translation));
+            overlays.extend(trailing.as_widget_mut().overlay(
+                &mut rest[0],
+                layout,
+                renderer,
+                viewport,
+                translation,
+            ));
         }
 
         (!overlays.is_empty()).then(|| overlay::Group::with_children(overlays).overlay())
     }
 }
 
-impl<'a, Message, Theme, Renderer> From<ItemRow<'a, Message, Theme, Renderer>> for Element<'a, Message, Theme, Renderer>
+impl<'a, Message, Theme, Renderer> From<ItemRow<'a, Message, Theme, Renderer>>
+    for Element<'a, Message, Theme, Renderer>
 where
     Message: 'a,
     Theme: 'a,

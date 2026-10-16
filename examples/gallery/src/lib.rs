@@ -6,8 +6,8 @@ use iced_ui::theme::{Accent, BaseColor};
 use iced_ui::{font, style, tokens};
 
 use iced::widget::{column, container, row, rule, space, text};
-use iced_ui::scroll_area::scroll_area as scrollable;
 use iced::{Element, Fill, Length, Task, Theme};
+use iced_ui::scroll_area::scroll_area as scrollable;
 
 pub use pages::{PAGES, Page};
 
@@ -103,50 +103,65 @@ impl Gallery {
 
         let page = &PAGES[self.page];
 
-        let nav = iced_ui::sidebar::sidebar()
-            .header(
-                row![
-                    container(lucide::COMMAND.sized(16)).center(32).style(|theme: &Theme| {
-                        let t = tokens(theme);
-                        container::Style {
-                            background: Some(t.palette.sidebar_primary.into()),
-                            text_color: Some(t.palette.sidebar_primary_foreground),
-                            border: style::rounded(t.radius_lg()),
-                            ..Default::default()
-                        }
-                    }),
-                    column![
-                        text("iced-ui").size(style::text::SM).font(font::SEMIBOLD),
-                        text(format!("{} components", PAGES.len())).size(style::text::XS),
-                    ],
-                ]
-                .spacing(8)
-                .align_y(iced::Center),
-            )
-            .group(PAGES.iter().enumerate().fold(group("Components"), |group, (index, info)| {
-                group.item(item(info.title).active(index == self.page).on_press(Message::Navigate(index)))
-            }))
-            .width(240.0);
+        let nav =
+            iced_ui::sidebar::sidebar()
+                .header(
+                    row![
+                        container(lucide::COMMAND.sized(16))
+                            .center(32)
+                            .style(|theme: &Theme| {
+                                let t = tokens(theme);
+                                container::Style {
+                                    background: Some(t.palette.sidebar_primary.into()),
+                                    text_color: Some(t.palette.sidebar_primary_foreground),
+                                    border: style::rounded(t.radius_lg()),
+                                    ..Default::default()
+                                }
+                            }),
+                        column![
+                            text("iced-ui").size(style::text::SM).font(font::SEMIBOLD),
+                            text(format!("{} components", PAGES.len())).size(style::text::XS),
+                        ],
+                    ]
+                    .spacing(8)
+                    .align_y(iced::Center),
+                )
+                .group(PAGES.iter().enumerate().fold(
+                    group("Components"),
+                    |group, (index, info)| {
+                        group.item(
+                            item(info.title)
+                                .active(index == self.page)
+                                .on_press(Message::Navigate(index)),
+                        )
+                    },
+                ))
+                .width(240.0);
 
         let base = iced_ui::select::select(Some(self.base), Message::Base)
             .options(BaseColor::ALL.iter().copied())
             .size(iced_ui::select::Size::Sm)
             .width(120);
 
-        let accent = Accent::ALL.iter().fold(
-            iced_ui::select::select(Some(self.accent), Message::Accent).option(None, "No accent"),
-            |select, accent| select.option(Some(*accent), accent.to_string()),
-        )
-        .size(iced_ui::select::Size::Sm)
-        .width(130);
+        let accent = Accent::ALL
+            .iter()
+            .fold(
+                iced_ui::select::select(Some(self.accent), Message::Accent)
+                    .option(None, "No accent"),
+                |select, accent| select.option(Some(*accent), accent.to_string()),
+            )
+            .size(iced_ui::select::Size::Sm)
+            .width(130);
 
-        let radius = iced_ui::toggle_group::toggle_group(&[self.radius as u32], |r| Message::Radius(r as f32))
-            .variant(iced_ui::toggle::Variant::Outline)
-            .size(iced_ui::toggle::Size::Sm)
-            .label(0, "0")
-            .label(6, "0.3")
-            .label(10, "0.6")
-            .label(16, "1.0");
+        let radius = iced_ui::toggle_group::toggle_group(&[self.radius as u32], |r| {
+            Message::Radius(r as f32)
+        })
+        .variant(iced_ui::toggle::Variant::Outline)
+        .size(iced_ui::toggle::Size::Sm)
+        .label(0, "0")
+        .label(6, "0.3")
+        .label(10, "0.6")
+        .label(16, "1.0");
 
         let header = row![
             text(page.title).size(style::text::SM).font(font::MEDIUM),
@@ -183,9 +198,11 @@ impl Gallery {
 
         let main = column![header, rule::horizontal(1).style(separator), content];
 
-        iced_ui::sonner::toaster(iced_ui::sidebar::layout(nav, main), &self.demo.toasts, |id| {
-            Message::Demo(pages::DemoMessage::DismissToast(id))
-        })
+        iced_ui::sonner::toaster(
+            iced_ui::sidebar::layout(nav, main),
+            &self.demo.toasts,
+            |id| Message::Demo(pages::DemoMessage::DismissToast(id)),
+        )
         .into()
     }
 }

@@ -41,7 +41,11 @@ pub fn accordion<'a, Message: Clone + 'a>() -> Accordion<'a, Message> {
 
 impl<'a, Message: Clone + 'a> Accordion<'a, Message> {
     /// Appends an item.
-    pub fn item(mut self, title: impl Into<String>, content: impl Into<Element<'a, Message>>) -> Self {
+    pub fn item(
+        mut self,
+        title: impl Into<String>,
+        content: impl Into<Element<'a, Message>>,
+    ) -> Self {
         self.items.push((title.into(), content.into(), false));
         self
     }
@@ -58,7 +62,11 @@ impl<'a, Message: Clone + 'a> Accordion<'a, Message> {
 
     /// Only allows one item to be open at a time (`type="single"
     /// collapsible`). `open` is the index of the open item.
-    pub fn single(mut self, open: Option<usize>, on_change: impl Fn(Option<usize>) -> Message + 'a) -> Self {
+    pub fn single(
+        mut self,
+        open: Option<usize>,
+        on_change: impl Fn(Option<usize>) -> Message + 'a,
+    ) -> Self {
         self.single = Some((open, Box::new(on_change)));
         self
     }
@@ -79,11 +87,15 @@ fn trigger<'a, Message: 'a>(title: &str, open: bool) -> Element<'a, Message> {
                 .width(Length::Fill),
         )
         .push(
-            (if open { lucide::CHEVRON_UP } else { lucide::CHEVRON_DOWN })
-                .sized(16)
-                .style(|theme: &Theme| text::Style {
-                    color: Some(tokens(theme).palette.muted_foreground),
-                }),
+            (if open {
+                lucide::CHEVRON_UP
+            } else {
+                lucide::CHEVRON_DOWN
+            })
+            .sized(16)
+            .style(|theme: &Theme| text::Style {
+                color: Some(tokens(theme).palette.muted_foreground),
+            }),
         )
         .spacing(16)
         .align_y(Alignment::Center)
@@ -96,26 +108,31 @@ impl<'a, Message: Clone + 'a> From<Accordion<'a, Message>> for Element<'a, Messa
         let count = accordion.items.len();
         let single = accordion.single;
 
-        let items = accordion.items.into_iter().enumerate().map(|(index, (title, content, default_open))| {
-            let content = container(content).padding(iced::Padding::ZERO.bottom(16)).width(Length::Fill);
-            let mut disclosure = Disclosure::new(trigger(&title, false), trigger(&title, true), content)
-                .default_open(default_open);
+        let items = accordion.items.into_iter().enumerate().map(
+            |(index, (title, content, default_open))| {
+                let content = container(content)
+                    .padding(iced::Padding::ZERO.bottom(16))
+                    .width(Length::Fill);
+                let mut disclosure =
+                    Disclosure::new(trigger(&title, false), trigger(&title, true), content)
+                        .default_open(default_open);
 
-            if let Some((open, on_change)) = &single {
-                let is_open = *open == Some(index);
-                let message = on_change(if is_open { None } else { Some(index) });
+                if let Some((open, on_change)) = &single {
+                    let is_open = *open == Some(index);
+                    let message = on_change(if is_open { None } else { Some(index) });
 
-                disclosure = disclosure.open(is_open).on_toggle(move |_| message.clone());
-            }
+                    disclosure = disclosure.open(is_open).on_toggle(move |_| message.clone());
+                }
 
-            let item = Column::new().push(disclosure);
+                let item = Column::new().push(disclosure);
 
-            if index + 1 < count {
-                item.push(super::separator::separator()).into()
-            } else {
-                item.into()
-            }
-        });
+                if index + 1 < count {
+                    item.push(super::separator::separator()).into()
+                } else {
+                    item.into()
+                }
+            },
+        );
 
         Column::with_children(items).width(accordion.width).into()
     }

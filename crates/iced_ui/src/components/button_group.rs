@@ -60,9 +60,13 @@ impl<'a, Message: Clone + 'a> From<ButtonGroup<'a, Message>> for Element<'a, Mes
         let count = group.buttons.len();
         let vertical = group.orientation == Orientation::Vertical;
 
-        let buttons = group.buttons.into_iter().enumerate().map(|(index, button)| {
-            Element::from(button.position(style::Position::of(index, count), vertical))
-        });
+        let buttons = group
+            .buttons
+            .into_iter()
+            .enumerate()
+            .map(|(index, button)| {
+                Element::from(button.position(style::Position::of(index, count), vertical))
+            });
 
         // Adjacent borders overlap, like `border-l-0`.
         match group.orientation {

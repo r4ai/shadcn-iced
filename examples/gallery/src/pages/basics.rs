@@ -31,7 +31,9 @@ pub const BADGE: Page = Page {
             example(
                 "With icon",
                 row![
-                    badge("Verified").icon(lucide::BADGE_CHECK).variant(badge::Variant::Secondary),
+                    badge("Verified")
+                        .icon(lucide::BADGE_CHECK)
+                        .variant(badge::Variant::Secondary),
                     badge("8").variant(badge::Variant::Destructive),
                     badge("99+").variant(badge::Variant::Outline),
                 ]
@@ -52,7 +54,11 @@ pub const CARD: Page = Page {
             card()
                 .title("Login to your account")
                 .description("Enter your email below to login to your account")
-                .action(button("Sign Up").variant(button::Variant::Link).on_press(Message::Noop))
+                .action(
+                    button("Sign Up")
+                        .variant(button::Variant::Link)
+                        .on_press(Message::Noop),
+                )
                 .content(
                     column![
                         column![
@@ -112,7 +118,9 @@ pub const INPUT: Page = Page {
                         input("Search...", &gallery.demo.search)
                             .icon(lucide::SEARCH)
                             .on_input(|v| demo(DemoMessage::Search(v))),
-                        text("Search across all components.").size(14).style(crate::muted),
+                        text("Search across all components.")
+                            .size(14)
+                            .style(crate::muted),
                     ]
                     .spacing(8)
                 )
@@ -129,7 +137,9 @@ pub const INPUT: Page = Page {
                         row![
                             input("Email", &gallery.demo.email)
                                 .on_input(|v| demo(DemoMessage::Email(v))),
-                            button("Subscribe").variant(button::Variant::Outline).on_press(Message::Noop),
+                            button("Subscribe")
+                                .variant(button::Variant::Outline)
+                                .on_press(Message::Noop),
                         ]
                         .spacing(8),
                     ]
@@ -208,8 +218,12 @@ pub const SEPARATOR: Page = Page {
             "Default",
             column![
                 column![
-                    text("Radix Primitives").size(14).font(iced_ui::font::MEDIUM),
-                    text("An open-source UI component library.").size(14).style(crate::muted),
+                    text("Radix Primitives")
+                        .size(14)
+                        .font(iced_ui::font::MEDIUM),
+                    text("An open-source UI component library.")
+                        .size(14)
+                        .style(crate::muted),
                 ]
                 .spacing(4),
                 separator(),
@@ -265,18 +279,27 @@ pub const SPINNER: Page = Page {
         column![
             example(
                 "Sizes",
-                row![spinner().size(12.0), spinner(), spinner().size(24.0), spinner().size(32.0)]
-                    .spacing(24)
-                    .align_y(Center)
+                row![
+                    spinner().size(12.0),
+                    spinner(),
+                    spinner().size(24.0),
+                    spinner().size(32.0)
+                ]
+                .spacing(24)
+                .align_y(Center)
             ),
             example(
                 "In a badge",
                 row![
                     badge::Badge::new(
-                        row![spinner().size(12.0), text("Syncing").size(12)].spacing(4).align_y(Center)
+                        row![spinner().size(12.0), text("Syncing").size(12)]
+                            .spacing(4)
+                            .align_y(Center)
                     ),
                     badge::Badge::new(
-                        row![spinner().size(12.0), text("Updating").size(12)].spacing(4).align_y(Center)
+                        row![spinner().size(12.0), text("Updating").size(12)]
+                            .spacing(4)
+                            .align_y(Center)
                     )
                     .variant(badge::Variant::Secondary),
                 ]
@@ -300,7 +323,9 @@ pub const KBD: Page = Page {
                 row![
                     text("Use").size(14).style(crate::muted),
                     kbd_group([kbd("Ctrl + B"), kbd("Ctrl + K")]),
-                    text("to open the command palette").size(14).style(crate::muted),
+                    text("to open the command palette")
+                        .size(14)
+                        .style(crate::muted),
                 ]
                 .spacing(6)
                 .align_y(Center),
@@ -321,8 +346,14 @@ pub const PROGRESS: Page = Page {
             column![
                 container(progress(gallery.demo.progress)).max_width(360),
                 row![
-                    button("-10").variant(button::Variant::Outline).size(button::Size::Sm).on_press(demo(DemoMessage::Progress(-10.0))),
-                    button("+10").variant(button::Variant::Outline).size(button::Size::Sm).on_press(demo(DemoMessage::Progress(10.0))),
+                    button("-10")
+                        .variant(button::Variant::Outline)
+                        .size(button::Size::Sm)
+                        .on_press(demo(DemoMessage::Progress(-10.0))),
+                    button("+10")
+                        .variant(button::Variant::Outline)
+                        .size(button::Size::Sm)
+                        .on_press(demo(DemoMessage::Progress(10.0))),
                 ]
                 .spacing(8),
             ]
@@ -475,7 +506,12 @@ pub const ITEM: Page = Page {
                 item("Basic Item")
                     .description("A simple item with title and description.")
                     .variant(item::Variant::Outline)
-                    .action(button("Action").variant(button::Variant::Outline).size(button::Size::Sm).on_press(Message::Noop)),
+                    .action(
+                        button("Action")
+                            .variant(button::Variant::Outline)
+                            .size(button::Size::Sm)
+                            .on_press(Message::Noop)
+                    ),
                 item("Your profile has been verified.")
                     .icon(lucide::BADGE_CHECK)
                     .variant(item::Variant::Outline)

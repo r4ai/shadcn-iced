@@ -14,32 +14,49 @@ fn muted(theme: &Theme) -> text::Style {
 
 /// `text-4xl font-extrabold tracking-tight`
 pub fn h1<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content).size(style::text::XL4).font(font::BOLD).line_height(1.11)
+    text(content)
+        .size(style::text::XL4)
+        .font(font::BOLD)
+        .line_height(1.11)
 }
 
 /// `text-3xl font-semibold tracking-tight`
 pub fn h2<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content).size(style::text::XL3).font(font::SEMIBOLD).line_height(1.2)
+    text(content)
+        .size(style::text::XL3)
+        .font(font::SEMIBOLD)
+        .line_height(1.2)
 }
 
 /// `text-2xl font-semibold tracking-tight`
 pub fn h3<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content).size(style::text::XL2).font(font::SEMIBOLD).line_height(1.33)
+    text(content)
+        .size(style::text::XL2)
+        .font(font::SEMIBOLD)
+        .line_height(1.33)
 }
 
 /// `text-xl font-semibold tracking-tight`
 pub fn h4<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content).size(style::text::XL).font(font::SEMIBOLD).line_height(1.4)
+    text(content)
+        .size(style::text::XL)
+        .font(font::SEMIBOLD)
+        .line_height(1.4)
 }
 
 /// `leading-7`
 pub fn p<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content).size(style::text::BASE).line_height(iced::Pixels(28.0))
+    text(content)
+        .size(style::text::BASE)
+        .line_height(iced::Pixels(28.0))
 }
 
 /// `text-xl text-muted-foreground`
 pub fn lead<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content).size(style::text::XL).line_height(1.4).style(muted)
+    text(content)
+        .size(style::text::XL)
+        .line_height(1.4)
+        .style(muted)
 }
 
 /// `text-lg font-semibold`
@@ -98,8 +115,16 @@ pub fn list<'a, Message: 'a>(
 ) -> Element<'a, Message> {
     Column::with_children(items.into_iter().map(|item| {
         Row::new()
-            .push(text("•").size(style::text::BASE).line_height(iced::Pixels(24.0)))
-            .push(text(item).size(style::text::BASE).line_height(iced::Pixels(24.0)))
+            .push(
+                text("•")
+                    .size(style::text::BASE)
+                    .line_height(iced::Pixels(24.0)),
+            )
+            .push(
+                text(item)
+                    .size(style::text::BASE)
+                    .line_height(iced::Pixels(24.0)),
+            )
             .spacing(10)
             .into()
     }))
