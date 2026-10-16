@@ -165,7 +165,8 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                     color: Some(alpha(tokens(theme).palette.muted_foreground, 0.5)),
                 }))
                 .spacing(8)
-                .align_y(Alignment::Center),
+                .align_y(Alignment::Center)
+                .height(Length::Fill),
         )
         .width(select.width)
         .height(match select.size {

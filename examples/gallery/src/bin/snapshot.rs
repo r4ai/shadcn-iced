@@ -84,6 +84,8 @@ fn main() {
     let mut is_live = false;
     let mut size = (1100.0, 820.0);
     let mut suffix = String::new();
+    let mut base = None;
+    let mut accent = None;
     let mut args = std::env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -101,6 +103,16 @@ fn main() {
                 let value = args.next().expect("WxH");
                 let (w, h) = value.split_once('x').expect("WxH");
                 size = (w.parse().unwrap(), h.parse().unwrap());
+                None
+            }
+            "--base" => {
+                let name = args.next().expect("base color");
+                base = iced_ui::theme::BaseColor::ALL.iter().copied().find(|b| b.name() == name);
+                None
+            }
+            "--accent" => {
+                let name = args.next().expect("accent");
+                accent = iced_ui::theme::Accent::ALL.iter().copied().find(|a| a.name() == name);
                 None
             }
             "--suffix" => {
@@ -139,6 +151,14 @@ fn main() {
 
         for mode in modes {
             let mut gallery = Gallery::new(index, mode);
+
+            if let Some(base) = base {
+                let _ = gallery.update(Message::Base(base));
+            }
+
+            if accent.is_some() {
+                let _ = gallery.update(Message::Accent(accent));
+            }
 
             for action in &before {
                 let messages: Vec<Message> = {

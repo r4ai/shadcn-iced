@@ -5,7 +5,7 @@ use iced_ui::prelude::*;
 use iced_ui::theme::{Accent, BaseColor};
 use iced_ui::{font, style, tokens};
 
-use iced::widget::{Column, column, container, row, rule, space, text};
+use iced::widget::{column, container, row, rule, space, text};
 use iced_ui::scroll_area::scroll_area as scrollable;
 use iced::{Element, Fill, Length, Task, Theme};
 
@@ -99,51 +99,73 @@ impl Gallery {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+        use iced_ui::sidebar::{group, item};
+
         let page = &PAGES[self.page];
 
-        let sidebar = {
-            let items = PAGES.iter().enumerate().map(|(index, info)| {
-                nav_item(info.title, index == self.page, Message::Navigate(index))
-            });
-
-            container(
-                scrollable(
-                    Column::new()
-                        .push(
-                            text("Components")
-                                .size(style::text::XS)
-                                .font(font::MEDIUM)
-                                .style(muted),
-                        )
-                        .push(space().height(4))
-                        .extend(items)
-                        .spacing(2)
-                        .padding([16, 12]),
-                )
-                .height(Fill),
+        let nav = iced_ui::sidebar::sidebar()
+            .header(
+                row![
+                    container(lucide::COMMAND.sized(16)).center(32).style(|theme: &Theme| {
+                        let t = tokens(theme);
+                        container::Style {
+                            background: Some(t.palette.sidebar_primary.into()),
+                            text_color: Some(t.palette.sidebar_primary_foreground),
+                            border: style::rounded(t.radius_lg()),
+                            ..Default::default()
+                        }
+                    }),
+                    column![
+                        text("iced-ui").size(style::text::SM).font(font::SEMIBOLD),
+                        text(format!("{} components", PAGES.len())).size(style::text::XS),
+                    ],
+                ]
+                .spacing(8)
+                .align_y(iced::Center),
             )
-            .width(220)
-            .height(Fill)
-        };
+            .group(PAGES.iter().enumerate().fold(group("Components"), |group, (index, info)| {
+                group.item(item(info.title).active(index == self.page).on_press(Message::Navigate(index)))
+            }))
+            .width(240.0);
+
+        let base = iced_ui::select::select(Some(self.base), Message::Base)
+            .options(BaseColor::ALL.iter().copied())
+            .size(iced_ui::select::Size::Sm)
+            .width(120);
+
+        let accent = Accent::ALL.iter().fold(
+            iced_ui::select::select(Some(self.accent), Message::Accent).option(None, "No accent"),
+            |select, accent| select.option(Some(*accent), accent.to_string()),
+        )
+        .size(iced_ui::select::Size::Sm)
+        .width(130);
+
+        let radius = iced_ui::toggle_group::toggle_group(&[self.radius as u32], |r| Message::Radius(r as f32))
+            .variant(iced_ui::toggle::Variant::Outline)
+            .size(iced_ui::toggle::Size::Sm)
+            .label(0, "0")
+            .label(6, "0.3")
+            .label(10, "0.6")
+            .label(16, "1.0");
 
         let header = row![
-            text("iced-ui").size(style::text::SM).font(font::SEMIBOLD),
+            text(page.title).size(style::text::SM).font(font::MEDIUM),
             space::horizontal(),
-            iced_ui::button::button(match self.mode {
-                Mode::Light => "Dark",
-                Mode::Dark => "Light",
-            })
-            .icon(match self.mode {
+            base,
+            accent,
+            radius,
+            iced_ui::button::icon_button(match self.mode {
                 Mode::Light => lucide::MOON,
                 Mode::Dark => lucide::SUN,
             })
-            .variant(iced_ui::button::Variant::Ghost)
-            .size(iced_ui::button::Size::Sm)
+            .variant(iced_ui::button::Variant::Outline)
+            .size(iced_ui::button::Size::IconSm)
             .on_press(Message::ToggleMode),
         ]
+        .spacing(8)
         .align_y(iced::Center)
         .padding([10, 16])
-        .height(56);
+        .height(52);
 
         let content = scrollable(
             column![
@@ -159,51 +181,13 @@ impl Gallery {
         .width(Fill)
         .height(Fill);
 
-        let root = column![
-            header,
-            rule::horizontal(1).style(separator),
-            row![sidebar, rule::vertical(1).style(separator), content].height(Fill),
-        ];
+        let main = column![header, rule::horizontal(1).style(separator), content];
 
-        iced_ui::sonner::toaster(root, &self.demo.toasts, |id| {
+        iced_ui::sonner::toaster(iced_ui::sidebar::layout(nav, main), &self.demo.toasts, |id| {
             Message::Demo(pages::DemoMessage::DismissToast(id))
         })
         .into()
     }
-}
-
-fn nav_item(label: &'static str, active: bool, message: Message) -> Element<'static, Message> {
-    iced_ui::primitive::pressable(
-        container(text(label).size(style::text::SM).font(if active {
-            font::MEDIUM
-        } else {
-            iced::Font::with_name("Geist")
-        }))
-        .padding([6, 8])
-        .width(Fill),
-    )
-    .on_press(message)
-    .width(Fill)
-    .style(move |theme, status| {
-        let t = tokens(theme);
-        let p = t.palette;
-        let hovered = matches!(
-            status,
-            iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed
-        );
-
-        iced::widget::button::Style {
-            background: (active || hovered).then_some(iced::Background::Color(p.accent)),
-            text_color: if active || hovered {
-                p.accent_foreground
-            } else {
-                p.foreground
-            },
-            border: style::rounded(t.radius_md()),
-            ..Default::default()
-        }
-    })
-    .into()
 }
 
 pub fn muted(theme: &Theme) -> text::Style {
