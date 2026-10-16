@@ -159,11 +159,15 @@ impl Gallery {
         .width(Fill)
         .height(Fill);
 
-        column![
+        let root = column![
             header,
             rule::horizontal(1).style(separator),
             row![sidebar, rule::vertical(1).style(separator), content].height(Fill),
-        ]
+        ];
+
+        iced_ui::sonner::toaster(root, &self.demo.toasts, |id| {
+            Message::Demo(pages::DemoMessage::DismissToast(id))
+        })
         .into()
     }
 }

@@ -2,6 +2,7 @@
 mod basics;
 mod button;
 pub mod interactive;
+pub mod overlays;
 
 use crate::{Gallery, Message};
 
@@ -18,6 +19,7 @@ pub struct Page {
 pub const PAGES: &[Page] = &[
     interactive::ACCORDION,
     basics::ALERT,
+    overlays::ALERT_DIALOG,
     basics::ASPECT_RATIO,
     basics::AVATAR,
     basics::BADGE,
@@ -27,22 +29,35 @@ pub const PAGES: &[Page] = &[
     basics::CARD,
     interactive::CHECKBOX,
     interactive::COLLAPSIBLE,
+    overlays::COMBOBOX,
+    overlays::COMMAND,
+    overlays::CONTEXT_MENU,
+    overlays::DIALOG,
+    overlays::DRAWER,
+    overlays::DROPDOWN_MENU,
     basics::EMPTY,
     interactive::FIELD,
+    overlays::HOVER_CARD,
     basics::INPUT,
     interactive::INPUT_GROUP,
     interactive::INPUT_OTP,
     basics::ITEM,
     basics::KBD,
+    overlays::MENUBAR,
+    overlays::NAVIGATION_MENU,
     interactive::NATIVE_SELECT,
     basics::PAGINATION,
+    overlays::POPOVER,
     basics::PROGRESS,
     interactive::RADIO_GROUP,
     interactive::RESIZABLE,
     basics::SCROLL_AREA,
+    overlays::SELECT,
     basics::SEPARATOR,
+    overlays::SHEET,
     basics::SKELETON,
     interactive::SLIDER,
+    overlays::SONNER,
     basics::SPINNER,
     interactive::SWITCH,
     basics::TABLE,
@@ -50,6 +65,7 @@ pub const PAGES: &[Page] = &[
     basics::TEXTAREA,
     interactive::TOGGLE,
     interactive::TOGGLE_GROUP,
+    overlays::TOOLTIP,
     basics::TYPOGRAPHY,
 ];
 
@@ -78,6 +94,17 @@ pub struct Demo {
     pub card: String,
     pub fruit: Option<&'static str>,
     pub otp: String,
+    pub dialog: bool,
+    pub alert_dialog: bool,
+    pub sheet: Option<iced_ui::sheet::Side>,
+    pub drawer: bool,
+    pub goal: i32,
+    pub status_bar: bool,
+    pub position: u8,
+    pub query: String,
+    pub framework: Option<&'static str>,
+    pub toasts: Vec<iced_ui::sonner::Toast<Message>>,
+    pub next_toast: u64,
 }
 
 pub const FRUITS: [&str; 5] = ["Apple", "Banana", "Blueberry", "Grapes", "Pineapple"];
@@ -107,6 +134,17 @@ impl Default for Demo {
             card: String::new(),
             fruit: None,
             otp: String::new(),
+            dialog: false,
+            alert_dialog: false,
+            sheet: None,
+            drawer: false,
+            goal: 350,
+            status_bar: true,
+            position: 1,
+            query: String::new(),
+            framework: None,
+            toasts: Vec::new(),
+            next_toast: 0,
         }
     }
 }
@@ -135,6 +173,17 @@ pub enum DemoMessage {
     Card(String),
     Fruit(&'static str),
     Otp(String),
+    Dialog(bool),
+    AlertDialog(bool),
+    Sheet(Option<iced_ui::sheet::Side>),
+    Drawer(bool),
+    Goal(i32),
+    StatusBar(bool),
+    Position(u8),
+    Query(String),
+    Framework(&'static str),
+    Toast(iced_ui::sonner::Kind),
+    DismissToast(u64),
 }
 
 impl Demo {
@@ -168,6 +217,38 @@ impl Demo {
             DemoMessage::Card(value) => self.card = value,
             DemoMessage::Fruit(value) => self.fruit = Some(value),
             DemoMessage::Otp(value) => self.otp = value,
+            DemoMessage::Dialog(open) => self.dialog = open,
+            DemoMessage::AlertDialog(open) => self.alert_dialog = open,
+            DemoMessage::Sheet(side) => self.sheet = side,
+            DemoMessage::Drawer(open) => self.drawer = open,
+            DemoMessage::Goal(delta) => self.goal = (self.goal + delta).clamp(200, 400),
+            DemoMessage::StatusBar(value) => self.status_bar = value,
+            DemoMessage::Position(value) => self.position = value,
+            DemoMessage::Query(value) => self.query = value,
+            DemoMessage::Framework(value) => {
+                self.framework = Some(value);
+                self.query.clear();
+            }
+            DemoMessage::Toast(kind) => {
+                use iced_ui::sonner::{Kind, Toast};
+
+                let id = self.next_toast;
+                self.next_toast += 1;
+
+                let toast = match kind {
+                    Kind::Default => Toast::new(id, "Event has been created")
+                        .description("Sunday, December 03, 2023 at 9:00 AM")
+                        .action("Undo", Message::Noop),
+                    Kind::Success => Toast::new(id, "Event has been created"),
+                    Kind::Info => Toast::new(id, "Be at the area 10 minutes before the event time"),
+                    Kind::Warning => Toast::new(id, "Event start time cannot be earlier than 8am"),
+                    Kind::Error => Toast::new(id, "Event has not been created"),
+                    Kind::Loading => Toast::new(id, "Loading..."),
+                };
+
+                self.toasts.push(toast.kind(kind));
+            }
+            DemoMessage::DismissToast(id) => self.toasts.retain(|toast| toast.id != id),
         }
 
         Task::none()

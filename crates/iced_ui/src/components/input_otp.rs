@@ -350,7 +350,7 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
                     p.foreground,
                     bounds,
                 );
-            } else if is_active && (state.since.elapsed().as_millis() / 500) % 2 == 0 {
+            } else if is_active && (state.since.elapsed().as_millis() / 500).is_multiple_of(2) {
                 let center = bounds.center();
 
                 renderer.fill_quad(

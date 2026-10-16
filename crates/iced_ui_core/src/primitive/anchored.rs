@@ -22,6 +22,17 @@ use iced::{
     window,
 };
 
+use std::sync::atomic::{self, AtomicU64};
+
+/// Incremented whenever a menu closes because one of its items was
+/// selected. Menus opened before compare it on every event and close too,
+/// which closes a whole chain of submenus at once.
+static SELECT_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+fn select_epoch() -> u64 {
+    SELECT_EPOCH.load(atomic::Ordering::Relaxed)
+}
+
 /// The side of the anchor the floating content is placed on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Side {
@@ -236,6 +247,7 @@ enum Hover {
 #[derive(Debug, Default)]
 struct State {
     open: bool,
+    epoch: u64,
     point: Option<Point>,
     hover: Hover,
     anchor_hovered: bool,
@@ -296,6 +308,10 @@ impl State {
 
         let was_open = matches!(self.hover, Hover::Open | Hover::Closing(_));
         let is_open = matches!(next, Hover::Open | Hover::Closing(_));
+
+        if is_open && !was_open {
+            self.epoch = select_epoch();
+        }
 
         self.hover = next;
 
@@ -397,6 +413,7 @@ where
                     && !state.open
                 {
                     state.open = true;
+                    state.epoch = select_epoch();
                     shell.invalidate_layout();
                     shell.request_redraw();
 
@@ -413,6 +430,7 @@ where
                     let was_open = state.open;
 
                     state.open = true;
+                    state.epoch = select_epoch();
                     state.point = Some(position);
                     shell.invalidate_layout();
                     shell.request_redraw();
@@ -763,6 +781,14 @@ where
         let bounds = layout.bounds();
         let was_captured = shell.is_event_captured();
 
+        if self.close_on_select
+            && !matches!(self.trigger, Trigger::Controlled { .. })
+            && self.state.epoch != select_epoch()
+        {
+            self.dismiss(shell);
+            return;
+        }
+
         self.content.as_widget_mut().update(
             self.tree, event, layout, cursor, renderer, clipboard, shell, &bounds,
         );
@@ -811,6 +837,8 @@ where
             | Event::Touch(touch::Event::FingerLifted { .. })
                 if captured_by_content && self.close_on_select =>
             {
+                let _ = SELECT_EPOCH.fetch_add(1, atomic::Ordering::Relaxed);
+                self.state.epoch = select_epoch();
                 self.dismiss(shell);
             }
             Event::Mouse(_) | Event::Touch(_) if self.modal => {
