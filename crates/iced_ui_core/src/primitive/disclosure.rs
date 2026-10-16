@@ -95,6 +95,8 @@ struct State {
     open: bool,
     pressed: bool,
     presence: Transition,
+    /// The progress of the animation when the layout was last computed.
+    laid_out: f32,
 }
 
 impl<'a, Message, Theme, Renderer> Disclosure<'a, Message, Theme, Renderer> {
@@ -119,6 +121,7 @@ where
             open: self.default_open,
             pressed: false,
             presence: Transition::new(if open { 1.0 } else { 0.0 }),
+            laid_out: if open { 1.0 } else { 0.0 },
         })
     }
 
@@ -163,10 +166,10 @@ where
                 now,
             );
 
-            (
-                open || state.presence.is_animating(now),
-                state.presence.value(now),
-            )
+            let progress = state.presence.value(now);
+            state.laid_out = progress;
+
+            (open || state.presence.is_animating(now), progress)
         };
 
         let trigger = if open {
@@ -254,15 +257,17 @@ where
     ) {
         let open = self.is_open(tree.state.downcast_ref::<State>());
 
-        if let Event::Window(window::Event::RedrawRequested(now)) = event
-            && tree
-                .state
-                .downcast_ref::<State>()
-                .presence
-                .is_animating(*now)
-        {
-            shell.invalidate_layout();
-            shell.request_redraw();
+        if let Event::Window(window::Event::RedrawRequested(now)) = event {
+            let state = tree.state.downcast_ref::<State>();
+
+            if state.presence.is_animating(*now) {
+                shell.invalidate_layout();
+                shell.request_redraw();
+            } else if state.laid_out != state.presence.value(*now) {
+                // The layout is still a frame of an animation that has ended.
+                shell.invalidate_layout();
+                shell.request_redraw();
+            }
         }
         let mut children = layout.children();
         let trigger = children.next().unwrap();
@@ -383,7 +388,9 @@ where
             );
         }
 
-        if let Some(content) = children.next() {
+        let clipped = animating || state.laid_out < 1.0;
+
+        if let Some(content) = children.next().filter(|_| open || animating) {
             let draw = |renderer: &mut Renderer| {
                 self.content.as_widget().draw(
                     &tree.children[2],
@@ -396,7 +403,7 @@ where
                 );
             };
 
-            if animating {
+            if clipped {
                 // The content slides out of a growing (or shrinking) box.
                 let bounds = layout.bounds();
                 let clip = Rectangle {
