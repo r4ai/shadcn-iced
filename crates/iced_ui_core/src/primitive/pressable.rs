@@ -33,6 +33,7 @@ pub struct Pressable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer
     padding: Padding,
     clip: bool,
     interaction: Option<mouse::Interaction>,
+    press_offset: f32,
     style: Box<dyn Fn(&Theme, Status) -> Style + 'a>,
 }
 
@@ -68,12 +69,20 @@ where
             padding: Padding::ZERO,
             clip: false,
             interaction: None,
+            press_offset: 0.0,
             style: Box::new(|_, _| Style {
                 background: None,
                 text_color: Color::BLACK,
                 ..Style::default()
             }),
         }
+    }
+
+    /// Moves the whole pressable down by `offset` while it is pressed
+    /// (`active:translate-y-px`).
+    pub fn press_offset(mut self, offset: f32) -> Self {
+        self.press_offset = offset;
+        self
     }
 
     /// Sets the message produced when the [`Pressable`] is pressed.
@@ -377,37 +386,46 @@ where
             _ => (self.style)(theme, status),
         };
 
-        if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0 {
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds,
-                    border: style.border,
-                    shadow: style.shadow,
-                    snap: style.snap,
-                },
-                style
-                    .background
-                    .unwrap_or(Background::Color(Color::TRANSPARENT)),
-            );
-        }
-
         let viewport = if self.clip {
             bounds.intersection(viewport).unwrap_or(*viewport)
         } else {
             *viewport
         };
 
-        self.content.as_widget().draw(
-            &tree.children[0],
-            renderer,
-            theme,
-            &renderer::Style {
-                text_color: style.text_color,
-            },
-            layout.children().next().unwrap(),
-            cursor,
-            &viewport,
-        );
+        let draw = |renderer: &mut Renderer| {
+            if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0
+            {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds,
+                        border: style.border,
+                        shadow: style.shadow,
+                        snap: style.snap,
+                    },
+                    style
+                        .background
+                        .unwrap_or(Background::Color(Color::TRANSPARENT)),
+                );
+            }
+
+            self.content.as_widget().draw(
+                &tree.children[0],
+                renderer,
+                theme,
+                &renderer::Style {
+                    text_color: style.text_color,
+                },
+                layout.children().next().unwrap(),
+                cursor,
+                &viewport,
+            );
+        };
+
+        if status == Status::Pressed && self.press_offset != 0.0 {
+            renderer.with_translation(Vector::new(0.0, self.press_offset), draw);
+        } else {
+            draw(renderer);
+        }
     }
 
     fn mouse_interaction(

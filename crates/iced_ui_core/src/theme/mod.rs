@@ -229,14 +229,14 @@ impl Tokens {
         self.mode == Mode::Dark
     }
 
-    /// `--radius-sm`: `radius - 4px`.
+    /// `--radius-sm`: `radius * 0.6`.
     pub fn radius_sm(&self) -> f32 {
-        (self.radius - 4.0).max(0.0)
+        self.radius * 0.6
     }
 
-    /// `--radius-md`: `radius - 2px`.
+    /// `--radius-md`: `radius * 0.8`.
     pub fn radius_md(&self) -> f32 {
-        (self.radius - 2.0).max(0.0)
+        self.radius * 0.8
     }
 
     /// `--radius-lg`: `radius`.
@@ -244,9 +244,24 @@ impl Tokens {
         self.radius
     }
 
-    /// `--radius-xl`: `radius + 4px`.
+    /// `--radius-xl`: `radius * 1.4`.
     pub fn radius_xl(&self) -> f32 {
-        self.radius + 4.0
+        self.radius * 1.4
+    }
+
+    /// `--radius-2xl`: `radius * 1.8`.
+    pub fn radius_2xl(&self) -> f32 {
+        self.radius * 1.8
+    }
+
+    /// `--radius-3xl`: `radius * 2.2`.
+    pub fn radius_3xl(&self) -> f32 {
+        self.radius * 2.2
+    }
+
+    /// `--radius-4xl`: `radius * 2.6`.
+    pub fn radius_4xl(&self) -> f32 {
+        self.radius * 2.6
     }
 }
 

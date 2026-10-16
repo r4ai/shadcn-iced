@@ -16,12 +16,12 @@
 //! ```
 use iced_ui_core::icon::Icon;
 use iced_ui_core::primitive::Pressable;
-use iced_ui_core::theme::{alpha, tokens};
+use iced_ui_core::theme::{alpha, mix, tokens};
 use iced_ui_core::{Element, font, style};
 
 use iced::widget::button::{Status, Style};
 use iced::widget::{Row, text};
-use iced::{Alignment, Background, Color, Length, Theme};
+use iced::{Alignment, Background, Length, Padding, Theme};
 
 /// The visual style of a [`Button`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -44,22 +44,22 @@ pub enum Variant {
 /// The size of a [`Button`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Size {
-    /// `h-9 px-4`
+    /// `h-8 px-2.5`
     #[default]
     Default,
     /// `h-6 px-2 text-xs`
     Xs,
-    /// `h-8 px-3`
+    /// `h-7 px-2.5 text-[0.8rem]`
     Sm,
-    /// `h-10 px-6`
+    /// `h-9 px-2.5`
     Lg,
-    /// A 36x36 square, for icon-only buttons.
+    /// A 32x32 square, for icon-only buttons.
     Icon,
     /// A 24x24 square, for icon-only buttons.
     IconXs,
-    /// A 32x32 square, for icon-only buttons.
+    /// A 28x28 square, for icon-only buttons.
     IconSm,
-    /// A 40x40 square, for icon-only buttons.
+    /// A 36x36 square, for icon-only buttons.
     IconLg,
 }
 
@@ -68,9 +68,9 @@ impl Size {
     pub fn height(self) -> f32 {
         match self {
             Size::Xs | Size::IconXs => 24.0,
-            Size::Sm | Size::IconSm => 32.0,
-            Size::Default | Size::Icon => 36.0,
-            Size::Lg | Size::IconLg => 40.0,
+            Size::Sm | Size::IconSm => 28.0,
+            Size::Default | Size::Icon => 32.0,
+            Size::Lg | Size::IconLg => 36.0,
         }
     }
 
@@ -82,25 +82,27 @@ impl Size {
         )
     }
 
-    fn padding_x(self, has_icon: bool) -> f32 {
-        match (self, has_icon) {
-            (Size::Default, false) => 16.0,
-            (Size::Default, true) => 12.0,
-            (Size::Xs, false) => 8.0,
-            (Size::Xs, true) => 6.0,
-            (Size::Sm, false) => 12.0,
-            (Size::Sm, true) => 10.0,
-            (Size::Lg, false) => 24.0,
-            (Size::Lg, true) => 16.0,
-            _ => 0.0,
+    /// The horizontal padding, reduced on the side of an icon
+    /// (`has-data-[icon=inline-start]:pl-2`).
+    fn padding(self, leading: bool, trailing: bool) -> Padding {
+        let (base, icon_side) = match self {
+            Size::Xs => (8.0, 6.0),
+            Size::Sm => (10.0, 6.0),
+            Size::Default | Size::Lg => (10.0, 8.0),
+            _ => (0.0, 0.0),
+        };
+
+        Padding {
+            left: if leading { icon_side } else { base },
+            right: if trailing { icon_side } else { base },
+            ..Padding::ZERO
         }
     }
 
     fn gap(self) -> f32 {
         match self {
-            Size::Xs => 4.0,
-            Size::Sm => 6.0,
-            _ => 8.0,
+            Size::Xs | Size::Sm => 4.0,
+            _ => 6.0,
         }
     }
 
@@ -108,6 +110,7 @@ impl Size {
     pub fn text_size(self) -> f32 {
         match self {
             Size::Xs | Size::IconXs => style::text::XS,
+            Size::Sm | Size::IconSm => 12.8,
             _ => style::text::SM,
         }
     }
@@ -116,7 +119,18 @@ impl Size {
     pub fn icon_size(self) -> f32 {
         match self {
             Size::Xs | Size::IconXs => 12.0,
+            Size::Sm => 14.0,
             _ => 16.0,
+        }
+    }
+
+    /// The corner radius: `rounded-lg`, smaller for the small sizes
+    /// (`rounded-[min(var(--radius-md),10px)]`).
+    pub fn radius(self, tokens: &iced_ui_core::Tokens) -> f32 {
+        match self {
+            Size::Xs | Size::IconXs => tokens.radius_md().min(10.0),
+            Size::Sm | Size::IconSm => tokens.radius_md().min(12.0),
+            _ => tokens.radius_lg(),
         }
     }
 }
@@ -242,7 +256,7 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         let size = button.size;
         let height = size.height();
         let icon_size = size.icon_size();
-        let has_icon = button.leading.is_some() || button.trailing.is_some();
+        let padding = size.padding(button.leading.is_some(), button.trailing.is_some());
 
         let label = match button.content {
             Content::Label(label) => text(label)
@@ -287,13 +301,17 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             .disabled(button.disabled)
             .width(width)
             .height(height)
-            .padding([0.0, size.padding_x(has_icon)])
+            .padding(padding)
+            .press_offset(1.0)
             .style(move |theme, status| {
                 let mut style = self::style(theme, status, variant);
                 let radius = if rounded {
                     f32::MAX
+                } else if position != style::Position::Alone {
+                    // `in-data-[slot=button-group]:rounded-lg`
+                    tokens(theme).radius_lg()
                 } else {
-                    tokens(theme).radius_md()
+                    size.radius(&tokens(theme))
                 };
 
                 style.border.radius = if vertical {
@@ -317,12 +335,12 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
     let p = &t.palette;
     let dark = t.is_dark();
     let hovered = matches!(status, Status::Hovered | Status::Pressed);
-    let radius = t.radius_md();
+    let radius = t.radius_lg();
 
     let mut style = match variant {
         Variant::Default => Style {
             background: Some(Background::Color(if hovered {
-                alpha(p.primary, 0.9)
+                alpha(p.primary, 0.8)
             } else {
                 p.primary
             })),
@@ -334,34 +352,30 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
             background: Some(Background::Color(alpha(
                 p.destructive,
                 match (dark, hovered) {
-                    (_, true) => 0.9,
-                    (true, false) => 0.6,
-                    (false, false) => 1.0,
+                    (false, false) => 0.1,
+                    (false, true) | (true, false) => 0.2,
+                    (true, true) => 0.3,
                 },
             ))),
-            text_color: Color::WHITE,
+            text_color: p.destructive,
             border: style::rounded(radius),
             ..Style::default()
         },
         Variant::Outline => Style {
             background: Some(Background::Color(match (dark, hovered) {
                 (false, false) => p.background,
-                (false, true) => p.accent,
+                (false, true) => p.muted,
                 (true, false) => alpha(p.input, 0.3),
                 (true, true) => alpha(p.input, 0.5),
             })),
-            text_color: if hovered && !dark {
-                p.accent_foreground
-            } else {
-                p.foreground
-            },
+            text_color: p.foreground,
             border: style::border(if dark { p.input } else { p.border }, radius),
-            shadow: style::shadow_xs(),
             ..Style::default()
         },
         Variant::Secondary => Style {
             background: Some(Background::Color(if hovered {
-                alpha(p.secondary, 0.8)
+                // `color-mix(in oklch, var(--secondary), var(--foreground) 5%)`
+                mix(p.secondary, p.foreground, 0.05)
             } else {
                 p.secondary
             })),
@@ -371,12 +385,8 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
         },
         Variant::Ghost => Style {
             background: hovered
-                .then(|| Background::Color(if dark { alpha(p.accent, 0.5) } else { p.accent })),
-            text_color: if hovered {
-                p.accent_foreground
-            } else {
-                p.foreground
-            },
+                .then(|| Background::Color(if dark { alpha(p.muted, 0.5) } else { p.muted })),
+            text_color: p.foreground,
             border: style::rounded(radius),
             ..Style::default()
         },

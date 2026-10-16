@@ -176,3 +176,9 @@ pub fn rounded(radius: f32) -> Border {
 
 /// `opacity-50`, applied to disabled controls.
 pub const DISABLED_OPACITY: f32 = 0.5;
+
+/// `ring-1 ring-foreground/10`, the hairline outline of Nova's cards,
+/// dialogs and popovers, as a 1px border of the given radius.
+pub fn ring_border(tokens: &Tokens, radius: f32) -> Border {
+    border(alpha(tokens.palette.foreground, 0.1), radius)
+}

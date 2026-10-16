@@ -1,9 +1,9 @@
 //! The fonts used by iced_ui.
 //!
-//! shadcn/ui's documentation uses [Geist](https://vercel.com/font) and
-//! [Geist Mono](https://vercel.com/font); both are bundled (feature `geist`)
-//! together with the [Lucide](https://lucide.dev) icon font (feature
-//! `lucide`).
+//! shadcn/ui's default style (Nova) uses [Inter](https://rsms.me/inter/)
+//! (feature `inter`). [Geist Mono](https://vercel.com/font) (feature `geist`)
+//! and the [Lucide](https://lucide.dev) icon font (feature `lucide`) are
+//! bundled too.
 //!
 //! Load them with [`ApplicationExt::iced_ui`]:
 //!
@@ -20,8 +20,8 @@ use iced::font::{Family, Weight};
 
 use std::borrow::Cow;
 
-/// The sans-serif font (`font-sans`), Geist.
-pub const SANS: Font = Font::with_name("Geist");
+/// The sans-serif font (`font-sans`), Inter.
+pub const SANS: Font = Font::with_name("Inter");
 
 /// The monospace font (`font-mono`), Geist Mono.
 pub const MONO: Font = Font::with_name("Geist Mono");
@@ -36,21 +36,21 @@ pub const fn weight(font: Font, weight: Weight) -> Font {
 
 /// `font-medium` (500) using the current default family.
 pub const MEDIUM: Font = Font {
-    family: Family::Name("Geist"),
+    family: Family::Name("Inter"),
     weight: Weight::Medium,
     ..Font::DEFAULT
 };
 
 /// `font-semibold` (600) using the default family.
 pub const SEMIBOLD: Font = Font {
-    family: Family::Name("Geist"),
+    family: Family::Name("Inter"),
     weight: Weight::Semibold,
     ..Font::DEFAULT
 };
 
 /// `font-bold` (700) using the default family.
 pub const BOLD: Font = Font {
-    family: Family::Name("Geist"),
+    family: Family::Name("Inter"),
     weight: Weight::Bold,
     ..Font::DEFAULT
 };
@@ -59,12 +59,16 @@ pub const BOLD: Font = Font {
 pub fn all() -> Vec<Cow<'static, [u8]>> {
     let mut fonts: Vec<&'static [u8]> = Vec::new();
 
+    #[cfg(feature = "inter")]
+    fonts.extend([
+        include_bytes!("../assets/fonts/Inter-Regular.ttf").as_slice(),
+        include_bytes!("../assets/fonts/Inter-Medium.ttf").as_slice(),
+        include_bytes!("../assets/fonts/Inter-SemiBold.ttf").as_slice(),
+        include_bytes!("../assets/fonts/Inter-Bold.ttf").as_slice(),
+    ]);
+
     #[cfg(feature = "geist")]
     fonts.extend([
-        include_bytes!("../assets/fonts/Geist-Regular.ttf").as_slice(),
-        include_bytes!("../assets/fonts/Geist-Medium.ttf").as_slice(),
-        include_bytes!("../assets/fonts/Geist-SemiBold.ttf").as_slice(),
-        include_bytes!("../assets/fonts/Geist-Bold.ttf").as_slice(),
         include_bytes!("../assets/fonts/GeistMono-Regular.ttf").as_slice(),
         include_bytes!("../assets/fonts/GeistMono-Medium.ttf").as_slice(),
     ]);
@@ -76,9 +80,9 @@ pub fn all() -> Vec<Cow<'static, [u8]>> {
 }
 
 /// Extends [`iced::Application`] with a method that loads the bundled fonts
-/// and makes Geist the default font.
+/// and makes Inter the default font.
 pub trait ApplicationExt: Sized {
-    /// Loads the bundled fonts and sets Geist as the default font.
+    /// Loads the bundled fonts and sets Inter as the default font.
     fn iced_ui(self) -> Self;
 }
 
@@ -86,7 +90,7 @@ impl<P: iced::Program> ApplicationExt for iced::Application<P> {
     fn iced_ui(self) -> Self {
         let app = all().into_iter().fold(self, |app, font| app.font(font));
 
-        if cfg!(feature = "geist") {
+        if cfg!(feature = "inter") {
             app.default_font(SANS)
         } else {
             app

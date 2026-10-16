@@ -22,9 +22,15 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 ```
 
-## Geist and Geist Mono
+## Inter
 
-`crates/iced_ui_core/assets/fonts/Geist*.ttf` are distributed under the SIL
+`crates/iced_ui_core/assets/fonts/Inter-*.ttf` (subset to Latin) are
+distributed under the SIL Open Font License 1.1. See
+[`INTER-LICENSE.txt`](crates/iced_ui_core/assets/fonts/INTER-LICENSE.txt).
+
+## Geist Mono
+
+`crates/iced_ui_core/assets/fonts/GeistMono-*.ttf` are distributed under the SIL
 Open Font License 1.1. See
 [`GEIST-LICENSE.txt`](crates/iced_ui_core/assets/fonts/GEIST-LICENSE.txt).
 
