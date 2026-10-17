@@ -7,7 +7,8 @@ use shadcn_iced::sidebar::{Item, Size, group, item, layout, sidebar, trigger};
 use shadcn_iced::style::{border, rounded};
 use shadcn_iced::{Icon, font, tokens};
 
-use iced::widget::{column, container, row, text};
+use iced::widget::canvas::{self, Frame, Path};
+use iced::widget::{Canvas, column, container, row, space, stack, text};
 use iced::{Center, Element, Fill, Theme};
 
 pub fn get(id: &str) -> Option<Fixture> {
@@ -76,21 +77,30 @@ fn view(s: &Store) -> Element<'_, Msg> {
     .padding([0, 16])
     .align_y(Center);
 
-    // `h-[528px] overflow-hidden rounded-lg border`
-    container(layout(nav, main))
-        .width(Fill)
-        .height(528)
-        .padding(1)
-        .clip(true)
-        .style(|theme: &Theme| {
-            let t = tokens(theme);
+    // `h-[528px] overflow-hidden rounded-lg border`. iced only clips to
+    // rectangles: the corners outside of the border are masked with the
+    // page background, and the border is drawn over the content.
+    let frame = container(space().width(Fill).height(Fill)).style(|theme: &Theme| {
+        let t = tokens(theme);
 
-            container::Style {
-                border: border(t.palette.border, t.radius_lg()),
-                ..container::Style::default()
-            }
-        })
-        .into()
+        container::Style {
+            border: border(t.palette.border, t.radius_lg()),
+            ..container::Style::default()
+        }
+    });
+
+    stack![
+        container(layout(nav, main))
+            .width(Fill)
+            .height(Fill)
+            .padding(1)
+            .clip(true),
+        Canvas::new(Corners).width(Fill).height(Fill),
+        frame
+    ]
+    .width(Fill)
+    .height(528)
+    .into()
 }
 
 /// Two lines of text in a large sidebar item
@@ -124,4 +134,52 @@ fn logo(icon: Icon) -> Element<'static, Msg> {
             }
         })
         .into()
+}
+
+/// Masks the corners of the content outside of a `rounded-lg` frame with
+/// the page background.
+struct Corners;
+
+impl canvas::Program<Msg> for Corners {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &(),
+        renderer: &iced::Renderer,
+        theme: &Theme,
+        bounds: iced::Rectangle,
+        _cursor: iced::mouse::Cursor,
+    ) -> Vec<canvas::Geometry> {
+        use iced::{Point, Vector};
+        use std::f32::consts::FRAC_PI_2;
+
+        let mut frame = Frame::new(renderer, bounds.size());
+        let r = tokens(theme).radius_lg();
+        let (w, h) = (bounds.width, bounds.height);
+
+        // Each corner, with the center of its arc and its starting angle.
+        for (corner, center, start) in [
+            (Point::ORIGIN, Point::new(r, r), 2.0),
+            (Point::new(w, 0.0), Point::new(w - r, r), 3.0),
+            (Point::new(w, h), Point::new(w - r, h - r), 0.0),
+            (Point::new(0.0, h), Point::new(r, h - r), 1.0),
+        ] {
+            let path = Path::new(|builder| {
+                builder.move_to(corner);
+
+                for step in 0..=16 {
+                    let angle = (start + step as f32 / 16.0) * FRAC_PI_2;
+
+                    builder.line_to(center + Vector::new(angle.cos(), angle.sin()) * r);
+                }
+
+                builder.close();
+            });
+
+            frame.fill(&path, tokens(theme).palette.background);
+        }
+
+        vec![frame.into_geometry()]
+    }
 }

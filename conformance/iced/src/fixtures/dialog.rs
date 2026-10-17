@@ -4,8 +4,7 @@ use crate::store::{Msg, Store};
 use shadcn_iced::button::{Variant, button};
 use shadcn_iced::dialog::dialog;
 
-use iced::Element;
-use iced::widget::row;
+use iced::{Element, Length};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
@@ -25,13 +24,18 @@ fn profile(store: &Store) -> Element<'_, Msg> {
     )
     .title("Edit profile")
     .description("Make changes to your profile here. Click save when you're done.")
-    .footer(
-        row![
-            button("Cancel").variant(Variant::Outline).on_press(close()),
-            button("Save changes").on_press(close()),
+    .footer_buttons(|fill| {
+        let width = if fill { Length::Fill } else { Length::Shrink };
+
+        vec![
+            button("Cancel")
+                .variant(Variant::Outline)
+                .on_press(close())
+                .width(width)
+                .into(),
+            button("Save changes").on_press(close()).width(width).into(),
         ]
-        .spacing(8),
-    )
+    })
     .on_close(close())
     .into()
 }

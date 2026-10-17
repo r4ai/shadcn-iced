@@ -1,6 +1,7 @@
 //! Headless building blocks: they handle behavior and leave the look to the
 //! components built on top of them.
 pub mod anchored;
+pub mod breakpoint;
 pub mod disclosure;
 pub mod focus;
 pub mod labelled;
@@ -13,6 +14,7 @@ pub mod tracked;
 pub mod underline;
 
 pub use anchored::{Align, Anchored, Side, anchored};
+pub use breakpoint::Breakpoint;
 pub use disclosure::{Disclosure, disclosure};
 pub use focus::{Focus, FocusWithin, focus_within};
 pub use labelled::{Labelled, labelled};

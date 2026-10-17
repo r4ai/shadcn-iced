@@ -88,6 +88,16 @@ impl<'a, Message: Clone + 'a> Input<'a, Message> {
         self
     }
 
+    /// Sets the font size. Inputs are `text-base md:text-sm`: they use
+    /// `text-sm` (14px) by default, the size from the `md` breakpoint
+    /// (768px) on; set `text-base` (16px) for windows narrower than that.
+    ///
+    /// The line height stays at 20px, which keeps the `h-8` height.
+    pub fn text_size(mut self, size: impl Into<Pixels>) -> Self {
+        self.raw = self.raw.size(size);
+        self
+    }
+
     /// Sets the padding.
     pub fn padding(mut self, padding: impl Into<iced::Padding>) -> Self {
         self.raw = self.raw.padding(padding);

@@ -7,12 +7,13 @@ use shadcn_iced::style::border;
 use shadcn_iced::{font, tokens};
 
 use iced::widget::{column, container, row, space, text};
-use iced::{Element, Fill, Pixels, Theme};
+use iced::{Element, Fill, Padding, Pixels, Theme};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
         "default" => Fixture::new(|_| {
             // `h-72 w-48 rounded-md border`
+            // Every separator has a `my-2`, the last one included.
             let tags = column((1..=50).rev().map(|i| {
                 column![
                     text(format!("v1.2.0-beta.{i}"))
@@ -21,9 +22,9 @@ pub fn get(id: &str) -> Option<Fixture> {
                     separator()
                 ]
                 .spacing(8)
+                .padding(Padding::default().bottom(8))
                 .into()
-            }))
-            .spacing(8);
+            }));
 
             container(
                 scroll_area(
