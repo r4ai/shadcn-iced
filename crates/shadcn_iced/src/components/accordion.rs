@@ -84,7 +84,8 @@ impl<'a, Message: Clone + 'a> Accordion<'a, Message> {
         self.push(title, content, true, false)
     }
 
-    /// Appends an item that cannot be toggled (`aria-disabled:opacity-50`).
+    /// Appends an item that cannot be toggled. Like in shadcn/ui, it looks
+    /// like the others.
     pub fn disabled_item(
         self,
         title: impl Into<String>,
@@ -125,11 +126,9 @@ fn trigger<'a, Message: Clone + 'a>(
     open: bool,
     disabled: bool,
 ) -> Element<'a, Message> {
-    let opacity = if disabled {
-        style::DISABLED_OPACITY
-    } else {
-        1.0
-    };
+    // `aria-disabled:opacity-50` never applies: Base UI disables the trigger
+    // with the `disabled` attribute instead, so it looks enabled.
+    let opacity = 1.0;
 
     let row = Row::new()
         .push(
@@ -252,8 +251,10 @@ impl<'a, Message: Clone + 'a> From<Accordion<'a, Message>> for Element<'a, Messa
         let column = Column::with_children(items).width(accordion.width);
 
         if bordered {
+            // The items sit inside the border.
             container(column)
                 .width(accordion.width)
+                .padding(1)
                 .style(|theme: &Theme| {
                     let t = tokens(theme);
 

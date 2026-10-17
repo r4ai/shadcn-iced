@@ -256,7 +256,7 @@ pub fn indicator<'a, Message: 'a>(
     disabled: bool,
     invalid: bool,
 ) -> Element<'a, Message> {
-    FocusWithin::new(dot(selected, disabled), move |theme, _status| {
+    FocusWithin::new(dot(selected), move |theme, _status| {
         self::style(theme, selected, disabled, invalid)
     })
     .into()
@@ -264,19 +264,10 @@ pub fn indicator<'a, Message: 'a>(
 
 /// The `size-4` content of the circle: its dot when selected
 /// (`bg-primary-foreground size-2 rounded-full`).
-fn dot<'a, Message: 'a>(selected: bool, disabled: bool) -> Element<'a, Message> {
-    let opacity = if disabled {
-        style::DISABLED_OPACITY
-    } else {
-        1.0
-    };
-
+fn dot<'a, Message: 'a>(selected: bool) -> Element<'a, Message> {
     let dot = selected.then(|| {
         container(space().width(8).height(8)).style(move |theme: &Theme| container::Style {
-            background: Some(Background::Color(alpha(
-                tokens(theme).palette.primary_foreground,
-                opacity,
-            ))),
+            background: Some(Background::Color(tokens(theme).palette.primary_foreground)),
             border: border::rounded(f32::MAX),
             ..container::Style::default()
         })
@@ -297,7 +288,7 @@ pub fn control<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     let disabled = on_select.is_none();
 
-    Pressable::new(dot(selected, disabled))
+    Pressable::new(dot(selected))
         .on_press_maybe(on_select)
         .disabled(disabled)
         .focusable(true)
@@ -349,15 +340,13 @@ pub fn focused_style(
 }
 
 /// The style of the circle of a radio item.
-pub fn style(theme: &Theme, selected: bool, disabled: bool, invalid: bool) -> focus::Style {
+///
+/// Disabled radios look enabled: Base UI radios are not `<button>`s, so
+/// their `disabled:opacity-50` never applies (only their labels fade).
+pub fn style(theme: &Theme, selected: bool, _disabled: bool, invalid: bool) -> focus::Style {
     let t = tokens(theme);
     let p = &t.palette;
     let dark = t.is_dark();
-    let opacity = if disabled {
-        style::DISABLED_OPACITY
-    } else {
-        1.0
-    };
     let radius = 8.0;
 
     let (background, border) = if selected {
@@ -381,14 +370,10 @@ pub fn style(theme: &Theme, selected: bool, disabled: bool, invalid: bool) -> fo
     };
 
     focus::Style {
-        background: Some(Background::Color(alpha(background, opacity))),
-        border: style::border(alpha(border, opacity), radius),
+        background: Some(Background::Color(background)),
+        border: style::border(border, radius),
         // `aria-invalid:ring-3 aria-invalid:ring-destructive/20`
-        ring: invalid.then(|| {
-            let mut ring = style::invalid_outset_ring(&t, radius);
-            ring.color = alpha(ring.color, opacity);
-            ring
-        }),
+        ring: invalid.then(|| style::invalid_outset_ring(&t, radius)),
         text_color: None,
     }
 }

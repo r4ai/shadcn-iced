@@ -15,7 +15,7 @@ use shadcn_iced_core::primitive::{Disclosure, Pressable};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::widget::{Row, container, text};
-use iced::{Alignment, Length, border};
+use iced::{Alignment, Background, Length, border};
 
 /// Creates a collapsible with a text header (`text-sm font-semibold`) and
 /// a ghost chevron button (`size-8`) in a `px-4 gap-4` row, like the
@@ -26,28 +26,30 @@ pub fn collapsible<'a, Message: Clone + 'a>(
 ) -> Disclosure<'a, Message> {
     let title = title.into();
 
-    let header = |title: String| -> Element<'a, Message> {
+    let header = |title: String, expanded: bool| -> Element<'a, Message> {
         Row::new()
             .push(
                 text(title)
                     .size(style::text::SM)
+                    .line_height(style::text::leading(style::text::SM))
                     .font(font::semibold())
                     .width(Length::Fill),
             )
-            .push(trigger::<Message>())
+            .push(trigger::<Message>(expanded))
             .spacing(16)
             .padding([0, 16])
             .align_y(Alignment::Center)
             .into()
     };
 
-    Disclosure::new(header(title.clone()), header(title), content).spacing(8.0)
+    Disclosure::new(header(title.clone(), false), header(title, true), content).spacing(8.0)
 }
 
 /// The ghost chevron button (`Button variant="ghost" size="icon"`) of the
 /// collapsible: it takes the keyboard focus, and the disclosure toggles on
-/// Enter and Space.
-fn trigger<'a, Message: Clone + 'a>() -> Element<'a, Message> {
+/// Enter and Space. It stays muted while the content is shown
+/// (`aria-expanded:bg-muted`).
+fn trigger<'a, Message: Clone + 'a>(expanded: bool) -> Element<'a, Message> {
     let size = Size::Icon;
 
     Pressable::new(container(lucide::CHEVRONS_UP_DOWN.sized(size.icon_size())).center(Length::Fill))
@@ -62,6 +64,11 @@ fn trigger<'a, Message: Clone + 'a>() -> Element<'a, Message> {
             let mut style = button::style(theme, status, Variant::Ghost);
 
             style.border.radius = border::radius(size.radius(&t));
+
+            if expanded {
+                style.background = Some(Background::Color(t.palette.muted));
+                style.text_color = t.palette.foreground;
+            }
 
             // `focus-visible:border-ring`
             if focused {

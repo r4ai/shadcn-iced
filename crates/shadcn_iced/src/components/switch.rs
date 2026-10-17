@@ -105,20 +105,26 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
             thumb,
         };
 
+        // `FieldLabel`: `text-sm font-medium leading-snug`, colored by an
+        // invalid field (`data-invalid:text-destructive`).
         let label = switch.label.map(|label| {
             text(label)
                 .size(style::text::SM)
                 .font(font::medium())
-                .line_height(iced::Pixels(14.0))
-                .style(move |theme: &Theme| text::Style {
-                    color: Some(alpha(
-                        tokens(theme).palette.foreground,
-                        if disabled {
-                            style::DISABLED_OPACITY
-                        } else {
-                            1.0
-                        },
-                    )),
+                .line_height(1.375)
+                .style(move |theme: &Theme| {
+                    let p = tokens(theme).palette;
+
+                    text::Style {
+                        color: Some(alpha(
+                            if invalid { p.destructive } else { p.foreground },
+                            if disabled {
+                                style::DISABLED_OPACITY
+                            } else {
+                                1.0
+                            },
+                        )),
+                    }
                 })
         });
 
@@ -199,11 +205,10 @@ pub fn thumb(theme: &Theme, checked: bool, disabled: bool) -> container::Style {
         (true, false) => p.foreground,
     };
 
+    // `data-disabled:opacity-50` fades the switch as a whole: the thumb
+    // stays opaque over the track.
     container::Style {
-        background: Some(Background::Color(shadcn_iced_core::theme::over(
-            alpha(color, opacity),
-            alpha(p.background, 1.0 - opacity),
-        ))),
+        background: Some(Background::Color(mix(p.background, color, opacity))),
         border: border::rounded(f32::MAX),
         ..container::Style::default()
     }
