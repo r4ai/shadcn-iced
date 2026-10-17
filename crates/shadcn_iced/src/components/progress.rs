@@ -28,12 +28,18 @@ pub fn progress_with_label<'a, Message: 'a>(
         .push(
             Row::new()
                 // `text-sm font-medium`
-                .push(text(label).size(style::text::SM).font(font::medium()))
+                .push(
+                    text(label)
+                        .size(style::text::SM)
+                        .line_height(style::text::leading(style::text::SM))
+                        .font(font::medium()),
+                )
                 .push(space::horizontal())
                 // `text-muted-foreground ml-auto text-sm tabular-nums`
                 .push(
                     text(format!("{}%", value.round()))
                         .size(style::text::SM)
+                        .line_height(style::text::leading(style::text::SM))
                         .style(|theme: &Theme| text::Style {
                             color: Some(tokens(theme).palette.muted_foreground),
                         }),
