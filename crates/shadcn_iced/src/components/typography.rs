@@ -3,8 +3,12 @@
 //! Port of <https://ui.shadcn.com/docs/components/typography>.
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Operation, Tree, Widget};
+use iced::advanced::{Clipboard, Shell, overlay};
 use iced::widget::{Column, Row, Text, container, text};
-use iced::{Background, Font, Length, Theme, border};
+use iced::{Background, Event, Font, Length, Rectangle, Size, Theme, Vector, border, mouse};
 
 fn muted(theme: &Theme) -> text::Style {
     text::Style {
@@ -165,4 +169,173 @@ pub fn list<'a, Message: 'a>(
     .spacing(8)
     .padding(iced::Padding::ZERO.top(8).left(7.25))
     .into()
+}
+
+/// Balances the lines of wrapped text (`text-balance`): lays out `content`
+/// in the narrowest width that does not add lines, so that its lines have
+/// similar lengths.
+///
+/// ```no_run
+/// # use shadcn_iced::typography::balance;
+/// # fn view<'a>() -> iced::Element<'a, ()> {
+/// balance(iced::widget::text("A heading long enough to wrap")).into()
+/// # }
+/// ```
+pub fn balance<'a, Message: 'a>(content: impl Into<Element<'a, Message>>) -> Balance<'a, Message> {
+    Balance {
+        content: content.into(),
+    }
+}
+
+/// Wrapped text with balanced lines. See [`balance`].
+pub struct Balance<'a, Message> {
+    content: Element<'a, Message>,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Balance<'_, Message> {
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let tree = &mut tree.children[0];
+        let content = self.content.as_widget_mut();
+        let node = content.layout(tree, renderer, limits);
+        let height = node.size().height;
+
+        let mut fits = node.size().width.min(limits.max().width);
+        let mut narrow = limits.min().width;
+
+        if !fits.is_finite() {
+            return layout::Node::with_children(node.size(), vec![node]);
+        }
+
+        // Like browsers, bisect the width while the height does not change.
+        while fits - narrow > 0.5 {
+            let width = (fits + narrow) / 2.0;
+            let candidate = content.layout(tree, renderer, &limits.max_width(width));
+
+            if candidate.size().height > height + 0.01 {
+                narrow = width;
+            } else {
+                fits = width;
+            }
+        }
+
+        let node = content.layout(tree, renderer, &limits.max_width(fits));
+
+        layout::Node::with_children(node.size(), vec![node])
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            operation,
+        );
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout.children().next().unwrap(),
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            viewport,
+            translation,
+        )
+    }
+}
+
+impl<'a, Message: 'a> From<Balance<'a, Message>> for Element<'a, Message> {
+    fn from(balance: Balance<'a, Message>) -> Self {
+        Element::new(balance)
+    }
 }
