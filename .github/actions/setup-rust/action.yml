@@ -1,0 +1,25 @@
+name: Set up Rust
+description: >-
+  Installs the stable Rust toolchain with the rustup of the runner, without a
+  third-party action.
+
+inputs:
+  components:
+    description: Extra components, comma-separated (`clippy`, `rustfmt`)
+    default: ""
+  targets:
+    description: Extra targets, comma-separated (`wasm32-unknown-unknown`)
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        COMPONENTS: ${{ inputs.components }}
+        TARGETS: ${{ inputs.targets }}
+      run: |
+        rustup toolchain install stable --profile minimal --no-self-update \
+          ${COMPONENTS:+--component "$COMPONENTS"} ${TARGETS:+--target "$TARGETS"}
+        rustup default stable
+        rustc --version

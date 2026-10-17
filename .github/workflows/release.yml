@@ -1,0 +1,176 @@
+name: Release
+
+# Releases the crates with release-plz (`release-plz.toml`):
+#
+# 1. Every push to `main` opens or updates the release pull request, which
+#    bumps the version of the crates and updates `CHANGELOG.md` from the
+#    conventional commits since the last release.
+# 2. Merging it publishes the crates to crates.io (trusted publishing: no
+#    token), tags `v<version>` and creates its GitHub release.
+# 3. The release gets the prebuilt binaries of `cargo shadcn-iced`, with their
+#    build provenance, for `cargo binstall`.
+#
+# Setup: see "Releasing" in `docs/development.md`.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  release-pr:
+    name: Release PR
+    if: github.repository == 'r4ai/shadcn-iced'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Push the branch of the release pull request.
+      contents: write
+      # Open and update the release pull request.
+      pull-requests: write
+    # One at a time, and never cancelled: the next push waits for this one.
+    concurrency:
+      group: release-pr
+      cancel-in-progress: false
+    steps:
+      # A pull request opened with `GITHUB_TOKEN` does not trigger CI: open it
+      # as the GitHub App of the `RELEASE_APP_ID` variable and
+      # `RELEASE_APP_PRIVATE_KEY` secret when there is one.
+      - id: app
+        if: vars.RELEASE_APP_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+      - run: ./scripts/prepare-publish.sh
+      - uses: release-plz/action@f393a7b38aca9d9b4c58447b291dbac963901df6 # v0.5.141
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }}
+
+  # Whether this push merged the release pull request, the only commits that
+  # release (`release_always = false`), so that the other pushes do not
+  # deploy to the `crates-io` environment.
+  check:
+    name: Check
+    if: github.repository == 'r4ai/shadcn-iced'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          branch="$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[0].head.ref // ""')"
+          echo "pull request branch: $branch"
+          if [[ "$branch" == release-plz-* ]]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    name: Publish
+    needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The environment that the trusted publishers of the crates on crates.io
+    # require.
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/shadcn-iced
+    permissions:
+      # Push the tag and create the GitHub release.
+      contents: write
+      # Find the release pull request of the commit.
+      pull-requests: read
+      # crates.io trusted publishing.
+      id-token: write
+    outputs:
+      cli-version: ${{ steps.cli.outputs.version }}
+      tag: ${{ steps.cli.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+      - run: ./scripts/prepare-publish.sh
+      - id: release
+        uses: release-plz/action@f393a7b38aca9d9b4c58447b291dbac963901df6 # v0.5.141
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      # The version of `cargo-shadcn-iced` if it was released, and the tag of
+      # the GitHub release (that of `shadcn-iced`, the same version).
+      - id: cli
+        env:
+          RELEASES: ${{ steps.release.outputs.releases }}
+        run: |
+          echo "$RELEASES" | jq .
+          {
+            echo "version=$(jq -r '.[] | select(.package_name == "cargo-shadcn-iced") | .version' <<< "$RELEASES")"
+            echo "tag=$(jq -r '.[] | select(.package_name == "shadcn-iced") | .tag' <<< "$RELEASES")"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  binaries:
+    name: Binaries (${{ matrix.target }})
+    needs: publish
+    if: needs.publish.outputs.cli-version != '' && needs.publish.outputs.tag != ''
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm }
+          - { target: x86_64-apple-darwin, os: macos-latest }
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest }
+          - { target: aarch64-pc-windows-msvc, os: windows-latest }
+    permissions:
+      # Upload the archives to the GitHub release.
+      contents: write
+      # Attest their build provenance.
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.publish.outputs.tag }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          targets: ${{ matrix.target }}
+      - id: upload
+        uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
+        with:
+          bin: cargo-shadcn-iced
+          target: ${{ matrix.target }}
+          ref: refs/tags/${{ needs.publish.outputs.tag }}
+          include: LICENSE,README.md
+          checksum: sha256
+          locked: true
+          token: ${{ github.token }}
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.upload.outputs.archive }}.*

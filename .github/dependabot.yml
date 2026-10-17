@@ -1,9 +1,12 @@
 # Keeps the pinned actions and the lockfiles up to date. `cooldown` waits a
-# week after a release so that compromised versions are likely yanked first.
+# week after a release so that compromised versions are likely yanked first,
+# like `minimumReleaseAge` of pnpm and `exclude-newer` of uv. The tools of
+# `mise.toml` are updated by hand (`mise lock`).
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    # The workflows and the composite actions (`.github/actions`).
+    directories: ["/", "/.github/actions/*"]
     schedule:
       interval: weekly
     cooldown:
@@ -44,3 +47,14 @@ updates:
     groups:
       conformance:
         update-types: [minor, patch]
+
+  # The Python scripts (`scripts/pyproject.toml`).
+  - package-ecosystem: uv
+    directory: /scripts
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      scripts:
+        patterns: ["*"]

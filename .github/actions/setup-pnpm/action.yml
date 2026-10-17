@@ -1,0 +1,31 @@
+name: Set up pnpm
+description: >-
+  Installs Node.js (the version of `mise.toml`) and pnpm (the
+  `packageManager` of the project, checked against its hash), then the
+  dependencies of the project from its lockfile.
+
+inputs:
+  directory:
+    description: The directory of the pnpm project (`site` or `conformance`)
+    required: true
+  cache:
+    description: Cache the pnpm store, keyed by the lockfile
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      with:
+        package_json_file: ${{ inputs.directory }}/package.json
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: mise.toml
+        cache: ${{ inputs.cache == 'true' && 'pnpm' || '' }}
+        cache-dependency-path: ${{ inputs.directory }}/pnpm-lock.yaml
+    # The supply-chain policies of `pnpm-workspace.yaml` apply: it fails on a
+    # package younger than 7 days, a trust downgrade or an unreviewed install
+    # script.
+    - shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: pnpm install --frozen-lockfile
