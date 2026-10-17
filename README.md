@@ -10,27 +10,16 @@ Use **65+ components**—from forms, overlays, and data tables to charts and AI 
 
 ## Showcase
 
-### Composed Interfaces
-
-![Analytics & Dashboard UI in Dark Mode (Zinc + Violet)](docs/screenshots/showcase-dashboard-dark.png)
-
-![AI Agent & Developer UI in Light Mode (Code Block, Trace & Questionnaire)](docs/screenshots/showcase-agent-light.png)
-
-### Component Highlights
-
 | | |
 | :---: | :---: |
-| ![Stacked Area Chart (Blue, Light)](docs/screenshots/chart-blue-light.png)<br/>**Charts** — Area, Bar, Line & Pie / Donut | ![Card & Form Inputs (Violet, Dark)](docs/screenshots/card-violet-dark.png)<br/>**Card & Inputs** — Tokens, focus rings & presets |
-| ![Dropdown Menu with Submenu (Dark)](docs/screenshots/dropdown-menu-dark.png)<br/>**Dropdown Menu** — Submenus & keyboard shortcuts | ![Dialog Modal (Light)](docs/screenshots/dialog-light.png)<br/>**Dialog** — Modal overlays & focus trapping |
+| ![Stacked Area Chart (Blue, Dark)](docs/screenshots/chart-blue-dark.png)<br/>**Charts** — Area, Bar, Line & Pie / Donut | ![Card & Form Inputs (Violet, Dark)](docs/screenshots/card-violet-dark.png)<br/>**Card & Inputs** — Tokens, focus rings & presets |
+| ![Dropdown Menu with Submenu (Dark)](docs/screenshots/dropdown-menu-dark.png)<br/>**Dropdown Menu** — Submenus & keyboard shortcuts | ![Dialog Modal (Dark)](docs/screenshots/dialog-dark.png)<br/>**Dialog** — Modal overlays & focus trapping |
 | ![Command Palette (Dark)](docs/screenshots/command-dark.png)<br/>**Command** — Searchable command palette | ![Agent Trace (Dark)](docs/screenshots/trace-dark.png)<br/>**Trace** — Collapsible agent tool steps & logs |
-| ![Calendar (Light)](docs/screenshots/calendar-light.png)<br/>**Calendar** — Single, range & month/year pickers | ![Field & Form Controls (Light)](docs/screenshots/field-light.png)<br/>**Field & Select** — Structured forms & validation |
+| ![Calendar (Dark)](docs/screenshots/calendar-dark.png)<br/>**Calendar** — Single, range & month/year pickers | ![Field & Form Controls (Dark)](docs/screenshots/field-dark.png)<br/>**Field & Select** — Structured forms & validation |
 
 ---
 
 ## Installation
-
-> [!NOTE]
-> The `0.0.0` packages on crates.io are reserved placeholders. Install `shadcn-iced` via Git until the first release is published.
 
 ### Option 1: Use as a Library
 
@@ -44,7 +33,7 @@ shadcn_iced = { git = "https://github.com/r4ai/shadcn-iced.git" }
 
 ### Option 2: Copy and Own (CLI)
 
-If you want full ownership over component source files (just like `shadcn/ui`), depend on `shadcn_iced_core` and use `cargo-shadcn-iced` to copy only the components you need into your repository:
+Depend on `shadcn_iced_core` and use `cargo-shadcn-iced` to copy only the components you need into your repository:
 
 ```toml
 [dependencies]
@@ -68,7 +57,7 @@ cargo shadcn-iced diff
 
 ## Usage
 
-Import `shadcn_iced::prelude::*`, call `.shadcn_iced()` on your `iced::application` to load the bundled fonts (`Geist`, `Geist Mono`, `Inter`, `Lucide` icons, and keyboard symbols), and configure a theme:
+Import `shadcn_iced::prelude::*`, call `.shadcn_iced()` on your `iced::application` to load the bundled fonts, and configure a theme:
 
 ```rust,no_run
 use shadcn_iced::prelude::*;
@@ -97,7 +86,7 @@ fn main() -> iced::Result {
 }
 ```
 
-You can run this example directly from the repository with:
+Run this example from the repository with:
 
 ```sh
 cargo run -p hello
@@ -105,7 +94,7 @@ cargo run -p hello
 
 ### Customizing Themes
 
-Combine any of the **7 base palettes** (`neutral`, `stone`, `zinc`, `mauve`, `olive`, `mist`, `taupe`), **17 accent colors**, **5 corner radius presets**, and menu styles, or customize palette tokens directly:
+Combine any of the **7 base palettes**, **17 accent colors**, **5 corner radius presets**, and menu styles:
 
 ```rust
 use shadcn_iced::theme::{self, Accent, MenuAccent, MenuColor, Mode, Radius};
@@ -122,13 +111,17 @@ let theme: iced::Theme = theme::zinc(Mode::Dark)
 
 ## Documentation
 
-- **[Website & Interactive Component Previews](https://shadcn-iced.r4ai.dev)** — Live WebAssembly examples, props, and code snippets for all components and charts.
-- **[Architecture (`docs/architecture.md`)](docs/architecture.md)** — Workspace structure, library vs. copy-and-own design, token pipeline, and headless primitives.
-- **[Development Guide (`docs/development.md`)](docs/development.md)** — Running the desktop gallery, taking headless snapshots, adding components, and running checks.
-- **[Conformance Suite (`conformance/README.md`)](conformance/README.md)** — Automated pixel-diff testing against official React `shadcn/ui`.
+- **[Website & Interactive Previews](https://shadcn-iced.r4ai.dev)**
+  - Live WebAssembly examples, props, and code snippets for all components
+- **[Architecture (`docs/architecture.md`)](docs/architecture.md)**
+  - Workspace structure, token pipeline, and headless primitives
+- **[Development Guide (`docs/development.md`)](docs/development.md)**
+  - Desktop gallery, headless snapshots, CLI usage, and CI checks
+- **[Conformance Suite (`conformance/README.md`)](conformance/README.md)**
+  - Automated pixel-diff testing against official React `shadcn/ui`
 
 ---
 
 ## License
 
-Licensed under the [MIT License](LICENSE). Bundled fonts (`Geist`, `Inter`, `Noto Sans Symbols`) and icons (`Lucide`) are covered by their respective permissive licenses detailed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+Licensed under the [MIT License](LICENSE). Third-party font and icon licenses are listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
