@@ -97,6 +97,7 @@ pub struct Toggle<'a, Message> {
     padding: Option<f32>,
     disabled: bool,
     width: Length,
+    tab_stop: bool,
 }
 
 /// Creates a [`Toggle`].
@@ -113,6 +114,7 @@ pub fn toggle<'a, Message: Clone + 'a>(on: bool) -> Toggle<'a, Message> {
         padding: None,
         disabled: false,
         width: Length::Shrink,
+        tab_stop: true,
     }
 }
 
@@ -178,6 +180,13 @@ impl<'a, Message: Clone + 'a> Toggle<'a, Message> {
         self.width = width.into();
         self
     }
+
+    /// Sets whether the toggle is reached with <kbd>Tab</kbd>. Defaults to
+    /// `true`; groups only keep one of their items in the tab order.
+    pub fn tab_stop(mut self, tab_stop: bool) -> Self {
+        self.tab_stop = tab_stop;
+        self
+    }
 }
 
 impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message> {
@@ -221,21 +230,32 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
                 .into()
         };
 
+        // Joined group items: `first:rounded-l-lg last:rounded-r-lg`
+        let radius = move |t: &shadcn_iced_core::Tokens| {
+            if position == Position::Alone {
+                size.radius(t)
+            } else {
+                t.radius_lg()
+            }
+        };
+
         Pressable::new(content)
             .on_press_maybe(toggle.on_toggle.map(|f| f(!on)))
             .disabled(disabled)
+            .focusable(true)
+            .tab_stop(toggle.tab_stop)
             .width(toggle.width)
             .height(size.height())
             .padding(padding)
-            .style(move |theme, status| {
+            .focus_style(move |theme, status, focused| {
                 let mut style = self::style(theme, status, on, variant, position);
                 let t = tokens(theme);
-                // Joined group items: `first:rounded-l-lg last:rounded-r-lg`
-                let radius = if position == Position::Alone {
-                    size.radius(&t)
-                } else {
-                    t.radius_lg()
-                };
+                let radius = radius(&t);
+
+                // `focus-visible:border-ring`
+                if focused {
+                    style.border.color = t.palette.ring;
+                }
 
                 style.border.radius = if vertical {
                     position.vertical_radius(radius)
@@ -244,6 +264,21 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
                 };
 
                 style
+            })
+            // `focus-visible:ring-[3px] focus-visible:ring-ring/50`
+            .ring(move |theme, _status, focused| {
+                focused.then(|| {
+                    let t = tokens(theme);
+
+                    style::ring(
+                        &t,
+                        if position == Position::Middle {
+                            0.0
+                        } else {
+                            radius(&t)
+                        },
+                    )
+                })
             })
             .into()
     }

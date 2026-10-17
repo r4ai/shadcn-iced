@@ -16,10 +16,14 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::Icon;
-use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::roving::Keys;
+use shadcn_iced_core::primitive::{Pressable, Roving};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Tree, Widget, tree};
 use iced::widget::button::{Status, Style};
 use iced::widget::{Column, Row, container, space, text};
 use iced::{Alignment, Background, Border, Color, Length, Theme, border};
@@ -148,9 +152,11 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
 
             // `justify-center`, or `justify-start` when vertical.
             let content: Element<'a, Message> = if vertical {
-                let hidden = labels
-                    .iter()
-                    .map(|(icon, label)| trigger_label(*icon, label.clone(), false));
+                let hidden = labels.iter().map(|(icon, label)| {
+                    Element::new(Ghost {
+                        content: trigger_label(*icon, label.clone(), false),
+                    })
+                });
 
                 // The labels overlap (`spacing(-20)`); the visible one
                 // comes last.
@@ -167,13 +173,33 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
                 container(content).center(Length::Fill).into()
             };
 
+            // Roving focus: the active tab is the one in the tab order.
             let trigger = Pressable::new(content)
                 .on_press_maybe((!disabled && !active).then(|| (tabs.on_select)(value)))
                 .disabled(disabled)
+                .focusable(true)
+                .tab_stop(active)
                 .width(if fill { Length::Fill } else { Length::Shrink })
                 .height(if vertical { 26.0 } else { TRIGGER_HEIGHT })
                 .padding([2, 6])
-                .style(move |theme, status| trigger(theme, status, active, variant));
+                .focus_style(move |theme, status, focused| {
+                    let mut style = trigger(theme, status, active, variant);
+
+                    // `focus-visible:border-ring`
+                    if focused {
+                        style.border.color = tokens(theme).palette.ring;
+                    }
+
+                    style
+                })
+                // `focus-visible:ring-[3px] focus-visible:ring-ring/50`
+                .ring(|theme, _status, focused| {
+                    focused.then(|| {
+                        let t = tokens(theme);
+
+                        style::ring(&t, t.radius_md())
+                    })
+                });
 
             if variant == Variant::Line {
                 // `after:h-0.5 after:bg-foreground after:bottom-[-5px]`
@@ -222,6 +248,8 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
             Variant::Line => 4,
         };
 
+        // The arrow keys move the focus between triggers; Enter or Space
+        // activates the focused one (`activateOnFocus={false}`).
         let list: Element<'a, Message> = if vertical {
             container(
                 Column::with_children(triggers)
@@ -251,6 +279,12 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
             .style(move |theme| self::list(theme, variant))
             .into()
         };
+
+        let list = Roving::new(list).keys(if vertical {
+            Keys::Vertical
+        } else {
+            Keys::Horizontal
+        });
 
         let has_content = tabs.content.is_some();
 
@@ -393,4 +427,54 @@ pub fn trigger(theme: &Theme, status: Status, active: bool, variant: Variant) ->
     }
 
     style
+}
+
+/// Takes the space of its content without showing it, nor exposing it to
+/// operations (`aria-hidden`): the hidden labels that size vertical
+/// triggers are not texts to find.
+struct Ghost<'a, Message> {
+    content: Element<'a, Message>,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Ghost<'_, Message> {
+    fn tag(&self) -> tree::Tag {
+        self.content.as_widget().tag()
+    }
+
+    fn state(&self) -> tree::State {
+        self.content.as_widget().state()
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        self.content.as_widget().children()
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        self.content.as_widget().diff(tree);
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content.as_widget_mut().layout(tree, renderer, limits)
+    }
+
+    fn draw(
+        &self,
+        _tree: &Tree,
+        _renderer: &mut iced::Renderer,
+        _theme: &Theme,
+        _style: &renderer::Style,
+        _layout: Layout<'_>,
+        _cursor: iced::mouse::Cursor,
+        _viewport: &iced::Rectangle,
+    ) {
+    }
 }
