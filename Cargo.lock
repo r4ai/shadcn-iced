@@ -644,6 +644,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shadcn_iced",
+ "unicode-script",
 ]
 
 [[package]]

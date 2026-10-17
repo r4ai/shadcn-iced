@@ -11,7 +11,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type CDPSession, type Page } from "@playwright/test"
 
 import { compare } from "./compare.ts"
 import {
@@ -70,6 +70,56 @@ async function stableScreenshot(page: Page) {
   }
 
   throw new Error("the page never stops changing")
+}
+
+/** The part of a CDP `DOM.Node` that {@link systemFonts} reads. */
+interface DomNode {
+  nodeId: number
+  nodeType: number
+  nodeValue: string
+  children?: DomNode[]
+  shadowRoots?: DomNode[]
+  contentDocument?: DomNode
+}
+
+/**
+ * The fonts of the system that render some text of the page: none should,
+ * since the iced runner has only the bundled fonts.
+ */
+async function systemFonts(cdp: CDPSession) {
+  const { root } = await cdp.send("DOM.getDocument", {
+    depth: -1,
+    pierce: true,
+  })
+  const elements: number[] = []
+  const visit = (node: DomNode) => {
+    if (
+      node.children?.some(
+        (child) => child.nodeType === 3 && child.nodeValue.trim() !== ""
+      )
+    ) {
+      elements.push(node.nodeId)
+    }
+    for (const child of [
+      ...(node.children ?? []),
+      ...(node.shadowRoots ?? []),
+      ...(node.contentDocument ? [node.contentDocument] : []),
+    ]) {
+      visit(child)
+    }
+  }
+  visit(root)
+
+  const fonts = new Set<string>()
+  for (const nodeId of elements) {
+    const result = await cdp
+      .send("CSS.getPlatformFontsForNode", { nodeId })
+      .catch(() => ({ fonts: [] }))
+    for (const font of result.fonts) {
+      if (!font.isCustomFont) fonts.add(font.familyName)
+    }
+  }
+  return [...fonts]
 }
 
 async function locate(page: Page, locator: Locator) {
@@ -148,6 +198,9 @@ for (const file of readScenarios()) {
               ),
               "Geist is loaded"
             ).toBe(true)
+            const cdp = await page.context().newCDPSession(page)
+            await cdp.send("DOM.enable")
+            await cdp.send("CSS.enable")
 
             for (const [index, step] of steps(scenario).entries()) {
               if ("snapshot" in step) {
@@ -162,6 +215,13 @@ for (const file of readScenarios()) {
                 // Fonts of overlays load when they are first shown.
                 await page.evaluate(() => document.fonts.ready)
                 writeFileSync(referencePath, await stableScreenshot(page))
+
+                const fallbacks = await systemFonts(cdp)
+                if (fallbacks.length > 0) {
+                  record.reference.failures.push(
+                    `snapshot ${step.snapshot}: text falls back to fonts of the system (${fallbacks.join(", ")})`
+                  )
+                }
 
                 const key = snapshotKey(
                   file.component,

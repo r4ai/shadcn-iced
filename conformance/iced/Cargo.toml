@@ -11,6 +11,7 @@ iced_test.workspace = true
 shadcn_iced = { path = "../../crates/shadcn_iced" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+unicode-script = "0.5"
 png = "0.18"
 
 [lints]
