@@ -92,6 +92,13 @@ Run this example from the repository with:
 cargo run -p hello
 ```
 
+Two example apps with mock data show the components working together, on the website ([/examples](https://shadcn-iced.r4ai.dev/examples)) or on your desktop:
+
+```sh
+cargo run -p dashboard  # the dashboard-01 block: sidebar, metrics, chart and data table
+cargo run -p settings   # an app's settings: profile, account, appearance, notifications
+```
+
 ### Customizing Themes
 
 Combine any of the **7 base palettes**, **17 accent colors**, **5 corner radius presets**, and menu styles:

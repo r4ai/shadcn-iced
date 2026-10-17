@@ -53,6 +53,23 @@ GALLERY_FONT=inter cargo run -p gallery
 
 ---
 
+## Running the Example Apps
+
+Two mock apps (`examples/dashboard`, `examples/settings`) show the components working together. Each is a crate of its own: a library with the state, `update` and `view` of the app, and a `main.rs` that runs it. The gallery maps their views (`examples/gallery/src/pages/apps.rs`) for the `/examples` pages of the website, and the `snapshot` binary renders them by id.
+
+```sh
+# The dashboard-01 block of shadcn/ui: sidebar, metrics, chart and data table
+cargo run -p dashboard
+
+# An app's settings: profile, account, appearance, notifications and display
+cargo run -p settings
+
+# Render an app headlessly, like any gallery page
+ICED_TEST_BACKEND=tiny-skia cargo run -p gallery --bin snapshot -- settings:dark --click Notifications --size 1280x1000
+```
+
+---
+
 ## Headless Snapshot Tool (`snapshot`)
 
 Render any gallery page to PNG files without opening a window using `examples/gallery/src/bin/snapshot.rs`.
