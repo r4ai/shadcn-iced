@@ -1,0 +1,29 @@
+{
+  "$schema": "./schema.json",
+  "component": "code-block",
+  "scenarios": [
+    {
+      "id": "header",
+      "viewport": [480, 160],
+      "steps": [
+        { "wait": 500 },
+        {
+          "expect": { "visible": ["Terminal", "pnpm add ai @ai-sdk/react zod"] }
+        },
+        { "snapshot": "default" }
+      ]
+    },
+    { "id": "line-numbers", "viewport": [480, 270] },
+    { "id": "diff", "viewport": [480, 200] },
+    {
+      "id": "floating-actions",
+      "viewport": [480, 100],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": "pnpm add ai @ai-sdk/react zod" },
+        { "snapshot": "hover" }
+      ]
+    },
+    { "id": "destructive-sm", "viewport": [480, 190] }
+  ]
+}

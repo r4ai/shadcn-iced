@@ -1,0 +1,22 @@
+{
+  "$schema": "./schema.json",
+  "component": "attachment",
+  "scenarios": [
+    { "id": "states", "viewport": [416, 350] },
+    { "id": "sizes", "viewport": [416, 200] },
+    { "id": "group", "viewport": [416, 190] },
+    {
+      "id": "trigger",
+      "viewport": [416, 130],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": "project-brief.pdf" },
+        { "snapshot": "hover" },
+        { "expect": { "visible": ["Not opened"], "hidden": ["Opened"] } },
+        { "click": "project-brief.pdf" },
+        { "expect": { "visible": ["Opened"], "hidden": ["Not opened"] } },
+        { "snapshot": "clicked" }
+      ]
+    }
+  ]
+}

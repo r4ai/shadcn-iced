@@ -1,0 +1,35 @@
+{
+  "$schema": "./schema.json",
+  "component": "message-scroller",
+  "scenarios": [
+    {
+      "id": "bottom",
+      "viewport": [416, 352],
+      "steps": [
+        { "wait": 500 },
+        {
+          "expect": {
+            "visible": ["That works, thanks!"]
+          }
+        },
+        { "snapshot": "pinned-to-newest" }
+      ]
+    },
+    {
+      "id": "scroll-to-start",
+      "viewport": [416, 352],
+      "steps": [
+        { "wait": 500 },
+        { "click": "That works, thanks!" },
+        { "press": "Home" },
+        { "wait": 300 },
+        {
+          "expect": {
+            "visible": ["How do I keep a chat pinned to the newest message?"]
+          }
+        },
+        { "snapshot": "scrolled-up" }
+      ]
+    }
+  ]
+}

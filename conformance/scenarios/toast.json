@@ -1,0 +1,55 @@
+{
+  "$schema": "./schema.json",
+  "component": "toast",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [640, 260],
+      "steps": [
+        { "snapshot": "idle" },
+        { "click": "Show Toast" },
+        { "wait": 600 },
+        {
+          "expect": {
+            "visible": [
+              "Event created",
+              "Sunday, December 3 at 9:00 AM",
+              "Undo"
+            ]
+          }
+        },
+        { "snapshot": "toast" },
+        { "click": "Undo" },
+        { "wait": 600 },
+        { "expect": { "hidden": ["Event created"] } },
+        { "snapshot": "dismissed" }
+      ]
+    },
+    {
+      "id": "auto-dismiss",
+      "viewport": [640, 260],
+      "steps": [
+        { "click": "Show Toast" },
+        { "wait": 600 },
+        { "expect": { "visible": ["Event created"] } },
+        { "wait": 5200 },
+        { "expect": { "hidden": ["Event created"] } },
+        { "snapshot": "expired" }
+      ]
+    },
+    {
+      "id": "types",
+      "viewport": [640, 260],
+      "steps": [
+        { "click": "Success" },
+        { "wait": 600 },
+        { "expect": { "visible": ["Event created"] } },
+        { "snapshot": "success" },
+        { "click": "Error" },
+        { "wait": 600 },
+        { "expect": { "visible": ["Event created", "Event failed"] } },
+        { "snapshot": "stacked" }
+      ]
+    }
+  ]
+}
