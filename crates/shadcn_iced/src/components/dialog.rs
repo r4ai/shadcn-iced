@@ -12,7 +12,10 @@
 //! dialog(button("Open Dialog").variant(Variant::Outline).on_press(Message::Open), open)
 //!     .title("Edit profile")
 //!     .description("Make changes to your profile here.")
-//!     .footer(button("Save changes").on_press(Message::Close))
+//!     .footer_buttons(|fill| {
+//!         let save = button("Save changes").on_press(Message::Close);
+//!         vec![if fill { save.width(iced::Fill) } else { save }.into()]
+//!     })
 //!     .on_close(Message::Close)
 //!     .into()
 //! # }
@@ -20,7 +23,7 @@
 use super::button::{Size, Variant, icon_button};
 
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::Layer;
+use shadcn_iced_core::primitive::{Breakpoint, Layer};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -35,6 +38,7 @@ pub struct Dialog<'a, Message> {
     description: Option<String>,
     content: Vec<Element<'a, Message>>,
     footer: Option<Element<'a, Message>>,
+    breakpoint: Breakpoint,
     on_close: Option<Message>,
     close_button: bool,
     width: f32,
@@ -56,6 +60,7 @@ pub fn dialog<'a, Message: Clone + 'a>(
         description: None,
         content: Vec::new(),
         footer: None,
+        breakpoint: Breakpoint::sm(),
         on_close: None,
         close_button: true,
         width: 384.0,
@@ -89,6 +94,30 @@ impl<'a, Message: Clone + 'a> Dialog<'a, Message> {
         self
     }
 
+    /// Sets the buttons of the footer, laid out like a `DialogFooter`
+    /// (`flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`): in a row
+    /// aligned to the right from the `sm` breakpoint on, and below it
+    /// stacked in reverse order, filling the footer.
+    ///
+    /// `buttons` is called twice, with whether the buttons fill the footer,
+    /// to build them for both layouts: give them a
+    /// [`Length::Fill`] width when they do.
+    pub fn footer_buttons(mut self, buttons: impl Fn(bool) -> Vec<Element<'a, Message>>) -> Self {
+        let row = Row::with_children(buttons(false)).spacing(8);
+        let mut stack = buttons(true);
+        stack.reverse();
+
+        self.footer = Some(
+            self.breakpoint
+                .either(
+                    row,
+                    Column::with_children(stack).spacing(8).width(Length::Fill),
+                )
+                .into(),
+        );
+        self
+    }
+
     /// Sets the message produced when the user closes the dialog (close
     /// button, <kbd>Escape</kbd> or a click outside).
     pub fn on_close(mut self, message: Message) -> Self {
@@ -102,7 +131,9 @@ impl<'a, Message: Clone + 'a> Dialog<'a, Message> {
         self
     }
 
-    /// Sets the maximum width. Defaults to `sm:max-w-sm` (384).
+    /// Sets the maximum width from the `sm` breakpoint on. Defaults to
+    /// `sm:max-w-sm` (384); below the breakpoint, the dialog fills the
+    /// window but for a 16px margin (`max-w-[calc(100%-2rem)]`).
     pub fn width(mut self, width: f32) -> Self {
         self.width = width;
         self
@@ -214,29 +245,56 @@ pub fn panel(theme: &Theme) -> container::Style {
     }
 }
 
+/// The padding of the [`Layer`] of dialogs: the 16px margin around them
+/// (`max-w-[calc(100%-2rem)]`), minus their ring, drawn outside of them.
+pub const LAYER_PADDING: f32 = 15.0;
+
 /// Wraps the content of a dialog in a [`panel`] of the given maximum width,
-/// drawing its ring on top so a [`footer_band`] can reach the edges.
+/// from the `sm` breakpoint on; below it, the panel fills the window but
+/// for the 16px margin of its [`Layer`] (`max-w-[calc(100%-2rem)]`).
 pub fn surface<'a, Message: 'a>(
     content: impl Into<Element<'a, Message>>,
     max_width: f32,
 ) -> Element<'a, Message> {
-    let ring =
-        container(space().width(Length::Fill).height(Length::Fill)).style(|theme: &Theme| {
-            let t = tokens(theme);
+    responsive_surface(content, &Breakpoint::sm(), max_width, f32::INFINITY)
+}
 
-            container::Style {
-                border: style::ring_border(&t, t.radius_xl()),
-                ..container::Style::default()
-            }
-        });
-
-    container(Stack::new().push(content).push(ring))
-        .max_width(max_width)
+/// Wraps the content of a dialog in a [`panel`], `wide` at most from the
+/// given breakpoint on and `narrow` at most below it. The panel must be the
+/// content of a [`Layer`] with a padding of [`LAYER_PADDING`], which measures the window
+/// for the breakpoint.
+///
+/// Like CSS `ring-1`, the ring is drawn outside of the panel, over the
+/// backdrop, so a [`footer_band`] reaches the edges of the panel.
+pub fn responsive_surface<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+    breakpoint: &Breakpoint,
+    wide: f32,
+    narrow: f32,
+) -> Element<'a, Message> {
+    let panel = container(content)
         .width(Length::Fill)
         .style(|theme: &Theme| container::Style {
             border: style::rounded(tokens(theme).radius_xl()),
             ..panel(theme)
-        })
+        });
+
+    let ring = container(panel)
+        .padding(1)
+        .width(Length::Fill)
+        .style(|theme: &Theme| {
+            let t = tokens(theme);
+
+            container::Style {
+                border: style::ring_border(&t, t.radius_xl() + 1.0),
+                ..container::Style::default()
+            }
+        });
+
+    // The ring adds a pixel on each side.
+    breakpoint
+        .measure(ring, 2.0 * LAYER_PADDING)
+        .max_width(wide + 2.0, narrow + 2.0)
         .into()
 }
 
@@ -276,13 +334,8 @@ pub fn footer_band<'a, Message: 'a>(
 impl<'a, Message: Clone + 'a> From<Dialog<'a, Message>> for Element<'a, Message> {
     fn from(dialog: Dialog<'a, Message>) -> Self {
         let footer = dialog.footer.map(|footer| {
-            footer_band(
-                Row::new()
-                    .push(space::horizontal())
-                    .push(footer)
-                    .align_y(Alignment::Center)
-                    .width(Length::Fill),
-            )
+            // `sm:justify-end`, unless the footer fills the band.
+            footer_band(container(footer).align_right(Length::Fill))
         });
 
         let body = Column::new()
@@ -307,8 +360,10 @@ impl<'a, Message: Clone + 'a> From<Dialog<'a, Message>> for Element<'a, Message>
             );
         }
 
-        Layer::new(dialog.base, surface(layers, dialog.width), dialog.open)
-            .padding(Padding::new(16.0))
+        let panel = responsive_surface(layers, &dialog.breakpoint, dialog.width, f32::INFINITY);
+
+        Layer::new(dialog.base, panel, dialog.open)
+            .padding(Padding::new(LAYER_PADDING))
             .backdrop_with(backdrop)
             .on_dismiss_maybe(dialog.on_close)
             .into()
