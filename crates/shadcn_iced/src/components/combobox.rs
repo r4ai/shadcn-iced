@@ -19,12 +19,14 @@ use super::button::{Size, Variant, icon_button};
 use super::menu::{self, menu_tokens};
 
 use shadcn_iced_core::icon::lucide;
+use shadcn_iced_core::primitive::anchored::toggle;
+use shadcn_iced_core::primitive::focus::{self, FocusWithin};
 use shadcn_iced_core::primitive::{Align, Anchored, Side, listbox};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, style, tokens};
 
 use iced::widget::{Row, container, scrollable, text};
-use iced::{Alignment, Background, Color, Length, Padding, Theme};
+use iced::{Alignment, Length, Padding, Theme};
 
 /// A combobox. See the [module documentation](self).
 pub struct Combobox<'a, T, Message> {
@@ -151,37 +153,23 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
             .disabled(disabled);
 
         // `InputGroup`: `h-8 rounded-lg border border-input dark:bg-input/30`.
-        let field = container(
+        // `InputGroup`: `h-8 rounded-lg border border-input dark:bg-input/30`,
+        // with `border-ring ring-3 ring-ring/50` while the input is focused.
+        let field = FocusWithin::new(
             Row::new()
                 .push(input)
-                .push(container(trigger).padding(Padding::ZERO.right(3)))
+                // Only the trigger opens and closes the list on click.
+                .push(container(toggle(trigger)).padding(Padding::ZERO.right(3)))
                 .align_y(Alignment::Center),
+            move |theme: &Theme, status| focus::Style {
+                text_color: disabled
+                    .then(|| alpha(tokens(theme).palette.foreground, style::DISABLED_OPACITY)),
+                ..super::input_group::style(theme, status, invalid, disabled)
+            },
         )
+        .padding(1)
         .width(combobox.width)
-        .height(32)
-        .center_y(32)
-        .style(move |theme: &Theme| {
-            let t = tokens(theme);
-            let p = &t.palette;
-
-            container::Style {
-                background: Some(Background::Color(if t.is_dark() {
-                    alpha(p.input, 0.3)
-                } else {
-                    Color::TRANSPARENT
-                })),
-                text_color: Some(alpha(
-                    p.foreground,
-                    if disabled {
-                        style::DISABLED_OPACITY
-                    } else {
-                        1.0
-                    },
-                )),
-                border: style::border(if invalid { p.destructive } else { p.input }, t.radius_lg()),
-                ..container::Style::default()
-            }
-        });
+        .height(32);
 
         let on_select = &combobox.on_select;
         let selected = combobox.selected.clone();
@@ -243,10 +231,13 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
         };
 
         // `min-w-[calc(var(--anchor-width)+--spacing(7))] rounded-lg
-        // shadow-md ring-1`
+        // shadow-md ring-1`, where the anchor is the input: the group less
+        // its border and the addon (`pr-2 mr-[-0.3rem]` and a `size-6`
+        // button).
+        let anchor_width = combobox.width - 2.0 - (8.0 - 4.8 + 24.0);
         let popup = container(body)
             .padding(1)
-            .width(combobox.width + 28.0)
+            .width(anchor_width + 28.0 + 2.0)
             .max_height(288)
             .style(menu::panel);
 
@@ -254,8 +245,10 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
             return field.into();
         }
 
-        // `side="bottom" align="start" sideOffset={6}`
+        // `side="bottom" align="start" sideOffset={6}`; the chevron, typing
+        // or `ArrowDown` open the list, not a click on the input.
         Anchored::new(field, popup)
+            .combobox()
             .side(Side::Bottom)
             .align(Align::Start)
             .offset(6.0)
