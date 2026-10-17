@@ -1,7 +1,9 @@
 //! A carousel with motion and swipe built using iced.
 //!
 //! Port of <https://ui.shadcn.com/docs/components/carousel>. The current
-//! index lives in your state:
+//! index lives in your state. Once the carousel was clicked (like the focus
+//! within its region on the web), <kbd>ArrowLeft</kbd> and
+//! <kbd>ArrowRight</kbd> go to the previous and next items.
 //!
 //! ```no_run
 //! # use shadcn_iced::carousel::carousel;
@@ -13,13 +15,18 @@
 //!     .into()
 //! # }
 //! ```
-use super::button::{Size, Variant, icon_button};
+use super::button::{self, Variant, icon_button};
 
 use shadcn_iced_core::Element;
 use shadcn_iced_core::icon::lucide;
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::{Clipboard, Shell, overlay};
+use iced::keyboard::{self, key};
 use iced::widget::{Column, Row, container};
-use iced::{Alignment, Length};
+use iced::{Alignment, Event, Length, Rectangle, Size, Theme, Vector, mouse};
 
 /// The scrolling direction of a [`Carousel`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -40,6 +47,7 @@ pub struct Carousel<'a, Message> {
     spacing: f32,
     orientation: Orientation,
     looping: bool,
+    height: Option<f32>,
 }
 
 /// Creates a [`Carousel`] showing the item at `index` first.
@@ -55,6 +63,7 @@ pub fn carousel<'a, Message: Clone + 'a>(
         spacing: 16.0,
         orientation: Orientation::Horizontal,
         looping: false,
+        height: None,
     }
 }
 
@@ -94,6 +103,15 @@ impl<'a, Message: Clone + 'a> Carousel<'a, Message> {
         self.looping = looping;
         self
     }
+
+    /// Gives a vertical carousel a fixed height (`h-[200px]` on the
+    /// `CarouselContent`): the items keep their own height and the ones
+    /// that do not fit are clipped, instead of showing exactly
+    /// [`per_view`](Self::per_view) items.
+    pub fn height(mut self, height: impl Into<iced::Pixels>) -> Self {
+        self.height = Some(height.into().0);
+        self
+    }
 }
 
 impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Message> {
@@ -123,20 +141,23 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
         let nav = |icon, target: Option<usize>| {
             icon_button(icon)
                 .variant(Variant::Outline)
-                .size(Size::IconSm)
+                .size(button::Size::IconSm)
                 .disabled(target.is_none())
                 .on_press_maybe(target.map(|target| (carousel.on_change)(target)))
                 .position(shadcn_iced_core::style::Position::Alone, false)
         };
 
-        let visible = carousel
-            .items
-            .into_iter()
-            .skip(index)
-            .take(carousel.per_view)
-            .map(|item| container(item).width(Length::Fill).into());
+        let previous_message = previous.map(|target| (carousel.on_change)(target));
+        let next_message = next.map(|target| (carousel.on_change)(target));
 
-        if horizontal {
+        let content: Element<'a, Message> = if horizontal {
+            let visible = carousel
+                .items
+                .into_iter()
+                .skip(index)
+                .take(carousel.per_view)
+                .map(|item| container(item).width(Length::Fill).into());
+
             Row::new()
                 .push(round(nav(lucide::CHEVRON_LEFT, previous)))
                 .push(
@@ -151,15 +172,218 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
                 .align_y(Alignment::Center)
                 .into()
         } else {
+            let viewport: Element<'a, Message> = match carousel.height {
+                // The overflowing items are clipped (`overflow-hidden`).
+                Some(height) => container(
+                    Column::with_children(
+                        carousel
+                            .items
+                            .into_iter()
+                            .skip(index)
+                            .map(|item| container(item).width(Length::Fill).into()),
+                    )
+                    .spacing(carousel.spacing),
+                )
+                .height(height)
+                .clip(true)
+                .into(),
+                None => Column::with_children(
+                    carousel
+                        .items
+                        .into_iter()
+                        .skip(index)
+                        .take(carousel.per_view)
+                        .map(|item| container(item).width(Length::Fill).into()),
+                )
+                .spacing(carousel.spacing)
+                .into(),
+            };
+
             Column::new()
                 .push(round(nav(lucide::CHEVRON_UP, previous)))
-                .push(Column::with_children(visible).spacing(carousel.spacing))
+                .push(viewport)
                 .push(round(nav(lucide::CHEVRON_DOWN, next)))
                 // `-top-12` / `-bottom-12`
                 .spacing(20)
                 .align_x(Alignment::Center)
                 .into()
+        };
+
+        Element::new(Keys {
+            content,
+            previous: previous_message,
+            next: next_message,
+        })
+    }
+}
+
+/// Goes to the previous or next item with <kbd>ArrowLeft</kbd> and
+/// <kbd>ArrowRight</kbd> (`onKeyDownCapture` on the carousel region), once
+/// the carousel was clicked. iced has no focus within a region: a click
+/// inside of it stands for the focus of its buttons, and a click outside of
+/// it for their blur.
+struct Keys<'a, Message> {
+    content: Element<'a, Message>,
+    previous: Option<Message>,
+    next: Option<Message>,
+}
+
+#[derive(Debug, Default)]
+struct KeysState {
+    active: bool,
+}
+
+impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Keys<'_, Message> {
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<KeysState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(KeysState::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let child = self
+            .content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits);
+
+        layout::Node::with_children(child.size(), vec![child])
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            operation,
+        );
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        let state = tree.state.downcast_mut::<KeysState>();
+
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(_)) => {
+                state.active = cursor.is_over(layout.bounds());
+            }
+            Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) if state.active => {
+                let message = match key.as_ref() {
+                    keyboard::Key::Named(key::Named::ArrowLeft) => Some(&self.previous),
+                    keyboard::Key::Named(key::Named::ArrowRight) => Some(&self.next),
+                    _ => None,
+                };
+
+                if let Some(message) = message {
+                    if let Some(message) = message {
+                        shell.publish(message.clone());
+                    }
+
+                    shell.capture_event();
+                    return;
+                }
+            }
+            _ => {}
         }
+
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout.children().next().unwrap(),
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            viewport,
+            translation,
+        )
     }
 }
 

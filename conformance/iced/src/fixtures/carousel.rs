@@ -5,6 +5,7 @@ use shadcn_iced::aspect_ratio::aspect_ratio;
 use shadcn_iced::card::card;
 use shadcn_iced::carousel::{Orientation, carousel};
 use shadcn_iced::font;
+use shadcn_iced::style::text::leading;
 
 use iced::widget::{container, text};
 use iced::{Element, Fill, Length};
@@ -28,12 +29,14 @@ pub fn get(id: &str) -> Option<Fixture> {
             .into()
         }),
         "vertical" => Fixture::new(|s| {
-            // `max-w-xs`, `h-[200px]`, `pt-1 basis-1/2`
+            // `max-w-xs`, `-mt-1 h-[200px]` (a 196px tall viewport), `pt-1
+            // basis-1/2` (the cards are taller than half of it)
             container(
                 carousel(index(s), go)
                     .items((1..=5).map(|n| slide(n, 30.0, false)))
                     .per_view(2)
-                    .spacing(0.0)
+                    .spacing(4.0)
+                    .height(196)
                     .orientation(Orientation::Vertical),
             )
             .max_width(320)
@@ -55,10 +58,15 @@ fn go(index: usize) -> Msg {
 /// `p-1` around a card with `flex aspect-square items-center justify-center
 /// p-6` content.
 fn slide(n: usize, size: f32, square: bool) -> Element<'static, Msg> {
-    let number = container(text(n.to_string()).size(size).font(font::semibold()))
-        .center_x(Fill)
-        .center_y(Fill)
-        .padding(24);
+    let number = container(
+        text(n.to_string())
+            .size(size)
+            .line_height(leading(size))
+            .font(font::semibold()),
+    )
+    .center_x(Fill)
+    .center_y(Fill)
+    .padding(24);
 
     let content: Element<'static, Msg> = if square {
         aspect_ratio(1.0, number).into()
