@@ -284,6 +284,16 @@ impl Harness {
         self.with_interface(|interface, context| {
             let base = iced::theme::Base::base(context.theme);
 
+            // A freshly built interface only draws its overlays once they
+            // have been laid out, by an update.
+            let _ = interface.update(
+                &[Event::Window(window::Event::RedrawRequested(Instant::now()))],
+                context.cursor,
+                context.renderer,
+                context.clipboard,
+                context.messages,
+            );
+
             interface.draw(
                 context.renderer,
                 context.theme,
