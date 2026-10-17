@@ -120,4 +120,5 @@ jobs:
       - uses: ./.github/actions/setup-rust
       - run: ./scripts/prepare-publish.sh
       - run: cargo package --locked -p shadcn_iced_core -p shadcn-iced --no-verify
-      - run: cargo package --locked -p cargo-shadcn-iced
+      # `--allow-dirty`: the copy of the components is not committed.
+      - run: cargo package --locked --allow-dirty -p cargo-shadcn-iced

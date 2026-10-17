@@ -39,3 +39,6 @@ version_group = "shadcn_iced"
 [[package]]
 name = "cargo-shadcn-iced"
 version_group = "shadcn_iced"
+# Its copy of the components (`scripts/prepare-publish.sh`) is not committed,
+# which cargo counts as a dirty working directory.
+publish_allow_dirty = true
