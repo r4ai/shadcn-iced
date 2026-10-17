@@ -10,7 +10,7 @@ repository = "https://github.com/r4ai/shadcn-iced"
 rust-version = "1.88"
 
 [workspace.dependencies]
-iced = { version = "0.14", features = ["advanced", "svg", "canvas", "image", "tokio"] }
+iced = { version = "0.14", features = ["advanced", "advanced-shaping", "svg", "canvas", "image", "tokio"] }
 iced_test = "0.14"
 
 [workspace.lints.clippy]

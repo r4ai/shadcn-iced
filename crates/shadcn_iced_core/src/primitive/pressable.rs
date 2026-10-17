@@ -34,6 +34,7 @@ pub struct Pressable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer
     clip: bool,
     interaction: Option<mouse::Interaction>,
     press_offset: f32,
+    clip_background: bool,
     style: Box<dyn Fn(&Theme, Status) -> Style + 'a>,
 }
 
@@ -70,6 +71,7 @@ where
             clip: false,
             interaction: None,
             press_offset: 0.0,
+            clip_background: false,
             style: Box::new(|_, _| Style {
                 background: None,
                 text_color: Color::BLACK,
@@ -82,6 +84,13 @@ where
     /// (`active:translate-y-px`).
     pub fn press_offset(mut self, offset: f32) -> Self {
         self.press_offset = offset;
+        self
+    }
+
+    /// Paints the background inside the border only (`bg-clip-padding`), so
+    /// that a transparent border leaves a gap around it.
+    pub fn clip_background(mut self, clip: bool) -> Self {
+        self.clip_background = clip;
         self
     }
 
@@ -393,7 +402,49 @@ where
         };
 
         let draw = |renderer: &mut Renderer| {
-            if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0
+            let inset = if self.clip_background {
+                style.border.width
+            } else {
+                0.0
+            };
+
+            if inset > 0.0 {
+                // The border and shadow, then the background inside the border.
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds,
+                        border: style.border,
+                        shadow: style.shadow,
+                        snap: style.snap,
+                    },
+                    Background::Color(Color::TRANSPARENT),
+                );
+
+                if let Some(background) = style.background {
+                    let radius = style.border.radius;
+                    let inner = |r: f32| (r - inset).max(0.0);
+
+                    renderer.fill_quad(
+                        renderer::Quad {
+                            bounds: bounds.shrink(inset),
+                            border: iced::Border {
+                                radius: iced::border::Radius {
+                                    top_left: inner(radius.top_left),
+                                    top_right: inner(radius.top_right),
+                                    bottom_right: inner(radius.bottom_right),
+                                    bottom_left: inner(radius.bottom_left),
+                                },
+                                ..iced::Border::default()
+                            },
+                            snap: style.snap,
+                            ..renderer::Quad::default()
+                        },
+                        background,
+                    );
+                }
+            } else if style.background.is_some()
+                || style.border.width > 0.0
+                || style.shadow.color.a > 0.0
             {
                 renderer.fill_quad(
                     renderer::Quad {
