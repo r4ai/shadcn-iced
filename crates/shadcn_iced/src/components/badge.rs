@@ -19,7 +19,7 @@ use shadcn_iced_core::{Element, font, style};
 
 use iced::widget::button;
 use iced::widget::{Row, container, text};
-use iced::{Alignment, Background, Border, Color, Padding, Theme, border};
+use iced::{Alignment, Background, Border, Color, Padding, Theme, border, mouse};
 
 /// The visual style of a [`Badge`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -33,7 +33,7 @@ pub enum Variant {
     Destructive,
     /// `border-border text-foreground`
     Outline,
-    /// Transparent, `hover:bg-muted` when it is a link.
+    /// Transparent, `hover:bg-muted hover:text-muted-foreground`.
     Ghost,
     /// `text-primary underline-offset-4`
     Link,
@@ -127,25 +127,36 @@ impl<'a, Message: Clone + 'a> From<Badge<'a, Message>> for Element<'a, Message> 
             .spacing(4)
             .align_y(Alignment::Center);
 
-        match badge.on_press {
-            Some(on_press) => Pressable::new(container(content).center_y(iced::Length::Fill))
-                .on_press(on_press)
-                .height(HEIGHT)
-                .padding(padding)
-                .style(move |theme, status| {
-                    let hovered =
-                        matches!(status, button::Status::Hovered | button::Status::Pressed);
-                    let style = self::style_with(theme, variant, hovered);
+        // Links (`[a]:hover:`) and ghost badges (`hover:bg-muted`) react to
+        // the pointer.
+        let link = badge.on_press.is_some();
 
-                    button::Style {
-                        background: style.background,
-                        text_color: style.text_color.unwrap_or(Color::BLACK),
-                        border: style.border,
-                        ..button::Style::default()
-                    }
-                })
-                .into(),
-            None => container(content)
+        match badge.on_press {
+            _ if link || variant == Variant::Ghost => {
+                Pressable::new(container(content).center_y(iced::Length::Fill))
+                    .on_press_maybe(badge.on_press)
+                    .interaction(if link {
+                        mouse::Interaction::Pointer
+                    } else {
+                        mouse::Interaction::Idle
+                    })
+                    .height(HEIGHT)
+                    .padding(padding)
+                    .style(move |theme, status| {
+                        let hovered =
+                            matches!(status, button::Status::Hovered | button::Status::Pressed);
+                        let style = self::style_with(theme, variant, hovered);
+
+                        button::Style {
+                            background: style.background,
+                            text_color: style.text_color.unwrap_or(Color::BLACK),
+                            border: style.border,
+                            ..button::Style::default()
+                        }
+                    })
+                    .into()
+            }
+            _ => container(content)
                 .height(HEIGHT)
                 .center_y(HEIGHT)
                 .padding(padding)
@@ -161,7 +172,7 @@ pub fn style(theme: &Theme, variant: Variant) -> container::Style {
 }
 
 /// The style of a [`Badge`] of the given variant, hovered or not. Only
-/// links (`[a]:hover:`) have a hover style.
+/// links (`[a]:hover:`) and ghost badges (`hover:`) have a hover style.
 pub fn style_with(theme: &Theme, variant: Variant, hovered: bool) -> container::Style {
     let t = tokens(theme);
     let p = &t.palette;

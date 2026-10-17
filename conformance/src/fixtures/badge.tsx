@@ -26,10 +26,14 @@ export default {
       </Badge>
     </div>
   ),
+  // In a flex container like the other fixtures: alone, the inline badge
+  // would sit on the baseline of a 24px line box, 3px lower.
   link: () => (
-    <Badge render={<a href="#link" />}>
-      Open Link
-      <ArrowUpRightIcon data-icon="inline-end" />
-    </Badge>
+    <div className="flex">
+      <Badge render={<a href="#link" />}>
+        Open Link
+        <ArrowUpRightIcon data-icon="inline-end" />
+      </Badge>
+    </div>
   ),
 } satisfies Fixtures
