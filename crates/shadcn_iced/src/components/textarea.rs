@@ -57,6 +57,15 @@ impl<'a, Message: Clone + 'a> Textarea<'a, Message> {
         self
     }
 
+    /// Sets the font size, with its Tailwind line height. Textareas are
+    /// `text-base md:text-sm`: they use `text-sm` (14px) by default, the
+    /// size from the `md` breakpoint (768px) on; set `text-base` (16px)
+    /// for windows narrower than that.
+    pub fn text_size(mut self, size: f32) -> Self {
+        self.raw = self.raw.size(size).line_height(style::text::leading(size));
+        self
+    }
+
     /// Marks the textarea as invalid.
     pub fn invalid(mut self, invalid: bool) -> Self {
         self.invalid = invalid;
