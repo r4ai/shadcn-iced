@@ -9,10 +9,11 @@ use iced::widget::{container, text};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
-        "trigger" => Fixture::new(example).init(|s| {
-            s.set("bookmarks", true);
-            s.set("person", "pedro");
-        }),
+        "trigger" | "open" | "submenu" | "checkboxes" | "radio-group" => Fixture::new(example)
+            .init(|s| {
+                s.set("bookmarks", true);
+                s.set("person", "pedro");
+            }),
         _ => return None,
     })
 }

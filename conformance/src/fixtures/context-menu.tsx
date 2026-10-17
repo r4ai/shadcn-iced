@@ -87,4 +87,8 @@ function Example() {
 
 export default {
   trigger: () => <Example />,
+  open: () => <Example />,
+  submenu: () => <Example />,
+  checkboxes: () => <Example />,
+  "radio-group": () => <Example />,
 } satisfies Fixtures
