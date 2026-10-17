@@ -30,7 +30,12 @@ export function Showcase() {
           <For each={SHOWCASE}>
             {(item) => (
               <figure class="flex flex-col overflow-hidden rounded-2xl border">
-                <PreviewFrame page={item.component.id} example={item.example.index} minHeight={item.height} class="rounded-b-none" />
+                <PreviewFrame
+                  page={item.component.id}
+                  example={item.example.index}
+                  minHeight={item.height}
+                  class="rounded-b-none"
+                />
                 <figcaption class="flex items-center justify-between gap-2 border-t px-4 py-2.5 text-sm">
                   <span class="font-medium">{item.component.title}</span>
                   <Link
