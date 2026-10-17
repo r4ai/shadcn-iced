@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Conformance scenarios of a component",
+  "type": "object",
+  "required": ["component", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "component": {
+      "description": "The component, named like its shadcn/ui registry item and its fixture files (`src/fixtures/<component>.tsx`, `iced/src/fixtures/<component>.rs`).",
+      "type": "string"
+    },
+    "scenarios": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/scenario" }
+    }
+  },
+  "$defs": {
+    "scenario": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "The fixture id, unique within the component.",
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "description": { "type": "string" },
+        "viewport": {
+          "description": "The logical size of the page, [width, height]. Defaults to [320, 120].",
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "themes": {
+          "description": "Defaults to both.",
+          "type": "array",
+          "items": { "enum": ["light", "dark"] }
+        },
+        "steps": {
+          "description": "Defaults to a single snapshot named `default`.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/step" }
+        }
+      }
+    },
+    "locator": {
+      "oneOf": [
+        { "type": "string", "description": "The center of the first visible text with this exact content." },
+        {
+          "type": "object",
+          "required": ["text"],
+          "additionalProperties": false,
+          "properties": {
+            "text": { "type": "string" },
+            "nth": { "type": "integer", "minimum": 0, "description": "0-based, in document order." }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["at"],
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "description": "A logical position in the page, [x, y].",
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        }
+      ]
+    },
+    "step": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["snapshot"],
+          "additionalProperties": false,
+          "properties": { "snapshot": { "type": "string", "pattern": "^[a-z0-9-]+$" } }
+        },
+        {
+          "type": "object",
+          "required": ["hover"],
+          "additionalProperties": false,
+          "properties": { "hover": { "$ref": "#/$defs/locator" } }
+        },
+        {
+          "type": "object",
+          "required": ["click"],
+          "additionalProperties": false,
+          "properties": { "click": { "$ref": "#/$defs/locator" } }
+        },
+        {
+          "type": "object",
+          "required": ["drag"],
+          "additionalProperties": false,
+          "properties": {
+            "drag": {
+              "type": "object",
+              "required": ["from", "to"],
+              "additionalProperties": false,
+              "properties": {
+                "from": { "$ref": "#/$defs/locator" },
+                "to": { "$ref": "#/$defs/locator" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["press"],
+          "additionalProperties": false,
+          "properties": {
+            "press": {
+              "type": "string",
+              "description": "A key combination with Playwright's names, e.g. `ArrowDown`, `Shift+Tab`, `Enter` or `a`."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": { "type": { "type": "string", "description": "Types text, a character at a time." } }
+        },
+        {
+          "type": "object",
+          "required": ["wait"],
+          "additionalProperties": false,
+          "properties": { "wait": { "type": "integer", "minimum": 0, "description": "Milliseconds." } }
+        },
+        {
+          "type": "object",
+          "required": ["expect"],
+          "additionalProperties": false,
+          "properties": {
+            "expect": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "visible": { "type": "array", "items": { "type": "string" } },
+                "hidden": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

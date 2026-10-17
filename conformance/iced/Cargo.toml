@@ -1,0 +1,17 @@
+[package]
+name = "conformance"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+description = "Renders the conformance scenarios with shadcn_iced, to compare them with shadcn/ui"
+
+[dependencies]
+iced.workspace = true
+iced_test.workspace = true
+shadcn_iced = { path = "../../crates/shadcn_iced" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+png = "0.18"
+
+[lints]
+workspace = true

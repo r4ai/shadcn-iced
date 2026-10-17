@@ -1,0 +1,91 @@
+name: Conformance
+
+# Compares shadcn_iced with shadcn/ui (see conformance/README.md).
+#
+# The weekly run first updates shadcn/ui to its latest release, so that it
+# fails when shadcn/ui changed in a way shadcn_iced does not follow yet.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "crates/**"
+      - "conformance/**"
+      - "Cargo.lock"
+      - ".github/workflows/conformance.yml"
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      update:
+        description: Update shadcn/ui to its latest release first
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conformance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: conformance/pnpm-lock.yaml
+      - name: Install
+        working-directory: conformance
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Update shadcn/ui
+        if: github.event_name == 'schedule' || inputs.update
+        working-directory: conformance
+        run: pnpm shadcn:update
+      - name: Type check
+        working-directory: conformance
+        run: pnpm typecheck
+      - name: Render with shadcn_iced
+        working-directory: conformance
+        run: pnpm iced
+      - name: Compare with shadcn/ui
+        working-directory: conformance
+        run: pnpm test
+      - name: Report
+        if: ${{ !cancelled() }}
+        working-directory: conformance
+        run: |
+          pnpm report
+          # The scores of this run, to commit when the baseline should change.
+          pnpm baseline
+          cp baseline.json out/baseline.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: conformance-report
+          path: |
+            conformance/out/report
+            conformance/out/reference
+            conformance/out/iced
+            conformance/out/diff
+            conformance/out/baseline.json
+          retention-days: 14
