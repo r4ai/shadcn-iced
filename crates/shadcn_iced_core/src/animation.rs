@@ -85,6 +85,18 @@ pub fn linear(t: f32) -> f32 {
     t.clamp(0.0, 1.0)
 }
 
+/// CSS's `ease`, the default timing function of `transition`:
+/// `cubic-bezier(0.25, 0.1, 0.25, 1)`.
+pub fn ease(t: f32) -> f32 {
+    cubic_bezier(0.25, 0.1, 0.25, 1.0, t)
+}
+
+/// CSS's `ease-out` keyword (not Tailwind's `ease-out`):
+/// `cubic-bezier(0, 0, 0.58, 1)`.
+pub fn css_ease_out(t: f32) -> f32 {
+    cubic_bezier(0.0, 0.0, 0.58, 1.0, t)
+}
+
 /// `ease-out`: `cubic-bezier(0, 0, 0.2, 1)`.
 pub fn ease_out(t: f32) -> f32 {
     cubic_bezier(0.0, 0.0, 0.2, 1.0, t)
@@ -303,7 +315,7 @@ mod tests {
 
     #[test]
     fn easing_bounds() {
-        for easing in [linear, ease_out, ease_in, ease_in_out] {
+        for easing in [linear, ease, css_ease_out, ease_out, ease_in, ease_in_out] {
             assert_eq!(easing(0.0), 0.0);
             assert_eq!(easing(1.0), 1.0);
             assert!((0.0..=1.0).contains(&easing(0.5)));

@@ -74,6 +74,7 @@ The `shadcn_iced_core::primitive` module provides the behavioral layer analogous
 | `focus` | Detects when a widget subtree holds keyboard focus (`focus_within`) to draw focus rings around composite inputs (`InputGroup`, `InputOtp`). |
 | `pressable` | Provides pointer press, release, and hover interaction tracking for custom interactive surfaces. |
 | `split` | Implements draggable, resizable pane dividers used by `Resizable`. |
+| `toaster` | Stacks, animates, expands, times out and swipes away the toasts of `Sonner`, porting sonner's transitions (`translateY`, `scale`, height and opacity, `400ms ease`). |
 
 ### Native Animations
 
