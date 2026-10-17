@@ -239,8 +239,9 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                         ..container::Style::default()
                     },
                 ))
-                // `-mx-1`, through the padding of the list.
-                .padding(Padding::ZERO.left(-8.0).right(-8.0))
+                // `-mx-1`: through the `p-1` of the groups, clipped by the
+                // list (`overflow-x-hidden`).
+                .padding(Padding::ZERO.left(-4.0).right(-4.0))
             };
 
         for (heading, items) in command.groups {
@@ -358,9 +359,9 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
 
         let bordered = command.bordered;
 
-        // `rounded-xl bg-popover p-1`
+        // `rounded-xl bg-popover p-1`, inside the border.
         container(Column::new().push(input).push(body).width(Length::Fill))
-            .padding(4)
+            .padding(if bordered { 5 } else { 4 })
             .width(command.width)
             .style(move |theme: &Theme| {
                 let t = tokens(theme);
