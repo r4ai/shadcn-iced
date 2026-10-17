@@ -4,15 +4,20 @@ use crate::store::Msg;
 use shadcn_iced::button::{Button, Variant};
 use shadcn_iced::kbd::{kbd, kbd_group};
 
-use iced::widget::{column, container, row, text};
-use iced::{Center, Fill, Padding, Pixels, Theme};
+use iced::widget::{column, float, row, text};
+use iced::{Center, Fill, Pixels, Theme, Vector};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
         "demo" => Fixture::new(|_| {
             column![
                 kbd_group([kbd("⌘"), kbd("⇧"), kbd("⌥"), kbd("⌃")]),
-                kbd_group([kbd("Ctrl"), sm("+").into(), kbd("B")]),
+                // The `<span>` inherits the 16px text of the page.
+                kbd_group([
+                    kbd("Ctrl"),
+                    text("+").size(16).line_height(Pixels(24.0)).into(),
+                    kbd("B"),
+                ]),
             ]
             .spacing(16)
             .width(Fill)
@@ -34,7 +39,9 @@ pub fn get(id: &str) -> Option<Fixture> {
             Button::new(
                 row![
                     text("Accept").size(14).font(shadcn_iced::font::medium()),
-                    container(kbd("⏎")).padding(Padding::ZERO.left(2)),
+                    // `translate-x-0.5` moves the key without resizing the
+                    // button.
+                    float(kbd("⏎")).translate(|_, _| Vector::new(2.0, 0.0)),
                 ]
                 .spacing(6)
                 .align_y(Center),
