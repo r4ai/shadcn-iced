@@ -1,0 +1,23 @@
+# The dependencies of the Python scripts of this directory, managed by uv:
+#
+#   uv run --project scripts scripts/gen_fonts.py
+[project]
+name = "shadcn-iced-scripts"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = [
+  # gen_fonts.py
+  "fonttools>=4.60",
+  # grid.py, montage.py
+  "pillow>=12",
+]
+
+[tool.uv]
+# The scripts are not a package to build and install.
+package = false
+# Only resolve releases at least 7 days old, like the cooldown of Dependabot
+# (`.github/dependabot.yml`) and pnpm (`minimumReleaseAge`).
+exclude-newer = "7 days"
+# Packages may only come from PyPI wheels and sdists, never from the index of
+# another name (dependency confusion).
+index-strategy = "first-index"

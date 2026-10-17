@@ -14,8 +14,7 @@
 Variable fonts are instantiated at the regular weight: cosmic-text renders
 the default instance of a variable font only.
 
-Usage: python3 scripts/gen_fonts.py
-Requires fontTools (`pip install fonttools`).
+Usage: uv run --project scripts scripts/gen_fonts.py
 """
 import io
 import sys

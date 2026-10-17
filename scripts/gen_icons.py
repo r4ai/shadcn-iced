@@ -2,7 +2,7 @@
 """Generate `crates/shadcn_iced_core/src/icon/lucide.rs` from lucide-static's
 `font/codepoints.json`.
 
-Usage: python3 scripts/gen_icons.py <path-to-lucide-static-package>
+Usage: uv run --project scripts scripts/gen_icons.py <path-to-lucide-static-package>
 """
 import json
 import sys
