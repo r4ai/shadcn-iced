@@ -27,6 +27,12 @@ pub fn popover<'a, Message: Clone + 'a>(
         .side(Side::Bottom)
         .align(Align::Center)
         .offset(4.0)
+        // `focus-visible:border-ring focus-visible:ring-3` of a button,
+        // once dismissed with the keyboard.
+        .focus_ring(|theme| {
+            let t = tokens(theme);
+            style::focus_visible(&t, t.radius_lg())
+        })
 }
 
 /// Creates a popover whose panel has the given width (e.g. `w-80`).
@@ -39,6 +45,12 @@ pub fn popover_with_width<'a, Message: Clone + 'a>(
         .side(Side::Bottom)
         .align(Align::Center)
         .offset(4.0)
+        // `focus-visible:border-ring focus-visible:ring-3` of a button,
+        // once dismissed with the keyboard.
+        .focus_ring(|theme| {
+            let t = tokens(theme);
+            style::focus_visible(&t, t.radius_lg())
+        })
 }
 
 /// Wraps content in a popover panel of the given width (`p-2.5 text-sm`).

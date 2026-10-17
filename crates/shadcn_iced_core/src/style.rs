@@ -148,6 +148,18 @@ pub fn ring(tokens: &Tokens, radius: f32) -> crate::primitive::focus::Ring {
     }
 }
 
+/// The `focus-visible` style of a bordered control of the given radius
+/// (`focus-visible:border-ring focus-visible:ring-3
+/// focus-visible:ring-ring/50`), e.g. for
+/// [`Anchored::focus_ring`](crate::primitive::Anchored::focus_ring).
+pub fn focus_visible(tokens: &Tokens, radius: f32) -> crate::primitive::focus::Style {
+    crate::primitive::focus::Style {
+        border: border(tokens.palette.ring, radius),
+        ring: Some(ring(tokens, radius)),
+        ..crate::primitive::focus::Style::default()
+    }
+}
+
 /// The ring of an invalid control as an outset ring
 /// (`ring-destructive/20`, `/40` in dark mode).
 pub fn invalid_outset_ring(tokens: &Tokens, radius: f32) -> crate::primitive::focus::Ring {

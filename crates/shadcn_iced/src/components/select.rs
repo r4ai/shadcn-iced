@@ -312,7 +312,19 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
             .align(Align::Start)
             .match_anchor_width(true)
             .close_on_select(true)
-            .modal(true);
+            .modal(true)
+            // `focus-visible:border-ring focus-visible:ring-3`, once
+            // dismissed with the keyboard.
+            .focus_ring(move |theme| {
+                let t = tokens(theme);
+                style::focus_visible(
+                    &t,
+                    match size {
+                        Size::Default => t.radius_lg(),
+                        Size::Sm => t.radius_md().min(10.0),
+                    },
+                )
+            });
 
         if select.align_item_with_trigger {
             // The item centered on the trigger, its text aligned with the
