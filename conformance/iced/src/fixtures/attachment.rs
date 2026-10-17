@@ -96,7 +96,9 @@ pub fn get(id: &str) -> Option<Fixture> {
                 } else {
                     "Not opened"
                 })
-                .size(14),
+                // `text-sm`
+                .size(14)
+                .line_height(iced::Pixels(20.0)),
             ]
             .spacing(12)
             .into())

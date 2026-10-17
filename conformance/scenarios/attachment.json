@@ -2,9 +2,9 @@
   "$schema": "./schema.json",
   "component": "attachment",
   "scenarios": [
-    { "id": "states", "viewport": [416, 350] },
+    { "id": "states", "viewport": [416, 360] },
     { "id": "sizes", "viewport": [416, 200] },
-    { "id": "group", "viewport": [416, 190] },
+    { "id": "group", "viewport": [416, 210] },
     {
       "id": "trigger",
       "viewport": [416, 130],
