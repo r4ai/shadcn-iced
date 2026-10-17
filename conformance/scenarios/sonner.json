@@ -1,0 +1,59 @@
+{
+  "$schema": "./schema.json",
+  "component": "sonner",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [640, 260],
+      "steps": [
+        { "snapshot": "idle" },
+        { "click": "Show Toast" },
+        { "wait": 600 },
+        {
+          "expect": {
+            "visible": [
+              "Event has been created",
+              "Sunday, December 03, 2023 at 9:00 AM",
+              "Undo"
+            ]
+          }
+        },
+        { "snapshot": "toast" },
+        { "click": "Undo" },
+        { "wait": 600 },
+        { "expect": { "hidden": ["Event has been created"] } },
+        { "snapshot": "dismissed" }
+      ]
+    },
+    {
+      "id": "auto-dismiss",
+      "viewport": [640, 260],
+      "steps": [
+        { "click": "Show Toast" },
+        { "wait": 600 },
+        { "expect": { "visible": ["Event has been created"] } },
+        { "wait": 4500 },
+        { "expect": { "hidden": ["Event has been created"] } },
+        { "snapshot": "expired" }
+      ]
+    },
+    {
+      "id": "types",
+      "viewport": [640, 260],
+      "steps": [
+        { "click": "Success" },
+        { "wait": 600 },
+        { "expect": { "visible": ["Event has been created"] } },
+        { "snapshot": "success" },
+        { "click": "Error" },
+        { "wait": 600 },
+        {
+          "expect": {
+            "visible": ["Event has been created", "Event has not been created"]
+          }
+        },
+        { "snapshot": "stacked" }
+      ]
+    }
+  ]
+}

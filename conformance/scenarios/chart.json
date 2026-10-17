@@ -1,0 +1,42 @@
+{
+  "$schema": "./schema.json",
+  "component": "chart",
+  "scenarios": [
+    {
+      "id": "bar",
+      "viewport": [416, 282],
+      "steps": [
+        { "wait": 300 },
+        { "snapshot": "idle" },
+        { "hover": { "at": [116, 150] } },
+        { "wait": 200 },
+        { "expect": { "visible": ["February"] } },
+        { "snapshot": "tooltip" }
+      ]
+    },
+    {
+      "id": "line",
+      "viewport": [416, 282],
+      "steps": [
+        { "wait": 300 },
+        { "snapshot": "idle" },
+        { "hover": { "at": [116, 150] } },
+        { "wait": 200 },
+        { "expect": { "visible": ["February"] } },
+        { "snapshot": "tooltip" }
+      ]
+    },
+    {
+      "id": "area-stacked",
+      "viewport": [416, 282],
+      "steps": [
+        { "wait": 300 },
+        { "snapshot": "idle" },
+        { "hover": { "at": [116, 150] } },
+        { "wait": 200 },
+        { "expect": { "visible": ["February"] } },
+        { "snapshot": "tooltip" }
+      ]
+    }
+  ]
+}

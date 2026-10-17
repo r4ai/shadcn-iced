@@ -1,0 +1,10 @@
+{
+  "$schema": "./schema.json",
+  "component": "message",
+  "scenarios": [
+    { "id": "conversation", "viewport": [416, 260] },
+    { "id": "header-footer", "viewport": [416, 190] },
+    { "id": "actions", "viewport": [416, 190] },
+    { "id": "attachment", "viewport": [416, 150] }
+  ]
+}
