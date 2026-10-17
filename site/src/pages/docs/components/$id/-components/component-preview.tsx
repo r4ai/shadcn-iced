@@ -18,7 +18,7 @@ export function ComponentPreview(props: { page: string; example: Example }) {
       data-not-typeset
       class="group relative mt-4 mb-12 flex flex-col overflow-hidden rounded-2xl border"
     >
-      <div data-slot="preview">
+      <div data-slot="preview" class="rounded-t-[calc(var(--radius-2xl)-1px)]">
         <PreviewFrame page={props.page} example={props.example.index} minHeight={minHeight(props.page)} />
       </div>
       <div

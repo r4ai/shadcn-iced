@@ -67,7 +67,7 @@ export function PreviewFrame(props: PreviewFrameProps) {
       // winit cancels touch scrolling on its canvas; scrolling the page over a
       // preview matters more on a phone.
       on:touchstart={{ handleEvent: (event) => event.stopPropagation(), capture: true, passive: true }}
-      class={cn("relative w-full overflow-hidden bg-background", props.class)}
+      class={cn("relative w-full overflow-hidden rounded-[inherit] bg-background", props.class)}
       style={{ height: `${height()}px` }}
     >
       {/* The canvas covers the spinner once it draws. */}
