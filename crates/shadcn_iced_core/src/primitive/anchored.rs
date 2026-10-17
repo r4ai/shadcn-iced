@@ -373,15 +373,17 @@ struct Grace {
 }
 
 impl Grace {
-    /// The grace area from `exit`, where the pointer left the anchor, to
-    /// the content on its left or right, if it is on one of those sides.
-    fn new(exit: Point, content: Rectangle, now: Instant) -> Option<Self> {
+    /// The grace area from `exit`, where the pointer left `anchor`, to the
+    /// content on its left or right, if it is on one of those sides and the
+    /// pointer did not leave past the other side of the anchor (moving
+    /// away from the content, or jumping to another anchor).
+    fn new(exit: Point, anchor: Rectangle, content: Rectangle, now: Instant) -> Option<Self> {
         // Moved back a little, so that the pointer can wobble.
         const BLEED: f32 = 5.0;
 
-        let (x, apex) = if content.x >= exit.x {
+        let (x, apex) = if content.x >= exit.x && exit.x >= anchor.x - BLEED {
             (content.x, Point::new(exit.x - BLEED, exit.y))
-        } else if content.x + content.width <= exit.x {
+        } else if content.x + content.width <= exit.x && exit.x <= anchor.x + anchor.width + BLEED {
             (
                 content.x + content.width,
                 Point::new(exit.x + BLEED, exit.y),
@@ -631,7 +633,7 @@ where
                         && let Some(position) = cursor.position()
                         && let Some(content) = state.content_bounds
                     {
-                        state.grace = Grace::new(position, content, now);
+                        state.grace = Grace::new(position, bounds, content, now);
 
                         if let Some(grace) = state.grace {
                             shell.request_redraw_at(grace.deadline);
@@ -1995,7 +1997,8 @@ mod tests {
         let now = Instant::now();
         // A submenu on the right of a trigger left at (100, 50).
         let content = Rectangle::new(Point::new(200.0, 0.0), Size::new(150.0, 200.0));
-        let grace = Grace::new(Point::new(100.0, 50.0), content, now).expect("grace area");
+        let anchor = Rectangle::new(Point::new(0.0, 30.0), Size::new(100.0, 20.0));
+        let grace = Grace::new(Point::new(100.0, 50.0), anchor, content, now).expect("grace area");
 
         // Diagonally down to the submenu, over the items below the trigger.
         assert!(grace.contains(Point::new(150.0, 100.0)));
@@ -2005,6 +2008,19 @@ mod tests {
         assert!(!grace.contains(Point::new(80.0, 50.0)));
 
         // Content overlapping the exit point has no grace area.
-        assert!(Grace::new(Point::new(250.0, 50.0), content, now).is_none());
+        assert!(Grace::new(Point::new(250.0, 50.0), anchor, content, now).is_none());
+    }
+
+    #[test]
+    fn no_grace_area_when_leaving_away_from_the_content() {
+        let now = Instant::now();
+        // A tooltip on the left of its trigger, and the pointer jumping to
+        // the next trigger on the right.
+        let anchor = Rectangle::new(Point::new(144.0, 80.0), Size::new(48.0, 32.0));
+        let content = Rectangle::new(Point::new(42.0, 82.0), Size::new(98.0, 28.0));
+
+        assert!(Grace::new(Point::new(222.0, 96.0), anchor, content, now).is_none());
+        // Leaving through its left edge still has one.
+        assert!(Grace::new(Point::new(143.0, 96.0), anchor, content, now).is_some());
     }
 }
