@@ -17,6 +17,11 @@ use iced::{
     mouse, touch,
 };
 
+std::thread_local! {
+    /// Whether the item being drawn is highlighted, for [`ItemRow::trailing_color`].
+    static HIGHLIGHTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// The look of the highlighted item of a [`Listbox`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Style {
@@ -494,6 +499,8 @@ where
                 );
             }
 
+            let was_highlighted = HIGHLIGHTED.replace(is_active);
+
             child.content.as_widget().draw(
                 tree,
                 renderer,
@@ -509,6 +516,8 @@ where
                 cursor,
                 viewport,
             );
+
+            HIGHLIGHTED.set(was_highlighted);
         }
     }
 
@@ -592,6 +601,7 @@ where
 pub struct ItemRow<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
     trailing: Option<Element<'a, Message, Theme, Renderer>>,
+    trailing_color: Option<Box<dyn Fn(&Theme, bool) -> Color + 'a>>,
     spacing: f32,
     padding: Padding,
 }
@@ -604,6 +614,7 @@ pub fn row<'a, Message, Theme, Renderer>(
     ItemRow {
         content: content.into(),
         trailing,
+        trailing_color: None,
         spacing: 16.0,
         padding: Padding::ZERO,
     }
@@ -613,6 +624,16 @@ impl<'a, Message, Theme, Renderer> ItemRow<'a, Message, Theme, Renderer> {
     /// Sets the minimum space between the content and the trailing part.
     pub fn spacing(mut self, spacing: f32) -> Self {
         self.spacing = spacing;
+        self
+    }
+
+    /// Sets the text color of the trailing part, given whether the item is
+    /// highlighted in its [`Listbox`], e.g. a shortcut that is muted
+    /// unless highlighted (`text-muted-foreground
+    /// group-focus:text-accent-foreground`). By default, it inherits the
+    /// color of the item.
+    pub fn trailing_color(mut self, f: impl Fn(&Theme, bool) -> Color + 'a) -> Self {
+        self.trailing_color = Some(Box::new(f));
         self
     }
 
@@ -791,6 +812,13 @@ where
         );
 
         if let (Some(trailing), Some(layout)) = (self.trailing.as_ref(), layouts.next()) {
+            let style = match &self.trailing_color {
+                Some(f) => &renderer::Style {
+                    text_color: f(theme, HIGHLIGHTED.get()),
+                },
+                None => style,
+            };
+
             trailing.as_widget().draw(
                 &tree.children[1],
                 renderer,

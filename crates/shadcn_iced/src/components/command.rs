@@ -15,7 +15,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::listbox;
+use shadcn_iced_core::primitive::{listbox, tracked};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -306,19 +306,25 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                     .spacing(8)
                     .align_y(Alignment::Center);
 
+                // `ml-auto text-xs tracking-widest text-muted-foreground
+                // group-data-selected:text-foreground`; `tracking-widest` is
+                // `0.1em`.
                 let shortcut = item.shortcut.map(|shortcut| {
-                    text(shortcut)
-                        .size(style::text::XS)
-                        .line_height(iced::Pixels(16.0))
-                        .style(|theme: &Theme| text::Style {
-                            color: Some(tokens(theme).palette.muted_foreground),
-                        })
-                        .into()
+                    tracked(shortcut, style::text::XS, iced::Pixels(16.0), None, 1.2).into()
                 });
 
                 // `gap-2 px-2 py-1.5`
                 list = list.item(
-                    listbox::row(row, shortcut).spacing(16.0).padding([6, 8]),
+                    listbox::row(row, shortcut)
+                        .spacing(16.0)
+                        .padding([6, 8])
+                        .trailing_color(|theme, highlighted| {
+                            if highlighted {
+                                highlight(theme).text_color
+                            } else {
+                                tokens(theme).palette.muted_foreground
+                            }
+                        }),
                     item.on_select,
                 );
             }
