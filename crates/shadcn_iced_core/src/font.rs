@@ -4,6 +4,9 @@
 //! and [Geist Mono](https://vercel.com/font) (feature `geist`).
 //! [Inter](https://rsms.me/inter/) (feature `inter`) and the
 //! [Lucide](https://lucide.dev) icon font (feature `lucide`) are bundled too.
+//! The keyboard symbols and arrows that Geist lacks (⌘ ⌥ ⌃ ⏎ ⌫ ...), used by
+//! shortcuts, are bundled too (feature `symbols`), so that they do not depend
+//! on the fonts of the system: see [`SYMBOLS`].
 //!
 //! Load them with [`ApplicationExt::shadcn_iced`]:
 //!
@@ -44,6 +47,19 @@ pub const SANS: Font = Font::with_name(GEIST);
 ///
 /// Components use [`mono`] instead, which honors [`set_mono`].
 pub const MONO: Font = Font::with_name(GEIST_MONO);
+
+/// The Shadcn Iced Symbols family (bundled with the `symbols` feature): the
+/// Arrows, Miscellaneous Technical, Control Pictures and Supplemental Arrows
+/// blocks (⌘ ⌥ ⌃ ⇧ ⏎ ⌫ ⎋ ⇥ ␣ ...), merged from
+/// [Noto Sans Symbols 2](https://fonts.google.com/noto/specimen/Noto+Sans+Symbols+2),
+/// [Noto Sans Symbols](https://fonts.google.com/noto/specimen/Noto+Sans+Symbols)
+/// and [Noto Sans Math](https://fonts.google.com/noto/specimen/Noto+Sans+Math)
+/// by `scripts/gen_fonts.py`.
+///
+/// Text can fall back to it for the glyphs that its font lacks, even where no
+/// font of the system has them (cosmic-text tries the fallback fonts of the
+/// platform first).
+pub const SYMBOLS: &str = "Shadcn Iced Symbols";
 
 /// The icon font, Lucide.
 pub const ICONS: Font = Font::with_name("lucide");
@@ -161,6 +177,9 @@ pub fn all() -> Vec<Cow<'static, [u8]>> {
         include_bytes!("../assets/fonts/GeistMono-Regular.ttf").as_slice(),
         include_bytes!("../assets/fonts/GeistMono-Medium.ttf").as_slice(),
     ]);
+
+    #[cfg(feature = "symbols")]
+    fonts.push(include_bytes!("../assets/fonts/ShadcnIcedSymbols-Regular.ttf").as_slice());
 
     #[cfg(feature = "lucide")]
     fonts.push(include_bytes!("../assets/fonts/lucide.ttf").as_slice());
