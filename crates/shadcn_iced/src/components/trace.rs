@@ -146,6 +146,7 @@ fn view<'a, Message: Clone + 'a>(line: &TraceLine<Message>) -> Row<'a, Message> 
                 .push(
                     text(line.title.clone())
                         .size(style::text::SM)
+                        .line_height(style::text::leading(style::text::SM))
                         .wrapping(text::Wrapping::None),
                 )
                 .push(line.trailing.map(|icon| icon.sized(16)))
@@ -155,6 +156,7 @@ fn view<'a, Message: Clone + 'a>(line: &TraceLine<Message>) -> Row<'a, Message> 
         .push(line.description.clone().map(|description| {
             text(description)
                 .size(style::text::SM)
+                .line_height(style::text::leading(style::text::SM))
                 .font(if mono { font::mono() } else { font::sans() })
                 .style(move |theme: &Theme| text::Style {
                     color: Some(alpha(
@@ -253,7 +255,8 @@ impl<'a, Message: Clone + 'a> From<Collapsible<'a, Message>> for Element<'a, Mes
         // leading-relaxed text-muted-foreground`
         let content = container(
             container(collapsible.content)
-                .padding(Padding::ZERO.left(16).right(4))
+                // `pl-4` after the 1px border.
+                .padding(Padding::ZERO.left(17).right(4))
                 .width(Length::Fill)
                 .style(|theme: &Theme| {
                     let p = tokens(theme).palette;

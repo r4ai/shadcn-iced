@@ -1,6 +1,8 @@
 //! Displays a callout for user attention.
 //!
 //! Port of <https://ui.shadcn.com/docs/components/alert>.
+use super::typography::balance;
+
 use shadcn_iced_core::icon::Icon;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
@@ -36,12 +38,15 @@ enum Description<'a, Message> {
 pub fn alert<'a, Message: 'a>(title: impl text::IntoFragment<'a>) -> Alert<'a, Message> {
     Alert {
         icon: None,
+        // `text-balance` (`md:text-pretty` on wide screens)
         title: Some(
-            text(title)
-                .size(style::text::SM)
-                .font(font::medium())
-                .line_height(iced::Pixels(20.0))
-                .into(),
+            balance(
+                text(title)
+                    .size(style::text::SM)
+                    .font(font::medium())
+                    .line_height(style::text::leading(style::text::SM)),
+            )
+            .into(),
         ),
         description: None,
         action: None,
@@ -98,11 +103,14 @@ impl<'a, Message: 'a> From<Alert<'a, Message>> for Element<'a, Message> {
         let variant = alert.variant;
 
         let description = alert.description.map(|description| match description {
-            Description::Text(fragment) => text(fragment)
-                .size(style::text::SM)
-                .line_height(iced::Pixels(20.0))
-                .style(move |theme: &Theme| description_style(theme, variant))
-                .into(),
+            // `text-balance` (`md:text-pretty` on wide screens)
+            Description::Text(fragment) => balance(
+                text(fragment)
+                    .size(style::text::SM)
+                    .line_height(style::text::leading(style::text::SM))
+                    .style(move |theme: &Theme| description_style(theme, variant)),
+            )
+            .into(),
             Description::Element(element) => element,
         });
 

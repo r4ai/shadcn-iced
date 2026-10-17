@@ -2,7 +2,7 @@
 //!
 //! Port of <https://ui.shadcn.com/docs/components/spinner>: a spinning
 //! `loader-circle` icon.
-use shadcn_iced_core::{Element, tokens};
+use shadcn_iced_core::{Element, animation, tokens};
 
 use iced::time::Instant;
 use iced::widget::canvas::{self, Canvas, Path, Stroke, path::Arc};
@@ -60,7 +60,7 @@ impl<Message> canvas::Program<Message> for Spinner {
         _bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Option<canvas::Action<Message>> {
-        matches!(event, Event::Window(window::Event::RedrawRequested(_)))
+        (animation::enabled() && matches!(event, Event::Window(window::Event::RedrawRequested(_))))
             .then(canvas::Action::request_redraw)
     }
 
@@ -74,7 +74,13 @@ impl<Message> canvas::Program<Message> for Spinner {
     ) -> Vec<canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
         let scale = self.size / 24.0;
-        let rotation = START.elapsed().as_secs_f32() * std::f32::consts::TAU;
+        // `animate-spin`: a turn per second, at rest when animations are
+        // disabled (like `prefers-reduced-motion`).
+        let rotation = if animation::enabled() {
+            START.elapsed().as_secs_f32() * std::f32::consts::TAU
+        } else {
+            0.0
+        };
         let center = Point::new(bounds.width / 2.0, bounds.height / 2.0);
 
         let arc = Path::new(|builder| {

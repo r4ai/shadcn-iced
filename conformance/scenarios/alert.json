@@ -4,7 +4,7 @@
   "scenarios": [
     {
       "id": "default",
-      "viewport": [480, 200],
+      "viewport": [480, 220],
       "steps": [
         {
           "expect": {
@@ -14,10 +14,10 @@
         { "snapshot": "default" }
       ]
     },
-    { "id": "destructive", "viewport": [480, 100] },
+    { "id": "destructive", "viewport": [480, 120] },
     {
       "id": "action",
-      "viewport": [480, 90],
+      "viewport": [480, 100],
       "steps": [
         { "expect": { "visible": ["Dark mode is now available", "Enable"] } },
         { "snapshot": "idle" },
