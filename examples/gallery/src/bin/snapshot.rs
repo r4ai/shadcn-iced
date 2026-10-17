@@ -27,7 +27,7 @@
 //!
 //! Snapshots are written to `target/snapshots/`.
 use gallery::{Gallery, Message, PAGES};
-use iced_ui::Mode;
+use shadcn_iced::Mode;
 
 use iced::keyboard::{Key, key::Named};
 use iced::{Point, mouse};
@@ -135,7 +135,7 @@ fn main() {
             }
             "--base" => {
                 let name = args.next().expect("base color");
-                base = iced_ui::theme::BaseColor::ALL
+                base = shadcn_iced::theme::BaseColor::ALL
                     .iter()
                     .copied()
                     .find(|b| b.name() == name);
@@ -143,14 +143,14 @@ fn main() {
             }
             "--accent" => {
                 let name = args.next().expect("accent");
-                accent = iced_ui::theme::Accent::ALL
+                accent = shadcn_iced::theme::Accent::ALL
                     .iter()
                     .copied()
                     .find(|a| a.name() == name);
                 None
             }
             "--chart" => {
-                use iced_ui::theme::{Accent, BaseColor, ThemeColor};
+                use shadcn_iced::theme::{Accent, BaseColor, ThemeColor};
                 let name = args.next().expect("chart color");
                 let color = BaseColor::ALL
                     .iter()
@@ -166,7 +166,7 @@ fn main() {
                 None
             }
             "--radius" => {
-                use iced_ui::theme::Radius;
+                use shadcn_iced::theme::Radius;
                 setup.push(Message::Radius(
                     match args.next().expect("radius").as_str() {
                         "none" => Radius::None,
@@ -179,7 +179,7 @@ fn main() {
                 None
             }
             "--menu-color" => {
-                use iced_ui::theme::MenuColor;
+                use shadcn_iced::theme::MenuColor;
                 setup.push(Message::MenuColor(
                     match args.next().expect("menu color").as_str() {
                         "inverted" => MenuColor::Inverted,
@@ -191,7 +191,7 @@ fn main() {
                 None
             }
             "--menu-accent" => {
-                use iced_ui::theme::MenuAccent;
+                use shadcn_iced::theme::MenuAccent;
                 setup.push(Message::MenuAccent(
                     match args.next().expect("menu accent").as_str() {
                         "bold" => MenuAccent::Bold,
@@ -235,7 +235,7 @@ fn main() {
     }
 
     // Deterministic screenshots, unless asked to capture animation frames.
-    iced_ui::animation::set_enabled(animations);
+    shadcn_iced::animation::set_enabled(animations);
 
     if pages.is_empty() {
         pages = PAGES.iter().map(|page| page.id.to_owned()).collect();

@@ -1,5 +1,5 @@
 //! The example of the README.
-use iced_ui::prelude::*;
+use shadcn_iced::prelude::*;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -20,8 +20,8 @@ fn view(_state: &()) -> iced::Element<'_, Message> {
 fn main() -> iced::Result {
     iced::application(|| (), |_: &mut (), _: Message| {}, view)
         // Any shadcn/ui preset, e.g. zinc in dark mode:
-        .theme(|_: &()| iced_ui::theme::zinc(Mode::Dark).build())
+        .theme(|_: &()| shadcn_iced::theme::zinc(Mode::Dark).build())
         // Loads Geist, Inter and the Lucide icons.
-        .iced_ui()
+        .shadcn_iced()
         .run()
 }

@@ -3,13 +3,13 @@
 use super::{DemoMessage, Page};
 use crate::{Message, example};
 
-use iced_ui::button::{Size, Variant, button};
-use iced_ui::command::item as command_item;
-use iced_ui::menu::item;
-use iced_ui::prelude::*;
-use iced_ui::primitive::{Align, Side};
-use iced_ui::sonner::Kind;
-use iced_ui::{alert_dialog as ad, drawer as dr, popover as pop, sheet as sh};
+use shadcn_iced::button::{Size, Variant, button};
+use shadcn_iced::command::item as command_item;
+use shadcn_iced::menu::item;
+use shadcn_iced::prelude::*;
+use shadcn_iced::primitive::{Align, Side};
+use shadcn_iced::sonner::Kind;
+use shadcn_iced::{alert_dialog as ad, drawer as dr, popover as pop, sheet as sh};
 
 use iced::time::Duration;
 use iced::widget::{column, container, row, text};
@@ -206,8 +206,8 @@ const DELIVERY_TIMES: [(&str, &str, Option<&str>); 5] = [
 fn delivery_time<'a>(index: u8, selected: bool) -> iced::Element<'a, Message> {
     let (label, description, badge_label) = DELIVERY_TIMES[index as usize];
 
-    let title = row![text(label).size(14).font(iced_ui::font::medium())]
-        .push(badge_label.map(|label| badge(label).variant(iced_ui::badge::Variant::Secondary)))
+    let title = row![text(label).size(14).font(shadcn_iced::font::medium())]
+        .push(badge_label.map(|label| badge(label).variant(shadcn_iced::badge::Variant::Secondary)))
         .spacing(8)
         .align_y(Center);
 
@@ -215,17 +215,17 @@ fn delivery_time<'a>(index: u8, selected: bool) -> iced::Element<'a, Message> {
         column![title, text(description).size(14).style(crate::muted)]
             .spacing(4)
             .width(Fill),
-        iced_ui::radio_group::radio_item(selected, "", Some(demo(DemoMessage::Position(index)))),
+        shadcn_iced::radio_group::radio_item(selected, "", Some(demo(DemoMessage::Position(index)))),
     ]
     .spacing(12)
     .align_y(Center);
 
-    iced_ui::primitive::Pressable::new(content)
+    shadcn_iced::primitive::Pressable::new(content)
         .on_press(demo(DemoMessage::Position(index)))
         .padding(10)
         .width(Fill)
         .style(move |theme: &iced::Theme, status| {
-            let t = iced_ui::tokens(theme);
+            let t = shadcn_iced::tokens(theme);
             let p = t.palette;
             let hovered = matches!(
                 status,
@@ -235,16 +235,16 @@ fn delivery_time<'a>(index: u8, selected: bool) -> iced::Element<'a, Message> {
 
             iced::widget::button::Style {
                 background: Some(iced::Background::Color(if selected {
-                    iced_ui::theme::alpha(p.primary, if dark { 0.1 } else { 0.05 })
+                    shadcn_iced::theme::alpha(p.primary, if dark { 0.1 } else { 0.05 })
                 } else if hovered {
-                    iced_ui::theme::alpha(p.muted, 0.5)
+                    shadcn_iced::theme::alpha(p.muted, 0.5)
                 } else {
                     iced::Color::TRANSPARENT
                 })),
                 text_color: p.foreground,
-                border: iced_ui::style::border(
+                border: shadcn_iced::style::border(
                     if selected {
-                        iced_ui::theme::alpha(p.primary, if dark { 0.2 } else { 0.3 })
+                        shadcn_iced::theme::alpha(p.primary, if dark { 0.2 } else { 0.3 })
                     } else {
                         p.border
                     },
@@ -309,7 +309,7 @@ pub const POPOVER: Page = Page {
             row![
                 text(label)
                     .size(14)
-                    .font(iced_ui::font::medium())
+                    .font(shadcn_iced::font::medium())
                     .width(Fill),
                 container(input("", value).on_input(|_| Message::Noop))
                     .width(iced::Length::FillPortion(2)),
@@ -336,7 +336,7 @@ pub const POPOVER: Page = Page {
                         column![
                             text("Dimensions")
                                 .size(14)
-                                .font(iced_ui::font::medium())
+                                .font(shadcn_iced::font::medium())
                                 .line_height(1.0),
                             text("Set the dimensions for the layer.")
                                 .size(14)
@@ -409,7 +409,7 @@ pub const HOVER_CARD: Page = Page {
                 button("Hover Here").variant(Variant::Link),
                 // `flex flex-col gap-0.5`
                 column![
-                    text("@nextjs").size(14).font(iced_ui::font::semibold()),
+                    text("@nextjs").size(14).font(shadcn_iced::font::semibold()),
                     text("The React Framework – created and maintained by @vercel.").size(14),
                     container(text("Joined December 2021").size(12).style(crate::muted))
                         .padding(iced::Padding::ZERO.top(4)),
@@ -524,9 +524,9 @@ pub const CONTEXT_MENU: Page = Page {
                     .center_x(320)
                     .center_y(180)
                     .style(|theme: &iced::Theme| {
-                        let t = iced_ui::tokens(theme);
+                        let t = shadcn_iced::tokens(theme);
                         container::Style {
-                            border: iced_ui::style::border(t.palette.border, t.radius_xl()),
+                            border: shadcn_iced::style::border(t.palette.border, t.radius_xl()),
                             ..Default::default()
                         }
                     }),
@@ -807,7 +807,7 @@ pub const NAVIGATION_MENU: Page = Page {
     title: "Navigation Menu",
     description: "A collection of links for navigating websites.",
     view: |_| {
-        use iced_ui::navigation_menu::{icon_link, link};
+        use shadcn_iced::navigation_menu::{icon_link, link};
 
         let components = [
             (

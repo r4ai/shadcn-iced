@@ -23,7 +23,7 @@ export const components: Component[] = (data.components as Component[])
   .slice()
   .sort((a, b) => a.title.localeCompare(b.title));
 
-export const REPOSITORY = "https://github.com/r4ai/iced-ui";
+export const REPOSITORY = "https://github.com/r4ai/shadcn-iced";
 
 export function githubUrl(file: string, line?: number) {
   return `${REPOSITORY}/blob/main/${file}${line ? `#L${line}` : ""}`;

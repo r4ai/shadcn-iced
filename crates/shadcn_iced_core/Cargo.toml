@@ -1,0 +1,23 @@
+[package]
+name = "shadcn_iced_core"
+description = "Theme tokens, fonts, icons and headless primitives for shadcn_iced"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["lucide", "inter", "geist"]
+# Bundles the Lucide icon font (~900 KB).
+lucide = []
+# Bundles the Geist and Geist Mono fonts (the defaults of shadcn/ui's Nova).
+geist = []
+# Bundles the Inter font.
+inter = []
+
+[dependencies]
+iced.workspace = true
+
+[lints]
+workspace = true

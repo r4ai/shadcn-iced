@@ -9,7 +9,7 @@ const toc = [
   { id: "fonts-and-icons", label: "Fonts and icons" },
 ];
 
-const main = `use iced_ui::prelude::*;
+const main = `use shadcn_iced::prelude::*;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -28,9 +28,9 @@ fn view(_state: &()) -> iced::Element<'_, Message> {
 fn main() -> iced::Result {
     iced::application(|| (), |_: &mut (), _: Message| {}, view)
         // Any shadcn/ui preset, e.g. zinc with the blue accent:
-        .theme(|_: &()| iced_ui::theme::zinc(Mode::Dark).build())
+        .theme(|_: &()| shadcn_iced::theme::zinc(Mode::Dark).build())
         // Loads Geist, Inter and the Lucide icons.
-        .iced_ui()
+        .shadcn_iced()
         .run()
 }`;
 
@@ -43,30 +43,30 @@ fn view(state: &State) -> iced::Element<'_, Message> {
 
 <Docs
   title="Installation"
-  description="Add iced-ui to an iced 0.14 application, as a library or as source you own."
+  description="Add shadcn-iced to an iced 0.14 application, as a library or as source you own."
   toc={toc}
   prev={{ href: url("/docs"), label: "Introduction" }}
   next={{ href: url("/docs/theming"), label: "Theming" }}
 >
   <h2 id="as-a-library">As a library</h2>
-  <p>Add <code>iced</code> and <code>iced_ui</code> to your <code>Cargo.toml</code>:</p>
+  <p>Add <code>iced</code> and <code>shadcn_iced</code> to your <code>Cargo.toml</code>:</p>
   <CodeBlock
     class="mt-4"
     lang="toml"
     title="Cargo.toml"
-    code={`[dependencies]\niced = "0.14"\niced_ui = { git = "https://github.com/r4ai/iced-ui" }`}
+    code={`[dependencies]\niced = "0.14"\nshadcn_iced = { git = "https://github.com/r4ai/shadcn-iced" }`}
   />
   <p>Then import the prelude, pick a theme and load the bundled fonts:</p>
   <CodeBlock class="mt-4" code={main} title="src/main.rs" />
 
   <h2 id="copy-and-paste">Copy and paste</h2>
   <p>Install the CLI:</p>
-  <CodeBlock class="mt-4" lang="sh" code="cargo install --git https://github.com/r4ai/iced-ui cargo-iced-ui" />
+  <CodeBlock class="mt-4" lang="sh" code="cargo install --git https://github.com/r4ai/shadcn-iced cargo-shadcn-iced" />
   <p>Then, in your project, add the dependencies and the components you want:</p>
   <CodeBlock
     class="mt-4"
     lang="sh"
-    code={`cargo add iced --features advanced,canvas,image,svg\ncargo add iced_ui_core --git https://github.com/r4ai/iced-ui\ncargo iced-ui add button card dialog`}
+    code={`cargo add iced --features advanced,canvas,image,svg\ncargo add shadcn_iced_core --git https://github.com/r4ai/shadcn-iced\ncargo shadcn-iced add button card dialog`}
   />
   <p>
     The components, and the components they use, are written to <code>src/ui/</code>, and <code>src/ui/mod.rs</code> is
@@ -76,7 +76,7 @@ fn view(state: &State) -> iced::Element<'_, Message> {
 
   <h2 id="fonts-and-icons">Fonts and icons</h2>
   <p>
-    <code>.iced_ui()</code> loads Geist, Geist Mono, Inter and the Lucide icon font, and makes Geist the default font.
-    Every Lucide icon is a constant of <code>iced_ui::lucide</code>, e.g. <code>lucide::ARROW_UP</code>.
+    <code>.shadcn_iced()</code> loads Geist, Geist Mono, Inter and the Lucide icon font, and makes Geist the default font.
+    Every Lucide icon is a constant of <code>shadcn_iced::lucide</code>, e.g. <code>lucide::ARROW_UP</code>.
   </p>
 </Docs>

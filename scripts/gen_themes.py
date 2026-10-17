@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate `crates/iced_ui_core/src/theme/presets.rs` from shadcn/ui's
+"""Generate `crates/shadcn_iced_core/src/theme/presets.rs` from shadcn/ui's
 `apps/v4/registry/themes.ts`.
 
 Usage: python3 scripts/gen_themes.py <path-to-shadcn-ui-checkout>
@@ -128,7 +128,7 @@ def main():
     for name in accents:
         out.append(f'    ("{name}", {name.upper()}_LIGHT, {name.upper()}_DARK),')
     out.append("];")
-    dest = Path(__file__).resolve().parent.parent / "crates/iced_ui_core/src/theme/presets.rs"
+    dest = Path(__file__).resolve().parent.parent / "crates/shadcn_iced_core/src/theme/presets.rs"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text("\n".join(out) + "\n")
     print(f"wrote {dest} ({len(BASES)} bases, {len(accents)} accents)")

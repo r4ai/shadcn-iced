@@ -45,14 +45,14 @@ const tab =
     </div>
     <div data-panel="cli" data-active="true" class="data-[active=false]:hidden">
       <p>Copy the component, and the components it uses, into <code>src/ui/</code>:</p>
-      <CodeBlock class="mt-4" lang="sh" code={`cargo iced-ui add ${component.id}`} />
+      <CodeBlock class="mt-4" lang="sh" code={`cargo shadcn-iced add ${component.id}`} />
     </div>
     <div data-panel="library" data-active="false" class="data-[active=false]:hidden">
-      <p>Or use it from the <code>iced_ui</code> crate:</p>
+      <p>Or use it from the <code>shadcn_iced</code> crate:</p>
       <CodeBlock
         class="mt-4"
         lang="rust"
-        code={`use iced_ui::${module}::*;\n// or everything at once:\nuse iced_ui::prelude::*;`}
+        code={`use shadcn_iced::${module}::*;\n// or everything at once:\nuse shadcn_iced::prelude::*;`}
       />
     </div>
     {
@@ -60,7 +60,7 @@ const tab =
         <div data-panel="manual" data-active="false" class="data-[active=false]:hidden">
           <p>
             Copy the source of the component into <code>src/ui/{module}.rs</code> (it uses{" "}
-            <code>iced_ui_core</code> and, sometimes, other components):
+            <code>shadcn_iced_core</code> and, sometimes, other components):
           </p>
           <CodeBlock class="mt-4" code={component.source.code} title={component.source.file} expandable />
           <p>

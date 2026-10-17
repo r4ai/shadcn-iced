@@ -1,5 +1,5 @@
 // The theme options of the previews: the options of shadcn/ui's `/create`
-// page that iced-ui supports, with the names `iced_ui::theme` uses.
+// page that shadcn-iced supports, with the names `shadcn_iced::theme` uses.
 
 export const BASES = ["neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe"] as const;
 

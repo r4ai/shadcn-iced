@@ -3,10 +3,10 @@
 use super::{DemoMessage, Page};
 use crate::{Message, example};
 
-use iced_ui::code_block::{self, Line, Size as CodeSize, Variant as CodeVariant};
-use iced_ui::prelude::*;
-use iced_ui::questionnaire::{Choice, Question};
-use iced_ui::trace::Status;
+use shadcn_iced::code_block::{self, Line, Size as CodeSize, Variant as CodeVariant};
+use shadcn_iced::prelude::*;
+use shadcn_iced::questionnaire::{Choice, Question};
+use shadcn_iced::trace::Status;
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Fill};
@@ -185,8 +185,8 @@ pub const CODE_BLOCK: Page = Page {
                     .max_height(if d.code_expanded { 4096.0 } else { 256.0 })
                     .footer(
                         button(if d.code_expanded { "Show less" } else { "Show more" })
-                            .variant(iced_ui::button::Variant::Ghost)
-                            .size(iced_ui::button::Size::Xs)
+                            .variant(shadcn_iced::button::Variant::Ghost)
+                            .size(shadcn_iced::button::Size::Xs)
                             .on_press(demo(DemoMessage::CodeExpanded(!d.code_expanded)))
                     ))
             ),
@@ -290,11 +290,11 @@ pub const TOAST: Page = Page {
     title: "Toast",
     description: "A succinct message that is displayed temporarily.",
     view: |_gallery| {
-        use iced_ui::toast::Kind;
+        use shadcn_iced::toast::Kind;
 
         let kind = |label: &'static str, kind: Kind| {
             button(label)
-                .variant(iced_ui::button::Variant::Outline)
+                .variant(shadcn_iced::button::Variant::Outline)
                 .on_press(demo(DemoMessage::BaseToast(Some(kind))))
         };
 
@@ -302,7 +302,7 @@ pub const TOAST: Page = Page {
             example(
                 "Demo",
                 button("Show Toast")
-                    .variant(iced_ui::button::Variant::Outline)
+                    .variant(shadcn_iced::button::Variant::Outline)
                     .on_press(demo(DemoMessage::BaseToast(None)))
             ),
             example(
@@ -471,9 +471,9 @@ pub const TRACE: Page = Page {
                             .collapsible(
                                 row![
                                     badge("vercel.com")
-                                        .variant(iced_ui::badge::Variant::Secondary),
+                                        .variant(shadcn_iced::badge::Variant::Secondary),
                                     badge("github.com")
-                                        .variant(iced_ui::badge::Variant::Secondary),
+                                        .variant(shadcn_iced::badge::Variant::Secondary),
                                 ]
                                 .spacing(6)
                             )

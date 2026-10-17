@@ -11,8 +11,8 @@ interface Previews {
 
 declare global {
   interface Window {
-    icedUiPreviewResized?: (target: string, height: number) => void;
-    icedUiPreviewScroll?: (dx: number, dy: number) => void;
+    shadcnIcedPreviewResized?: (target: string, height: number) => void;
+    shadcnIcedPreviewScroll?: (dx: number, dy: number) => void;
   }
 }
 
@@ -42,7 +42,7 @@ export function load(): Promise<Previews> {
 
 const frames = new Map<string, HTMLElement>();
 
-window.icedUiPreviewResized = (target, height) => {
+window.shadcnIcedPreviewResized = (target, height) => {
   const frame = frames.get(target);
   if (!frame) return;
 
@@ -50,7 +50,7 @@ window.icedUiPreviewResized = (target, height) => {
   frame.style.height = `${Math.max(min, Math.ceil(height))}px`;
 };
 
-window.icedUiPreviewScroll = (dx, dy) => window.scrollBy(dx, dy);
+window.shadcnIcedPreviewScroll = (dx, dy) => window.scrollBy(dx, dy);
 
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 

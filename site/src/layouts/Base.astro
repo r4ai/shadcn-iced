@@ -31,7 +31,7 @@ const { title, description } = Astro.props;
       (() => {
         let mode = null;
         try {
-          mode = localStorage.getItem("iced-ui:mode");
+          mode = localStorage.getItem("shadcn-iced:mode");
         } catch {}
         const dark = mode ? mode === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
         document.documentElement.classList.toggle("dark", dark);

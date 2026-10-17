@@ -2,13 +2,13 @@
 use super::{DemoMessage, Page};
 use crate::{Message, example};
 
-use iced_ui::button::{Size as ButtonSize, Variant as ButtonVariant};
-use iced_ui::calendar::Date;
-use iced_ui::chart::{self, Series};
-use iced_ui::date_picker::date_range_picker;
-use iced_ui::prelude::*;
-use iced_ui::separator::vertical_separator;
-use iced_ui::sidebar::{Item, Size as SidebarSize, group, item, menu_action};
+use shadcn_iced::button::{Size as ButtonSize, Variant as ButtonVariant};
+use shadcn_iced::calendar::Date;
+use shadcn_iced::chart::{self, Series};
+use shadcn_iced::date_picker::date_range_picker;
+use shadcn_iced::prelude::*;
+use shadcn_iced::separator::vertical_separator;
+use shadcn_iced::sidebar::{Item, Size as SidebarSize, group, item, menu_action};
 
 use iced::widget::{column, container, row, text};
 use iced::{Center, Fill, Length};
@@ -181,7 +181,7 @@ pub const DATE_PICKER: Page = Page {
                     "Date of birth",
                     date_picker(d.dob, |date| demo(DemoMessage::Dob(date)), d.month, month)
                         .placeholder("Select date")
-                        .format(iced_ui::date_picker::numeric_date)
+                        .format(shadcn_iced::date_picker::numeric_date)
                         .chevron(false)
                         .dropdowns(1940, 2026)
                         .open(d.dob_open, demo(DemoMessage::DobOpen(false)))
@@ -201,14 +201,14 @@ fn slide(n: usize, size: f32, square: bool) -> iced::Element<'static, Message> {
     let number = container(
         text(n.to_string())
             .size(size)
-            .font(iced_ui::font::semibold()),
+            .font(shadcn_iced::font::semibold()),
     )
     .center_x(Fill)
     .center_y(Fill)
     .padding(24);
 
     let content: iced::Element<'static, Message> = if square {
-        iced_ui::aspect_ratio::aspect_ratio(1.0, number).into()
+        shadcn_iced::aspect_ratio::aspect_ratio(1.0, number).into()
     } else {
         number.height(Length::Shrink).into()
     };
@@ -256,7 +256,7 @@ pub const CAROUSEL: Page = Page {
                     carousel(index, on_change)
                         .items((1..=5).map(|n| slide(n, 30.0, false)))
                         .per_view(2)
-                        .orientation(iced_ui::carousel::Orientation::Vertical)
+                        .orientation(shadcn_iced::carousel::Orientation::Vertical)
                 )
                 .max_width(320)
             ),
@@ -375,13 +375,13 @@ pub const CHART: Page = Page {
 fn two_lines(
     title: &'static str,
     subtitle: &'static str,
-    trailing: iced_ui::Icon,
+    trailing: shadcn_iced::Icon,
 ) -> iced::Element<'static, Message> {
     row![
         column![
             text(title)
                 .size(14)
-                .font(iced_ui::font::medium())
+                .font(shadcn_iced::font::medium())
                 .line_height(1.25),
             text(subtitle).size(12).line_height(1.25),
         ]
@@ -394,15 +394,15 @@ fn two_lines(
 
 /// The square logo of the team switcher (`size-8 rounded-lg
 /// bg-sidebar-primary`).
-fn logo(icon: iced_ui::Icon) -> iced::Element<'static, Message> {
+fn logo(icon: shadcn_iced::Icon) -> iced::Element<'static, Message> {
     container(icon.sized(16))
         .center(32)
         .style(|theme: &iced::Theme| {
-            let t = iced_ui::tokens(theme);
+            let t = shadcn_iced::tokens(theme);
             container::Style {
                 background: Some(t.palette.sidebar_primary.into()),
                 text_color: Some(t.palette.sidebar_primary_foreground),
-                border: iced_ui::style::rounded(t.radius_lg()),
+                border: shadcn_iced::style::rounded(t.radius_lg()),
                 ..Default::default()
             }
         })
@@ -412,7 +412,7 @@ fn logo(icon: iced_ui::Icon) -> iced::Element<'static, Message> {
 /// A collapsible item of the main navigation, with a chevron.
 fn nav_item(
     title: &'static str,
-    icon: iced_ui::Icon,
+    icon: shadcn_iced::Icon,
     open: bool,
     children: &[&'static str],
 ) -> Item<'static, Message> {
@@ -433,7 +433,7 @@ fn nav_item(
 
     if open {
         for child in children {
-            item = item.child(iced_ui::sidebar::item(*child).on_press(Message::Noop));
+            item = item.child(shadcn_iced::sidebar::item(*child).on_press(Message::Noop));
         }
     }
 
@@ -510,12 +510,12 @@ pub const SIDEBAR: Page = Page {
                     .on_press(Message::Noop),
             )
             .collapsed(collapsed)
-            .variant(iced_ui::sidebar::Variant::Inset);
+            .variant(shadcn_iced::sidebar::Variant::Inset);
 
         // `h-16 shrink-0 items-center gap-2 px-4`, then `gap-4 p-4 pt-0`
         let main = column![
             row![
-                iced_ui::sidebar::trigger(demo(DemoMessage::SidebarCollapsed(!collapsed))),
+                shadcn_iced::sidebar::trigger(demo(DemoMessage::SidebarCollapsed(!collapsed))),
                 container(vertical_separator()).height(16),
                 breadcrumb()
                     .link("Build Your Application", Message::Noop)
@@ -540,14 +540,14 @@ pub const SIDEBAR: Page = Page {
 
         example(
             "Demo",
-            container(iced_ui::sidebar::layout(nav, main))
+            container(shadcn_iced::sidebar::layout(nav, main))
                 .height(560)
                 .width(Fill)
                 .clip(true)
                 .style(|theme: &iced::Theme| {
-                    let t = iced_ui::tokens(theme);
+                    let t = shadcn_iced::tokens(theme);
                     container::Style {
-                        border: iced_ui::style::border(t.palette.border, t.radius_lg()),
+                        border: shadcn_iced::style::border(t.palette.border, t.radius_lg()),
                         ..Default::default()
                     }
                 }),

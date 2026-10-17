@@ -94,7 +94,7 @@ pub struct Demo {
     pub email: String,
     pub password: String,
     pub search: String,
-    pub message: iced_ui::textarea::Content,
+    pub message: shadcn_iced::textarea::Content,
     pub progress: f32,
     pub page: usize,
     pub terms: bool,
@@ -115,7 +115,7 @@ pub struct Demo {
     pub dialog: bool,
     pub alert_dialog: bool,
     pub small_alert_dialog: bool,
-    pub sheet: Option<iced_ui::sheet::Side>,
+    pub sheet: Option<shadcn_iced::sheet::Side>,
     pub default_sheet: bool,
     pub drawer: bool,
     pub goal: i32,
@@ -123,25 +123,25 @@ pub struct Demo {
     pub position: u8,
     pub query: String,
     pub framework: Option<&'static str>,
-    pub toasts: Vec<iced_ui::sonner::Toast<Message>>,
+    pub toasts: Vec<shadcn_iced::sonner::Toast<Message>>,
     pub next_toast: u64,
-    pub month: iced_ui::calendar::Month,
-    pub date: Option<iced_ui::calendar::Date>,
+    pub month: shadcn_iced::calendar::Month,
+    pub date: Option<shadcn_iced::calendar::Date>,
     pub range: (
-        Option<iced_ui::calendar::Date>,
-        Option<iced_ui::calendar::Date>,
+        Option<shadcn_iced::calendar::Date>,
+        Option<shadcn_iced::calendar::Date>,
     ),
     pub slide: usize,
     pub sidebar_collapsed: bool,
     pub scroller_at_end: bool,
-    pub dob: Option<iced_ui::calendar::Date>,
+    pub dob: Option<shadcn_iced::calendar::Date>,
     pub dob_open: bool,
     pub copied: Option<String>,
     pub code_wrap: bool,
     pub code_expanded: bool,
-    pub questions: Vec<iced_ui::questionnaire::Question>,
-    pub questionnaire: iced_ui::questionnaire::State,
-    pub base_toasts: Vec<iced_ui::toast::Toast<Message>>,
+    pub questions: Vec<shadcn_iced::questionnaire::Question>,
+    pub questionnaire: shadcn_iced::questionnaire::State,
+    pub base_toasts: Vec<shadcn_iced::toast::Toast<Message>>,
 }
 
 pub const FRUITS: [&str; 5] = ["Apple", "Banana", "Blueberry", "Grapes", "Pineapple"];
@@ -153,7 +153,7 @@ impl Default for Demo {
             email: String::new(),
             password: String::new(),
             search: String::new(),
-            message: iced_ui::textarea::Content::new(),
+            message: shadcn_iced::textarea::Content::new(),
             progress: 60.0,
             page: 2,
             terms: true,
@@ -184,14 +184,14 @@ impl Default for Demo {
             framework: None,
             toasts: Vec::new(),
             next_toast: 0,
-            month: iced_ui::calendar::Month {
+            month: shadcn_iced::calendar::Month {
                 year: 2026,
                 month: 10,
             },
-            date: iced_ui::calendar::Date::new(2026, 10, 16),
+            date: shadcn_iced::calendar::Date::new(2026, 10, 16),
             range: (
-                iced_ui::calendar::Date::new(2026, 10, 12),
-                iced_ui::calendar::Date::new(2026, 10, 22),
+                shadcn_iced::calendar::Date::new(2026, 10, 12),
+                shadcn_iced::calendar::Date::new(2026, 10, 22),
             ),
             slide: 0,
             sidebar_collapsed: false,
@@ -202,7 +202,7 @@ impl Default for Demo {
             code_wrap: false,
             code_expanded: false,
             questions: agent::questions(),
-            questionnaire: iced_ui::questionnaire::State::new(),
+            questionnaire: shadcn_iced::questionnaire::State::new(),
             base_toasts: Vec::new(),
         }
     }
@@ -214,7 +214,7 @@ pub enum DemoMessage {
     Email(String),
     Password(String),
     Search(String),
-    Edit(iced_ui::textarea::Action),
+    Edit(shadcn_iced::textarea::Action),
     Progress(f32),
     Page(usize),
     Terms(bool),
@@ -235,7 +235,7 @@ pub enum DemoMessage {
     Dialog(bool),
     AlertDialog(bool),
     SmallAlertDialog(bool),
-    Sheet(Option<iced_ui::sheet::Side>),
+    Sheet(Option<shadcn_iced::sheet::Side>),
     DefaultSheet(bool),
     Drawer(bool),
     Goal(i32),
@@ -243,23 +243,23 @@ pub enum DemoMessage {
     Position(u8),
     Query(String),
     Framework(&'static str),
-    Toast(iced_ui::sonner::Kind),
+    Toast(shadcn_iced::sonner::Kind),
     DismissToast(u64),
-    Month(iced_ui::calendar::Month),
-    Date(iced_ui::calendar::Date),
-    Range(iced_ui::calendar::Date),
+    Month(shadcn_iced::calendar::Month),
+    Date(shadcn_iced::calendar::Date),
+    Range(shadcn_iced::calendar::Date),
     Slide(usize),
     SidebarCollapsed(bool),
     ScrollerAtEnd(bool),
     ScrollToEnd,
     Preset(i64),
-    Dob(iced_ui::calendar::Date),
+    Dob(shadcn_iced::calendar::Date),
     DobOpen(bool),
     CopyCode(String),
     CodeWrap(bool),
     CodeExpanded(bool),
-    Questionnaire(iced_ui::questionnaire::Event),
-    BaseToast(Option<iced_ui::toast::Kind>),
+    Questionnaire(shadcn_iced::questionnaire::Event),
+    BaseToast(Option<shadcn_iced::toast::Kind>),
     CloseBaseToast(u64),
 }
 
@@ -311,7 +311,7 @@ impl Demo {
                 self.query.clear();
             }
             DemoMessage::Toast(kind) => {
-                use iced_ui::sonner::{Kind, Toast};
+                use shadcn_iced::sonner::{Kind, Toast};
 
                 let id = self.next_toast;
                 self.next_toast += 1;
@@ -342,7 +342,7 @@ impl Demo {
             DemoMessage::SidebarCollapsed(collapsed) => self.sidebar_collapsed = collapsed,
             DemoMessage::ScrollerAtEnd(at_end) => self.scroller_at_end = at_end,
             DemoMessage::Preset(days) => {
-                let date = iced_ui::calendar::Date::today().add_days(days);
+                let date = shadcn_iced::calendar::Date::today().add_days(days);
                 self.date = Some(date);
                 self.month = date.month_of();
             }
@@ -363,7 +363,7 @@ impl Demo {
                     let id = self.next_toast;
                     self.next_toast += 1;
                     self.toasts.push(
-                        iced_ui::sonner::Toast::new(id, "Agent plan saved").description(format!(
+                        shadcn_iced::sonner::Toast::new(id, "Agent plan saved").description(format!(
                             "Direction: {} · Progress signals: {} · Timing: {}",
                             answers[0].join(", "),
                             if answers[1].is_empty() {
@@ -374,11 +374,11 @@ impl Demo {
                             answers[2].join(", ")
                         )),
                     );
-                    self.questionnaire = iced_ui::questionnaire::State::new();
+                    self.questionnaire = shadcn_iced::questionnaire::State::new();
                 }
             }
             DemoMessage::BaseToast(kind) => {
-                use iced_ui::toast::{Kind, Toast};
+                use shadcn_iced::toast::{Kind, Toast};
 
                 let id = self.next_toast;
                 self.next_toast += 1;
@@ -403,7 +403,7 @@ impl Demo {
             DemoMessage::CloseBaseToast(id) => self.base_toasts.retain(|toast| toast.id != id),
             DemoMessage::ScrollToEnd => {
                 self.scroller_at_end = true;
-                return iced_ui::message_scroller::scroll_to_end(chat::SCROLLER_ID);
+                return shadcn_iced::message_scroller::scroll_to_end(chat::SCROLLER_ID);
             }
         }
 

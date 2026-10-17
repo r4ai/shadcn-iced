@@ -28,7 +28,7 @@ const read = (file) => {
 };
 
 const components = pages.map((page) => {
-  const component = `crates/iced_ui/src/components/${page.id.replaceAll("-", "_")}.rs`;
+  const component = `crates/shadcn_iced/src/components/${page.id.replaceAll("-", "_")}.rs`;
 
   return {
     id: page.id,

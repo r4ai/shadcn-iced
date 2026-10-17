@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate `crates/iced_ui_core/src/icon/lucide.rs` from lucide-static's
+"""Generate `crates/shadcn_iced_core/src/icon/lucide.rs` from lucide-static's
 `font/codepoints.json`.
 
 Usage: python3 scripts/gen_icons.py <path-to-lucide-static-package>
@@ -36,7 +36,7 @@ def main():
     for name, ident in names:
         out.append(f'    ("{name}", {ident}),')
     out.append("];")
-    dest = Path(__file__).resolve().parent.parent / "crates/iced_ui_core/src/icon/lucide.rs"
+    dest = Path(__file__).resolve().parent.parent / "crates/shadcn_iced_core/src/icon/lucide.rs"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text("\n".join(out) + "\n")
     print(f"wrote {dest} ({len(names)} icons)")

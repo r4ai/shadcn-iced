@@ -6,7 +6,7 @@
 //! cargo run -p gallery --bin site_data > site/src/data/gallery.json
 //! ```
 use gallery::{Gallery, PAGES};
-use iced_ui::Mode;
+use shadcn_iced::Mode;
 
 fn string(value: &str) -> String {
     let mut out = String::from("\"");

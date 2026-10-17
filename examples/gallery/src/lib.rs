@@ -1,14 +1,14 @@
-//! The iced_ui gallery: a documentation-like showcase of every component.
+//! The shadcn_iced gallery: a documentation-like showcase of every component.
 pub mod customizer;
 pub mod pages;
 
-use iced_ui::prelude::*;
-use iced_ui::theme::{Accent, BaseColor, MenuAccent, MenuColor, Radius, ThemeColor};
-use iced_ui::{font, style, tokens};
+use shadcn_iced::prelude::*;
+use shadcn_iced::theme::{Accent, BaseColor, MenuAccent, MenuColor, Radius, ThemeColor};
+use shadcn_iced::{font, style, tokens};
 
 use iced::widget::{column, container, row, rule, space, text};
 use iced::{Element, Fill, Length, Task, Theme};
-use iced_ui::scroll_area::scroll_area as scrollable;
+use shadcn_iced::scroll_area::scroll_area as scrollable;
 
 pub use pages::{PAGES, Page};
 
@@ -82,7 +82,7 @@ impl Gallery {
     }
 
     fn rebuild_theme(&mut self) {
-        let mut config = iced_ui::theme::Config::new(self.base, self.mode)
+        let mut config = shadcn_iced::theme::Config::new(self.base, self.mode)
             .accent_maybe(self.accent)
             .radius_preset(self.radius)
             .menu_accent(self.menu_accent)
@@ -160,12 +160,12 @@ impl Gallery {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        use iced_ui::sidebar::{group, item};
+        use shadcn_iced::sidebar::{group, item};
 
         let page = &PAGES[self.page];
 
         let nav =
-            iced_ui::sidebar::sidebar()
+            shadcn_iced::sidebar::sidebar()
                 .header(
                     row![
                         container(lucide::COMMAND.sized(16))
@@ -180,7 +180,7 @@ impl Gallery {
                                 }
                             }),
                         column![
-                            text("iced-ui").size(style::text::SM).font(font::semibold()),
+                            text("shadcn-iced").size(style::text::SM).font(font::semibold()),
                             text(format!("{} components", PAGES.len())).size(style::text::XS),
                         ],
                     ]
@@ -202,17 +202,17 @@ impl Gallery {
         let header = row![
             text(page.title).size(style::text::SM).font(font::medium()),
             space::horizontal(),
-            iced_ui::button::button("Customize")
+            shadcn_iced::button::button("Customize")
                 .icon(lucide::PALETTE)
-                .variant(iced_ui::button::Variant::Outline)
-                .size(iced_ui::button::Size::Sm)
+                .variant(shadcn_iced::button::Variant::Outline)
+                .size(shadcn_iced::button::Size::Sm)
                 .on_press(Message::Customize(true)),
-            iced_ui::button::icon_button(match self.mode {
+            shadcn_iced::button::icon_button(match self.mode {
                 Mode::Light => lucide::MOON,
                 Mode::Dark => lucide::SUN,
             })
-            .variant(iced_ui::button::Variant::Outline)
-            .size(iced_ui::button::Size::IconSm)
+            .variant(shadcn_iced::button::Variant::Outline)
+            .size(shadcn_iced::button::Size::IconSm)
             .on_press(Message::ToggleMode),
         ]
         .spacing(8)
@@ -234,7 +234,7 @@ impl Gallery {
         .width(Fill)
         .height(Fill);
 
-        let main = iced_ui::sheet::sheet(
+        let main = shadcn_iced::sheet::sheet(
             column![header, rule::horizontal(1).style(separator), content],
             self.customize,
         )
@@ -243,7 +243,7 @@ impl Gallery {
         .content(scrollable(customizer::view(self)).height(Fill))
         .on_close(Message::Customize(false));
 
-        self.toasters(iced_ui::sidebar::layout(nav, main), true)
+        self.toasters(shadcn_iced::sidebar::layout(nav, main), true)
     }
 
     /// Shows the toasts of the Sonner and Toast pages on top of `content`,
@@ -262,11 +262,11 @@ impl Gallery {
             (&[][..], &[][..])
         };
 
-        let content = iced_ui::toast::toaster(content, base_toasts, |id| {
+        let content = shadcn_iced::toast::toaster(content, base_toasts, |id| {
             Message::Demo(DemoMessage::CloseBaseToast(id))
         });
 
-        iced_ui::sonner::toaster(content, toasts, |id| {
+        shadcn_iced::sonner::toaster(content, toasts, |id| {
             Message::Demo(DemoMessage::DismissToast(id))
         })
         .into()
@@ -372,10 +372,10 @@ pub fn example<'a>(
 /// Settings shared by the app and the snapshot renderer.
 pub fn settings() -> iced::Settings {
     iced::Settings {
-        fonts: iced_ui::font::all(),
+        fonts: shadcn_iced::font::all(),
         default_font: {
-            iced_ui::font::set_sans(customizer::body_font());
-            iced_ui::font::sans()
+            shadcn_iced::font::set_sans(customizer::body_font());
+            shadcn_iced::font::sans()
         },
         ..Default::default()
     }

@@ -2,7 +2,7 @@
 // Deployed by the `Site` workflow (`pnpm run deploy`).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "iced-ui",
+  "name": "shadcn-iced",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./dist",

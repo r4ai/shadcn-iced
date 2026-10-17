@@ -3,9 +3,9 @@
 use super::{DemoMessage, Page};
 use crate::{Message, example};
 
-use iced_ui::prelude::*;
-use iced_ui::theme::alpha;
-use iced_ui::{alert, avatar, badge, button, card, item, typography as ty};
+use shadcn_iced::prelude::*;
+use shadcn_iced::theme::alpha;
+use shadcn_iced::{alert, avatar, badge, button, card, item, typography as ty};
 
 use iced::widget::{column, container, row, space, text};
 use iced::{Center, Color, Fill, FillPortion, Theme};
@@ -71,12 +71,12 @@ pub const BADGE: Page =
                             .leading(
                                 spinner()
                                     .size(12.0)
-                                    .style(|theme| { iced_ui::tokens(theme).palette.destructive })
+                                    .style(|theme| { shadcn_iced::tokens(theme).palette.destructive })
                             )
                             .variant(badge::Variant::Destructive),
                         badge("Generating")
                             .trailing(spinner().size(12.0).style(|theme| {
-                                iced_ui::tokens(theme).palette.secondary_foreground
+                                shadcn_iced::tokens(theme).palette.secondary_foreground
                             }))
                             .variant(badge::Variant::Secondary),
                     ]
@@ -293,8 +293,8 @@ pub const TEXTAREA: Page = Page {
                 container(
                     column![
                         container(label("Message")).style(|theme: &Theme| container::Style {
-                            text_color: Some(iced_ui::theme::alpha(
-                                iced_ui::tokens(theme).palette.foreground,
+                            text_color: Some(shadcn_iced::theme::alpha(
+                                shadcn_iced::tokens(theme).palette.foreground,
                                 0.5
                             )),
                             ..Default::default()
@@ -311,7 +311,7 @@ pub const TEXTAREA: Page = Page {
                 container(
                     column![
                         label("Message").style(|theme: &Theme| text::Style {
-                            color: Some(iced_ui::tokens(theme).palette.destructive),
+                            color: Some(shadcn_iced::tokens(theme).palette.destructive),
                         }),
                         textarea(&gallery.demo.message)
                             .placeholder("Type your message here.")
@@ -410,7 +410,7 @@ pub const SEPARATOR: Page = Page {
                         text("shadcn/ui")
                             .size(14)
                             .line_height(iced::Pixels(14.0))
-                            .font(iced_ui::font::medium()),
+                            .font(shadcn_iced::font::medium()),
                         sm_muted("The Foundation for your Design System"),
                     ]
                     .spacing(6),
@@ -533,7 +533,7 @@ pub const SPINNER: Page =
                 button::Button::new(
                     row![
                         spinner().size(14.0).style(style),
-                        text(label).size(12.8).font(iced_ui::font::medium())
+                        text(label).size(12.8).font(shadcn_iced::font::medium())
                     ]
                     .spacing(4)
                     .align_y(Center),
@@ -570,13 +570,13 @@ pub const SPINNER: Page =
                     column![
                         // `disabled:opacity-50`
                         loading("Loading...", button::Variant::Default, |theme| {
-                            alpha(iced_ui::tokens(theme).palette.primary_foreground, 0.5)
+                            alpha(shadcn_iced::tokens(theme).palette.primary_foreground, 0.5)
                         }),
                         loading("Please wait", button::Variant::Outline, |theme| {
-                            alpha(iced_ui::tokens(theme).palette.foreground, 0.5)
+                            alpha(shadcn_iced::tokens(theme).palette.foreground, 0.5)
                         }),
                         loading("Processing", button::Variant::Secondary, |theme| {
-                            alpha(iced_ui::tokens(theme).palette.secondary_foreground, 0.5)
+                            alpha(shadcn_iced::tokens(theme).palette.secondary_foreground, 0.5)
                         }),
                     ]
                     .spacing(16)
@@ -587,12 +587,12 @@ pub const SPINNER: Page =
                     row![
                         badge("Syncing").leading(
                             spinner().size(12.0).style(|theme| {
-                                iced_ui::tokens(theme).palette.primary_foreground
+                                shadcn_iced::tokens(theme).palette.primary_foreground
                             })
                         ),
                         badge("Updating")
                             .leading(spinner().size(12.0).style(|theme| {
-                                iced_ui::tokens(theme).palette.secondary_foreground
+                                shadcn_iced::tokens(theme).palette.secondary_foreground
                             }))
                             .variant(badge::Variant::Secondary),
                         badge("Processing")
@@ -636,7 +636,7 @@ pub const KBD: Page = Page {
                 "Button",
                 button::Button::new(
                     row![
-                        text("Accept").size(14).font(iced_ui::font::medium()),
+                        text("Accept").size(14).font(shadcn_iced::font::medium()),
                         container(kbd("⏎")).padding(iced::Padding::ZERO.left(2)),
                     ]
                     .spacing(6)
@@ -669,7 +669,7 @@ pub const PROGRESS: Page = Page {
             ),
             example(
                 "Label",
-                container(iced_ui::progress::progress_with_label(
+                container(shadcn_iced::progress::progress_with_label(
                     "Upload progress",
                     56.0
                 ))
@@ -776,7 +776,7 @@ pub const TYPOGRAPHY: Page = Page {
                 ty::h3("The Joke Tax"),
                 ty::list(["1st level of puns: 5 gold coins", "2nd level of jokes: 10 gold coins", "3rd level of one-liners: 20 gold coins"]),
                 ty::h4("People stopped telling jokes"),
-                row![ty::p("Run"), ty::inline_code("cargo iced-ui add button"), ty::p("to copy it.")].spacing(6).align_y(Center),
+                row![ty::p("Run"), ty::inline_code("cargo shadcn-iced add button"), ty::p("to copy it.")].spacing(6).align_y(Center),
                 ty::large("Are you absolutely sure?"),
                 ty::small("Email address"),
                 ty::muted_text("Enter your email address."),
@@ -803,13 +803,13 @@ pub const TABLE: Page = Page {
         ];
 
         let medium = |value: &'static str| -> iced::Element<'static, Message> {
-            text(value).size(14).font(iced_ui::font::medium()).into()
+            text(value).size(14).font(shadcn_iced::font::medium()).into()
         };
 
         let invoices_table = invoices.iter().fold(
             table(["Invoice", "Status", "Method", "Amount"]),
             |table, (invoice, status, method, amount)| {
-                table.row::<iced_ui::table::Cell<'_, Message>>([
+                table.row::<shadcn_iced::table::Cell<'_, Message>>([
                     medium(invoice).into(),
                     (*status).into(),
                     (*method).into(),
@@ -820,7 +820,7 @@ pub const TABLE: Page = Page {
 
         let actions = |product: &'static str,
                        price: &'static str|
-         -> [iced_ui::table::Cell<'static, Message>; 3] {
+         -> [shadcn_iced::table::Cell<'static, Message>; 3] {
             [
                 medium(product).into(),
                 price.into(),
@@ -953,7 +953,7 @@ pub const EMPTY: Page = Page {
                     .extra(
                         button::Button::new(
                             row![
-                                text("Learn More").size(12.8).font(iced_ui::font::medium()).style(crate::muted),
+                                text("Learn More").size(12.8).font(shadcn_iced::font::medium()).style(crate::muted),
                                 lucide::ARROW_UP_RIGHT.sized(14).style(crate::muted),
                             ]
                             .spacing(4)
@@ -1150,10 +1150,10 @@ fn placeholder<'a>(label: &'a str) -> iced::Element<'a, Message> {
     container(sm_muted(label))
         .center(Fill)
         .style(|theme: &Theme| {
-            let t = iced_ui::tokens(theme);
+            let t = shadcn_iced::tokens(theme);
             container::Style {
                 background: Some(t.palette.muted.into()),
-                border: iced_ui::style::rounded(t.radius_lg()),
+                border: shadcn_iced::style::rounded(t.radius_lg()),
                 ..Default::default()
             }
         })
@@ -1187,9 +1187,9 @@ pub const SCROLL_AREA: Page = Page {
     view: |_| {
         // `rounded-md border`
         let frame = |theme: &Theme| {
-            let t = iced_ui::tokens(theme);
+            let t = shadcn_iced::tokens(theme);
             container::Style {
-                border: iced_ui::style::border(t.palette.border, t.radius_md()),
+                border: shadcn_iced::style::border(t.palette.border, t.radius_md()),
                 ..Default::default()
             }
         };
@@ -1207,7 +1207,7 @@ pub const SCROLL_AREA: Page = Page {
                     container(placeholder("3 : 4")).width(150).height(200),
                     row![
                         text("Photo by").size(12).style(crate::muted),
-                        text(artist).size(12).font(iced_ui::font::semibold()),
+                        text(artist).size(12).font(shadcn_iced::font::semibold()),
                     ]
                     .spacing(4),
                 ]
@@ -1227,7 +1227,7 @@ pub const SCROLL_AREA: Page = Page {
                             text("Tags")
                                 .size(14)
                                 .line_height(iced::Pixels(14.0))
-                                .font(iced_ui::font::medium()),
+                                .font(shadcn_iced::font::medium()),
                             tags
                         ]
                         .spacing(16)
@@ -1241,7 +1241,7 @@ pub const SCROLL_AREA: Page = Page {
             ),
             example(
                 "Horizontal",
-                container(iced_ui::scroll_area::horizontal_scroll_area(works))
+                container(shadcn_iced::scroll_area::horizontal_scroll_area(works))
                     .width(384)
                     .padding(1)
                     .style(frame),

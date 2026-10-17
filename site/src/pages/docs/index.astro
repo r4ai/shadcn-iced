@@ -9,7 +9,7 @@ const toc = [
   { id: "live-previews", label: "Live previews" },
 ];
 
-const example = `use iced_ui::prelude::*;
+const example = `use shadcn_iced::prelude::*;
 
 fn view(_state: &()) -> iced::Element<'_, Message> {
     card()
@@ -28,7 +28,7 @@ fn view(_state: &()) -> iced::Element<'_, Message> {
   next={{ href: url("/docs/installation"), label: "Installation" }}
 >
   <p>
-    iced-ui brings the components of <a href="https://ui.shadcn.com" target="_blank" rel="noreferrer">shadcn/ui</a>
+    shadcn-iced brings the components of <a href="https://ui.shadcn.com" target="_blank" rel="noreferrer">shadcn/ui</a>
     to <a href="https://iced.rs" target="_blank" rel="noreferrer">iced</a>, the cross-platform GUI library for Rust.
     It follows the current default style of shadcn/ui (Base UI with the Nova style), down to its spacing, colors,
     radii and animations.
@@ -36,18 +36,18 @@ fn view(_state: &()) -> iced::Element<'_, Message> {
   <CodeBlock class="mt-6" code={example} title="src/main.rs" />
 
   <h2 id="how-it-works">How it works</h2>
-  <p>Like shadcn/ui, iced-ui is the code of its components first. You choose how to use it:</p>
+  <p>Like shadcn/ui, shadcn-iced is the code of its components first. You choose how to use it:</p>
   <ul>
     <li>
-      <strong>As a library</strong>: depend on the <code>iced_ui</code> crate and update it like any dependency.
+      <strong>As a library</strong>: depend on the <code>shadcn_iced</code> crate and update it like any dependency.
     </li>
     <li>
-      <strong>Copy and paste</strong>: <code>cargo iced-ui add button dialog</code> writes the source of the components to
+      <strong>Copy and paste</strong>: <code>cargo shadcn-iced add button dialog</code> writes the source of the components to
       <code>src/ui/</code>, where you can change anything.
     </li>
   </ul>
   <p>
-    Both share <code>iced_ui_core</code>: the theme, the fonts and icons, and the headless primitives (anchored
+    Both share <code>shadcn_iced_core</code>: the theme, the fonts and icons, and the headless primitives (anchored
     overlays, modal layers, listboxes, disclosures) that Base UI provides to shadcn/ui.
   </p>
 

@@ -1,9 +1,9 @@
 // The color mode and the theme options of the site, kept in localStorage.
 import { DEFAULT_THEME, type ThemeOptions } from "../lib/theme";
 
-const MODE_KEY = "iced-ui:mode";
-const THEME_KEY = "iced-ui:theme";
-const EVENT = "iced-ui:theme";
+const MODE_KEY = "shadcn-iced:mode";
+const THEME_KEY = "shadcn-iced:theme";
+const EVENT = "shadcn-iced:theme";
 
 function read(key: string) {
   try {

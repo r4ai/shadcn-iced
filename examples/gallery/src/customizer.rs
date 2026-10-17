@@ -1,12 +1,12 @@
 //! The theme customizer, like shadcn/ui's `/create` page (without styles).
 use crate::{Gallery, Message};
 
-use iced_ui::button::{self, button};
-use iced_ui::code_block::code_block;
-use iced_ui::field::field;
-use iced_ui::select::{Size, select};
-use iced_ui::theme::{Accent, BaseColor, MenuAccent, MenuColor, Radius, ThemeColor};
-use iced_ui::{font, style};
+use shadcn_iced::button::{self, button};
+use shadcn_iced::code_block::code_block;
+use shadcn_iced::field::field;
+use shadcn_iced::select::{Size, select};
+use shadcn_iced::theme::{Accent, BaseColor, MenuAccent, MenuColor, Radius, ThemeColor};
+use shadcn_iced::{font, style};
 
 use iced::widget::{column, text};
 use iced::{Element, Fill};
@@ -119,7 +119,7 @@ pub fn view(gallery: &Gallery) -> Element<'_, Message> {
             .wrap(true),
         button("Reset")
             .variant(button::Variant::Outline)
-            .icon(iced_ui::prelude::lucide::ROTATE_CCW)
+            .icon(shadcn_iced::prelude::lucide::ROTATE_CCW)
             .width(Fill)
             .on_press(Message::ResetTheme),
     ]
@@ -132,7 +132,7 @@ pub fn view(gallery: &Gallery) -> Element<'_, Message> {
 /// The Rust code building the customized theme.
 pub fn code(gallery: &Gallery) -> String {
     let mut code = format!(
-        "use iced_ui::theme::{{self, Accent, BaseColor, MenuAccent, MenuColor, Radius}};\n\n\
+        "use shadcn_iced::theme::{{self, Accent, BaseColor, MenuAccent, MenuColor, Radius}};\n\n\
          let theme = theme::Config::new(BaseColor::{:?}, mode)",
         gallery.base
     );
@@ -176,7 +176,7 @@ pub fn code(gallery: &Gallery) -> String {
 
     if body_font() != font::GEIST {
         code.push_str(
-            "\n\n// Before `.iced_ui()`:\niced_ui::font::set_sans(iced_ui::font::INTER);",
+            "\n\n// Before `.shadcn_iced()`:\nshadcn_iced::font::set_sans(shadcn_iced::font::INTER);",
         );
     }
 
@@ -187,7 +187,7 @@ pub fn code(gallery: &Gallery) -> String {
             "GEIST"
         };
         code.push_str(&format!(
-            "\niced_ui::font::set_heading(Some(iced_ui::font::{name}));"
+            "\nshadcn_iced::font::set_heading(Some(shadcn_iced::font::{name}));"
         ));
     }
 

@@ -2,12 +2,12 @@
 use super::{DemoMessage, Page};
 use crate::{Message, example};
 
-use iced_ui::attachment::{self, State};
-use iced_ui::bubble::{Align, Side, Variant, bubble_group};
-use iced_ui::button::{Size, Variant as ButtonVariant};
-use iced_ui::marker::Variant as MarkerVariant;
-use iced_ui::message_scroller;
-use iced_ui::prelude::*;
+use shadcn_iced::attachment::{self, State};
+use shadcn_iced::bubble::{Align, Side, Variant, bubble_group};
+use shadcn_iced::button::{Size, Variant as ButtonVariant};
+use shadcn_iced::marker::Variant as MarkerVariant;
+use shadcn_iced::message_scroller;
+use shadcn_iced::prelude::*;
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Fill};
@@ -235,7 +235,7 @@ pub const MESSAGE: Page = Page {
                                     .size(12)
                                     .style(|theme: &iced::Theme| {
                                         text::Style {
-                                            color: Some(iced_ui::tokens(theme).palette.destructive),
+                                            color: Some(shadcn_iced::tokens(theme).palette.destructive),
                                         }
                                     }),
                                 ghost_icon(lucide::REFRESH_CCW, Size::IconXs),
@@ -262,7 +262,7 @@ pub const MESSAGE: Page = Page {
     },
 };
 
-fn ghost_icon<'a>(icon: iced_ui::Icon, size: Size) -> Element<'a, Message> {
+fn ghost_icon<'a>(icon: shadcn_iced::Icon, size: Size) -> Element<'a, Message> {
     icon_button(icon)
         .variant(ButtonVariant::Ghost)
         .size(size)
@@ -503,7 +503,7 @@ pub const MESSAGE_SCROLLER: Page = Page {
             .button((!at_end).then_some(Message::Demo(DemoMessage::ScrollToEnd)));
 
         let header = column![
-            text("New Chat").size(16).font(iced_ui::font::medium()),
+            text("New Chat").size(16).font(shadcn_iced::font::medium()),
             text("How can I help you today?")
                 .size(14)
                 .style(crate::muted),
@@ -515,16 +515,16 @@ pub const MESSAGE_SCROLLER: Page = Page {
             "Demo",
             sm(container(column![
                 header,
-                iced_ui::separator::separator(),
+                shadcn_iced::separator::separator(),
                 container(scroller).height(Fill),
             ])
             .height(480)
             .style(|theme: &iced::Theme| {
-                let t = iced_ui::tokens(theme);
+                let t = shadcn_iced::tokens(theme);
                 container::Style {
                     background: Some(t.palette.card.into()),
                     text_color: Some(t.palette.card_foreground),
-                    border: iced_ui::style::ring_border(&t, t.radius_xl()),
+                    border: shadcn_iced::style::ring_border(&t, t.radius_xl()),
                     ..Default::default()
                 }
             })),

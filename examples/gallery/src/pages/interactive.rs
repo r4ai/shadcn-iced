@@ -4,8 +4,8 @@
 use super::{DemoMessage, Page};
 use crate::{Message, example};
 
-use iced_ui::prelude::*;
-use iced_ui::{button, button_group, field, font, input_group, radio_group, tabs, toggle};
+use shadcn_iced::prelude::*;
+use shadcn_iced::{button, button_group, field, font, input_group, radio_group, tabs, toggle};
 
 use iced::widget::{column, container, row, text};
 use iced::{Center, Element, Fill, Theme};
@@ -196,7 +196,7 @@ pub const SWITCH: Page =
                 "Sizes",
                 container(field::field_group([
                     switch(false)
-                        .size(iced_ui::switch::Size::Sm)
+                        .size(shadcn_iced::switch::Size::Sm)
                         .label("Small")
                         .on_toggle(noop)
                         .into(),
@@ -347,7 +347,7 @@ pub const SLIDER: Page = Page {
             example(
                 "Range",
                 narrow(
-                    iced_ui::slider::range_slider(0.0..=100.0, &[25.0, 50.0], |_, _| Message::Noop)
+                    shadcn_iced::slider::range_slider(0.0..=100.0, &[25.0, 50.0], |_, _| Message::Noop)
                         .step(5.0)
                         .into()
                 )
@@ -355,7 +355,7 @@ pub const SLIDER: Page = Page {
             example(
                 "Multiple Thumbs",
                 narrow(
-                    iced_ui::slider::range_slider(0.0..=100.0, &[10.0, 20.0, 70.0], |_, _| {
+                    shadcn_iced::slider::range_slider(0.0..=100.0, &[10.0, 20.0, 70.0], |_, _| {
                         Message::Noop
                     })
                     .step(10.0)
@@ -365,8 +365,8 @@ pub const SLIDER: Page = Page {
             example(
                 "Vertical",
                 row![
-                    iced_ui::slider::vertical(0.0..=100.0, 50.0, noop),
-                    iced_ui::slider::vertical(0.0..=100.0, 25.0, noop),
+                    shadcn_iced::slider::vertical(0.0..=100.0, 50.0, noop),
+                    shadcn_iced::slider::vertical(0.0..=100.0, 25.0, noop),
                 ]
                 .spacing(24)
             ),
@@ -380,7 +380,7 @@ pub const SLIDER: Page = Page {
                             muted("0.3, 0.7"),
                         ]
                         .align_y(Center),
-                        iced_ui::slider::range_slider(0.0..=1.0, &[0.3, 0.7], |_, _| Message::Noop)
+                        shadcn_iced::slider::range_slider(0.0..=1.0, &[0.3, 0.7], |_, _| Message::Noop)
                             .step(0.1),
                     ]
                     .spacing(12)
@@ -518,7 +518,7 @@ pub const TOGGLE_GROUP: Page = Page {
             example(
                 "Vertical",
                 toggle_group(formats, |f| demo(DemoMessage::Format(f)))
-                    .orientation(iced_ui::toggle_group::Orientation::Vertical)
+                    .orientation(shadcn_iced::toggle_group::Orientation::Vertical)
                     .spacing(4.0)
                     .icon(Format::Bold, lucide::BOLD)
                     .icon(Format::Italic, lucide::ITALIC)
@@ -693,9 +693,9 @@ fn bordered<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message
         .padding([8, 16])
         .width(Fill)
         .style(|theme: &Theme| {
-            let t = iced_ui::tokens(theme);
+            let t = shadcn_iced::tokens(theme);
             container::Style {
-                border: iced_ui::style::border(t.palette.border, t.radius_md()),
+                border: shadcn_iced::style::border(t.palette.border, t.radius_md()),
                 ..Default::default()
             }
         })
@@ -747,7 +747,7 @@ pub const COLLAPSIBLE: Page = Page {
             example(
                 "Demo",
                 container(
-                    iced_ui::collapsible::custom(
+                    shadcn_iced::collapsible::custom(
                         trigger(),
                         trigger(),
                         column![
@@ -976,10 +976,10 @@ pub const INPUT_GROUP: Page = Page {
                 wide(
                     column![
                         input_group(input("Searching...", ""))
-                            .trailing(iced_ui::spinner::spinner()),
+                            .trailing(shadcn_iced::spinner::spinner()),
                         input_group(input("Saving changes...", ""))
                             .trailing_text("Saving...")
-                            .trailing(iced_ui::spinner::spinner()),
+                            .trailing(shadcn_iced::spinner::spinner()),
                     ]
                     .spacing(16)
                     .into()
@@ -1124,14 +1124,14 @@ pub const NATIVE_SELECT: Page = Page {
             ),
             example(
                 "Small",
-                iced_ui::native_select::small(
+                shadcn_iced::native_select::small(
                     native_select(&STATUSES[..], status, |s| demo(DemoMessage::Fruit(s)))
                         .placeholder("Select status")
                 ),
             ),
             example(
                 "Invalid",
-                iced_ui::native_select::invalid(
+                shadcn_iced::native_select::invalid(
                     native_select(&super::FRUITS[..3], None::<&str>, noop)
                         .placeholder("Error state")
                 ),
@@ -1180,9 +1180,9 @@ fn panels<'a>(
         .height(height)
         .padding(1)
         .style(|theme: &Theme| {
-            let t = iced_ui::tokens(theme);
+            let t = shadcn_iced::tokens(theme);
             container::Style {
-                border: iced_ui::style::border(t.palette.border, t.radius_lg()),
+                border: shadcn_iced::style::border(t.palette.border, t.radius_lg()),
                 ..Default::default()
             }
         })
@@ -1204,7 +1204,7 @@ pub const RESIZABLE: Page = Page {
                     resizable(
                         panel("One"),
                         resizable(panel("Two"), panel("Three"))
-                            .axis(iced_ui::resizable::Axis::Vertical)
+                            .axis(shadcn_iced::resizable::Axis::Vertical)
                             .default_ratio(0.25)
                             .grip(true),
                     )
@@ -1216,7 +1216,7 @@ pub const RESIZABLE: Page = Page {
                 "Vertical",
                 panels(
                     resizable(panel("Header"), panel("Content"))
-                        .axis(iced_ui::resizable::Axis::Vertical)
+                        .axis(shadcn_iced::resizable::Axis::Vertical)
                         .default_ratio(0.25),
                     200.0,
                 ),

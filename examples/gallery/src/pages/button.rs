@@ -1,9 +1,9 @@
 use super::{DemoMessage, Page};
 use crate::{Gallery, Message, example};
 
-use iced_ui::button::{Button, Size, Variant, button, icon_button};
-use iced_ui::prelude::{lucide, spinner};
-use iced_ui::theme::alpha;
+use shadcn_iced::button::{Button, Size, Variant, button, icon_button};
+use shadcn_iced::prelude::{lucide, spinner};
+use shadcn_iced::theme::alpha;
 
 use iced::widget::{column, row, text};
 use iced::{Center, Color, Element, Theme};
@@ -23,7 +23,7 @@ fn loading<'a>(
     color: fn(&Theme) -> Color,
 ) -> Button<'a, Message> {
     let spinner = spinner().style(color);
-    let label = text(label).size(14).font(iced_ui::font::medium());
+    let label = text(label).size(14).font(shadcn_iced::font::medium());
 
     let content = if trailing {
         row![label, spinner]
@@ -138,10 +138,10 @@ fn view(_gallery: &Gallery) -> Element<'_, Message> {
             row![
                 // `disabled:opacity-50`
                 loading("Generating", Variant::Outline, false, |theme| {
-                    alpha(iced_ui::tokens(theme).palette.foreground, 0.5)
+                    alpha(shadcn_iced::tokens(theme).palette.foreground, 0.5)
                 }),
                 loading("Downloading", Variant::Secondary, true, |theme| {
-                    alpha(iced_ui::tokens(theme).palette.secondary_foreground, 0.5)
+                    alpha(shadcn_iced::tokens(theme).palette.secondary_foreground, 0.5)
                 }),
             ]
             .spacing(8)

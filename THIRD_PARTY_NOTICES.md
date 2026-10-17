@@ -3,7 +3,7 @@
 ## shadcn/ui
 
 The design of the components (colors, spacing, radii, variants) and the
-theme presets in `crates/iced_ui_core/src/theme/presets.rs` are ported from
+theme presets in `crates/shadcn_iced_core/src/theme/presets.rs` are ported from
 [shadcn/ui](https://github.com/shadcn-ui/ui).
 
 ```
@@ -24,18 +24,18 @@ copies or substantial portions of the Software.
 
 ## Inter
 
-`crates/iced_ui_core/assets/fonts/Inter-*.ttf` (subset to Latin) are
+`crates/shadcn_iced_core/assets/fonts/Inter-*.ttf` (subset to Latin) are
 distributed under the SIL Open Font License 1.1. See
-[`INTER-LICENSE.txt`](crates/iced_ui_core/assets/fonts/INTER-LICENSE.txt).
+[`INTER-LICENSE.txt`](crates/shadcn_iced_core/assets/fonts/INTER-LICENSE.txt).
 
 ## Geist and Geist Mono
 
-`crates/iced_ui_core/assets/fonts/Geist*.ttf` are distributed under the SIL
+`crates/shadcn_iced_core/assets/fonts/Geist*.ttf` are distributed under the SIL
 Open Font License 1.1. See
-[`GEIST-LICENSE.txt`](crates/iced_ui_core/assets/fonts/GEIST-LICENSE.txt).
+[`GEIST-LICENSE.txt`](crates/shadcn_iced_core/assets/fonts/GEIST-LICENSE.txt).
 
 ## Lucide
 
-`crates/iced_ui_core/assets/fonts/lucide.ttf` is distributed under the ISC
+`crates/shadcn_iced_core/assets/fonts/lucide.ttf` is distributed under the ISC
 License. See
-[`LUCIDE-LICENSE.txt`](crates/iced_ui_core/assets/fonts/LUCIDE-LICENSE.txt).
+[`LUCIDE-LICENSE.txt`](crates/shadcn_iced_core/assets/fonts/LUCIDE-LICENSE.txt).

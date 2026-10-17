@@ -2,7 +2,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* The neutral theme of shadcn/ui (base-nova), the default of iced-ui. */
+/* The neutral theme of shadcn/ui (base-nova), the default of shadcn-iced. */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);

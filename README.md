@@ -1,4 +1,4 @@
-# iced-ui
+# shadcn-iced
 
 Beautifully designed components for [iced](https://iced.rs), ported from
 [shadcn/ui](https://ui.shadcn.com).
@@ -7,7 +7,7 @@ Use them as a regular library, **or copy their source into your project and
 own it**, just like shadcn/ui:
 
 ```sh
-cargo iced-ui add button dialog dropdown-menu
+cargo shadcn-iced add button dialog dropdown-menu
 ```
 
 | | |
@@ -64,12 +64,12 @@ cargo run -p hello       # the example below
 ```toml
 [dependencies]
 iced = "0.14"
-iced_ui = { git = "https://github.com/r4ai/iced-ui" }
+shadcn_iced = { git = "https://github.com/r4ai/shadcn-iced" }
 ```
 
 ```rust
-use iced_ui::prelude::*;
-use iced_ui::button::Variant;
+use shadcn_iced::prelude::*;
+use shadcn_iced::button::Variant;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -88,9 +88,9 @@ fn view(_state: &()) -> iced::Element<'_, Message> {
 fn main() -> iced::Result {
     iced::application(|| (), |_: &mut (), _: Message| {}, view)
         // Any shadcn/ui preset, e.g. zinc with the blue accent:
-        .theme(|_: &()| iced_ui::theme::zinc(Mode::Dark).build())
+        .theme(|_: &()| shadcn_iced::theme::zinc(Mode::Dark).build())
         // Loads Geist, Inter and the Lucide icons.
-        .iced_ui()
+        .shadcn_iced()
         .run()
 }
 ```
@@ -100,15 +100,15 @@ fn main() -> iced::Result {
 Install the CLI:
 
 ```sh
-cargo install --git https://github.com/r4ai/iced-ui cargo-iced-ui
+cargo install --git https://github.com/r4ai/shadcn-iced cargo-shadcn-iced
 ```
 
 Then, in your project:
 
 ```sh
 cargo add iced --features advanced,canvas,image,svg
-cargo add iced_ui_core --git https://github.com/r4ai/iced-ui
-cargo iced-ui add button card dialog
+cargo add shadcn_iced_core --git https://github.com/r4ai/shadcn-iced
+cargo shadcn-iced add button card dialog
 ```
 
 The components (and the components they use) are written to `src/ui/`, and
@@ -126,10 +126,10 @@ fn view(state: &State) -> iced::Element<'_, Message> {
 Other commands:
 
 ```sh
-cargo iced-ui list           # every component, with a description
-cargo iced-ui add --all      # copy everything
-cargo iced-ui diff           # which local copies differ from upstream
-cargo iced-ui view dialog    # print the source of a component
+cargo shadcn-iced list           # every component, with a description
+cargo shadcn-iced add --all      # copy everything
+cargo shadcn-iced diff           # which local copies differ from upstream
+cargo shadcn-iced view dialog    # print the source of a component
 ```
 
 ## Theming
@@ -137,7 +137,7 @@ cargo iced-ui view dialog    # print the source of a component
 Components read shadcn/ui's design tokens from the iced theme:
 
 ```rust
-use iced_ui::theme::{self, Accent, BaseColor, Mode};
+use shadcn_iced::theme::{self, Accent, BaseColor, Mode};
 
 let theme = theme::Config::new(BaseColor::Stone, Mode::Light)
     .accent(Accent::Orange)
@@ -150,7 +150,7 @@ The other options of shadcn/ui's `/create` page are there too (the
 gallery's **Customize** sheet shows the code for any combination):
 
 ```rust
-use iced_ui::theme::{Accent, MenuAccent, MenuColor, Radius};
+use shadcn_iced::theme::{Accent, MenuAccent, MenuColor, Radius};
 
 let theme = theme::Config::new(BaseColor::Neutral, Mode::Dark)
     .accent(Accent::Blue)
@@ -161,13 +161,13 @@ let theme = theme::Config::new(BaseColor::Neutral, Mode::Dark)
     .build();
 
 // Fonts (`font` and `fontHeading`): Geist by default, Inter is bundled too.
-iced_ui::font::set_sans(iced_ui::font::INTER); // before `.iced_ui()`
-iced_ui::font::set_heading(Some(iced_ui::font::GEIST));
+shadcn_iced::font::set_sans(shadcn_iced::font::INTER); // before `.shadcn_iced()`
+shadcn_iced::font::set_heading(Some(shadcn_iced::font::GEIST));
 ```
 
 `Config::build` returns a plain `iced::Theme` whose extended palette is also
 derived from the tokens, so built-in iced widgets blend in. Inside a
-component, `iced_ui::tokens(theme)` returns the full token set (`background`,
+component, `shadcn_iced::tokens(theme)` returns the full token set (`background`,
 `primary`, `muted-foreground`, `ring`, `chart-1`…, `sidebar-*`, radii).
 Plain iced themes (`iced::Theme::Dracula`, …) work too: their tokens are
 derived from their palette.
@@ -176,17 +176,17 @@ derived from their palette.
 
 ```
 crates/
-  iced_ui_core/   tokens, themes, fonts, icons, headless primitives
-  iced_ui/        the components, one self-contained file each
-  cargo-iced-ui/  the copy-and-paste CLI (embeds the component sources)
+  shadcn_iced_core/   tokens, themes, fonts, icons, headless primitives
+  shadcn_iced/        the components, one self-contained file each
+  cargo-shadcn-iced/  the copy-and-paste CLI (embeds the component sources)
 examples/
   gallery/        a documentation-like showcase of every component
   gallery-web/    the gallery examples compiled to WebAssembly, for the website
 site/             the website (Astro), with live previews of every example
 ```
 
-Each file in `crates/iced_ui/src/components/` only depends on `iced`,
-`iced_ui_core` and sibling components through `super::`. That rule is what
+Each file in `crates/shadcn_iced/src/components/` only depends on `iced`,
+`shadcn_iced_core` and sibling components through `super::`. That rule is what
 makes a component work identically inside the library and copied into your
 project; `scripts/check-copy.sh` (run in CI) verifies it by copying every
 component into a fresh project and compiling it with `-D warnings`.
@@ -251,7 +251,7 @@ iced is not a browser, so a few things differ:
   and zoom in and out (`animate-in`/`animate-out`), sheets and drawers slide
   from their edge, accordions and collapsibles expand, toasts slide in, the
   switch thumb slides and hover/press colors transition. Turn them off with
-  `iced_ui::animation::set_enabled(false)` (e.g. for reduced motion).
+  `shadcn_iced::animation::set_enabled(false)` (e.g. for reduced motion).
 - Keyboard focus: iced only focuses text inputs, so focus rings are shown on
   inputs, input groups and OTP fields; menus, selects and command palettes
   support <kbd>↑</kbd>/<kbd>↓</kbd>/<kbd>Enter</kbd>/<kbd>Esc</kbd>.
@@ -272,7 +272,7 @@ Lucide under the ISC license. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.m
 ## 日本語
 
 shadcn/ui のデザインを iced で再現した UI ライブラリです。
-`iced_ui` をライブラリとして使うことも、`cargo iced-ui add button` で
+`shadcn_iced` をライブラリとして使うことも、`cargo shadcn-iced add button` で
 コンポーネントのソースを自分のプロジェクトにコピーして自由に改変することも
 できます。テーマ（全ベースカラー・アクセントカラー、ライト/ダーク）、
 最新のデフォルトスタイル（Base UI + Nova）、/create 相当のテーマ設定、Geist / Inter フォント、Lucide アイコン、アニメーション、Base UI に相当するヘッドレスな

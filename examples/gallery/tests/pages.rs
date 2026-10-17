@@ -1,13 +1,13 @@
 //! Renders every page of the gallery headlessly, in light and dark mode,
 //! to catch layout panics and broken views.
 use gallery::{Gallery, PAGES};
-use iced_ui::Mode;
+use shadcn_iced::Mode;
 
 use iced_test::simulator::Simulator;
 
 #[test]
 fn every_page_renders() {
-    iced_ui::animation::set_enabled(false);
+    shadcn_iced::animation::set_enabled(false);
 
     for (index, page) in PAGES.iter().enumerate() {
         for mode in [Mode::Light, Mode::Dark] {
@@ -37,11 +37,11 @@ fn toasts_expire_after_their_duration() {
     use iced::time::{Duration, Instant};
     use iced::{Event, window};
 
-    iced_ui::animation::set_enabled(false);
+    shadcn_iced::animation::set_enabled(false);
 
     let mut gallery = Gallery::new(Gallery::page_by_id("sonner").unwrap(), Mode::Light);
     let _ = gallery.update(Message::Demo(DemoMessage::Toast(
-        iced_ui::sonner::Kind::Success,
+        shadcn_iced::sonner::Kind::Success,
     )));
 
     let start = Instant::now();

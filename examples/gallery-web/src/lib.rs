@@ -9,17 +9,17 @@
 //! [`set_theme`] and [`theme_code`]), and the previews call back two
 //! functions of `window`:
 //!
-//! - `icedUiPreviewResized(target, height)`, with the natural height of an
+//! - `shadcnIcedPreviewResized(target, height)`, with the natural height of an
 //!   example, so the page can size its preview to fit,
-//! - `icedUiPreviewScroll(dx, dy)`, with the wheel scrolls the example does
+//! - `shadcnIcedPreviewScroll(dx, dy)`, with the wheel scrolls the example does
 //!   not use, so the page still scrolls over a preview.
 //!
 //! Build it with `site/scripts/build-wasm.mjs`.
 #![cfg(target_arch = "wasm32")]
 
 use gallery::{Gallery, PAGES};
-use iced_ui::theme::{Accent, BaseColor, Radius};
-use iced_ui::{ApplicationExt, Mode};
+use shadcn_iced::theme::{Accent, BaseColor, Radius};
+use shadcn_iced::{ApplicationExt, Mode};
 
 use iced::futures::channel::mpsc;
 use iced::widget::{container, sensor, space};
@@ -33,10 +33,10 @@ const PADDING: f32 = 40.0;
 
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(catch, js_namespace = window, js_name = icedUiPreviewResized)]
+    #[wasm_bindgen(catch, js_namespace = window, js_name = shadcnIcedPreviewResized)]
     fn preview_resized(target: &str, height: f32) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(catch, js_namespace = window, js_name = icedUiPreviewScroll)]
+    #[wasm_bindgen(catch, js_namespace = window, js_name = shadcnIcedPreviewScroll)]
     fn preview_scroll(dx: f32, dy: f32) -> Result<(), JsValue>;
 }
 
@@ -127,7 +127,7 @@ pub fn start() {
         .title(move |_: &Previews, _| title.clone())
         .theme(Previews::theme)
         .subscription(Previews::subscription)
-        .iced_ui()
+        .shadcn_iced()
         .run();
 
     if let Err(error) = result {
