@@ -336,8 +336,11 @@ pub fn example<'a>(
         let index = BUILT.get();
         BUILT.set(index + 1);
 
+        // Centered, like in the frame below: the column of the page aligns
+        // its examples to the left, which shows when one fills its width
+        // up to a maximum (e.g. `w-full max-w-sm`).
         return if index == focus {
-            content.into()
+            container(content.into()).center_x(Fill).into()
         } else {
             space().width(0).height(0).into()
         };
