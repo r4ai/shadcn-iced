@@ -1,113 +1,248 @@
 # Architecture
 
-This document describes the internal structure of `shadcn-iced`, how components work both as a library and as copied source files, and where the implementation differs from the web version of [shadcn/ui](https://ui.shadcn.com).
+`shadcn-iced` ports the design system and component model of [shadcn/ui](https://ui.shadcn.com) to [`iced`](https://github.com/iced-rs/iced) (`0.14`).
+
+---
+
+## High-Level Overview
+
+`shadcn-iced` separates its core foundation from its component catalog so every component file stays self-contained and portable.
+
+```mermaid
+flowchart TD
+    subgraph Workspace["shadcn-iced Workspace"]
+        Core["shadcn_iced_core (Tokens, Themes, Fonts, Primitives)"]
+        Lib["shadcn_iced (66 Styled Components)"]
+        CLI["cargo-shadcn-iced (CLI Source Copier)"]
+        Gallery["examples/gallery (Desktop Showcase & Snapshot CLI)"]
+        Web["examples/gallery-web (WASM Multi-Canvas Previews)"]
+        Conf["conformance (Pixel-Diff Suite vs. React shadcn/ui)"]
+    end
+
+    Core --> Lib
+    Core --> Gallery
+    Lib --> Gallery
+    Gallery --> Web
+    Lib -. "embeds components/*.rs" .-> CLI
+    Lib --> Conf
+```
+
+### Two Consumption Modes
+
+Every file in `crates/shadcn_iced/src/components/*.rs` imports only from `iced`, `shadcn_iced_core`, and sibling components (`super::<name>`).
+
+```mermaid
+flowchart LR
+    subgraph Mode1["1. Library Mode"]
+        App1["Your App"] --> ShadcnIced["shadcn_iced"]
+        ShadcnIced --> Core1["shadcn_iced_core"]
+    end
+
+    subgraph Mode2["2. Copy-and-Own Mode"]
+        CLI2["cargo shadcn-iced add"] -. "copies .rs files" .-> LocalUI["src/ui/*.rs"]
+        App2["Your App"] --> LocalUI
+        LocalUI --> Core2["shadcn_iced_core"]
+    end
+```
+
+- **Library Mode**
+  - Depend on `shadcn_iced` directly in `Cargo.toml`
+  - Import components via `use shadcn_iced::prelude::*;`
+- **Copy-and-Own Mode (CLI)**
+  - Depend only on `shadcn_iced_core` and `iced`
+  - Copy component source files into `src/ui/` with `cargo shadcn-iced add <name>`
+  - Customize layout, styles, or behavior directly in your repository
+
+---
 
 ## Workspace Layout
 
-```text
-crates/
-  shadcn_iced_core/   Design tokens, themes, fonts, icons, animations, and headless primitives
-  shadcn_iced/        UI components (one self-contained module per component)
-  cargo-shadcn-iced/  CLI tool that embeds and copies component sources into user projects
-examples/
-  gallery/            Native desktop showcase and headless snapshot generator
-  gallery-web/        WebAssembly runtime powering the live previews on the website
-  hello/              Minimal starter application
-site/                 Documentation website (TanStack Start, Solid, Vite)
-conformance/          Comparison with the latest shadcn/ui: a shadcn/ui app, Playwright
-                      tests and a headless iced runner (`iced/`) sharing scenarios
-scripts/
-  check-copy.sh       CI script verifying that copied components compile standalone
+| Path | Package / Role | Description |
+| :--- | :--- | :--- |
+| `crates/shadcn_iced_core` | `shadcn_iced_core` | Design tokens, OKLCH-converted palettes, theme builder,<br/>bundled fonts & icons, animations, and 17 headless primitives. |
+| `crates/shadcn_iced` | `shadcn_iced` | All 66 styled components (`src/components/*.rs`),<br/>re-exports of `shadcn_iced_core`, and `shadcn_iced::prelude`. |
+| `crates/cargo-shadcn-iced` | `cargo-shadcn-iced` | CLI binary (`cargo shadcn-iced`) that embeds `components/*.rs`<br/>and copies selected components with transitive siblings. |
+| `examples/hello` | `hello` | Minimal single-file app (`cargo run -p hello`)<br/>demonstrating the `README.md` quick start. |
+| `examples/gallery` | `gallery` | Desktop showcase of 65 component pages and 4 chart pages,<br/>plus `snapshot` (PNG renderer) and `extract_docs` (site JSON). |
+| `examples/gallery-web` | `gallery-web` | WebAssembly entrypoint (`wasm32-unknown-unknown`) driving<br/>all website component previews in a single `iced::daemon`. |
+| `conformance/` | `conformance` | Visual regression harness comparing `shadcn-iced` snapshots<br/>against an official Next.js + React `shadcn/ui` app. |
+| `site/` | Astro + Starlight | Documentation website (`https://shadcn-iced.r4ai.dev`)<br/>consuming `extract_docs` JSON and the `gallery-web` WASM bundle. |
+| `scripts/` | Developer Scripts | Maintenance utilities (`check-copy.sh`, `gen_themes.py`,<br/>`gen_icons.py`, `gen_fonts.py`, `grid.py`, `montage.py`). |
+
+---
+
+## Theme & Design Token Pipeline
+
+`iced` style closures receive `&iced::Theme`. `shadcn_iced_core::theme` bridges full `shadcn/ui` tokens onto `iced::Theme::Custom` without requiring a custom theme type in user applications.
+
+```mermaid
+flowchart LR
+    Builder["theme::Config (base, accent, radius, menu)"]
+    Build["Config::build()"]
+    Registry["Global REGISTRY (RwLock HashMap)"]
+    IcedTheme["iced::Theme::Custom (+ derived Extended palette)"]
+    TokensFn["tokens(&theme)"]
+    Tokens["Tokens (Palette, Radius, Menu, Mode)"]
+
+    Builder --> Build
+    Build -- "registers (name, tokens)" --> Registry
+    Build --> IcedTheme
+    IcedTheme --> TokensFn
+    Registry -. "on cache miss" .-> TokensFn
+    TokensFn --> Tokens
 ```
 
-## Library and Copy-and-Paste Model
+### How `tokens(&theme)` Resolves Tokens
 
-`shadcn-iced` is structured so that every component works identically whether it is imported from the `shadcn_iced` crate or copied into a user's repository via `cargo shadcn-iced add`.
+1. **Theme Builder (`theme::Config`)**
+   - Created via `theme::light()`, `theme::dark()`, `theme::zinc(mode)`, or `theme::Config::new(base, mode)`
+   - `base`: `BaseColor` (`Neutral`, `Stone`, `Zinc`, `Mauve`, `Olive`, `Mist`, `Taupe`)
+   - `accent`: `Accent` (`Amber`, `Blue`, `Cyan`, `Emerald`, `Fuchsia`, `Green`, `Indigo`, `Lime`, `Orange`, `Pink`, `Purple`, `Red`, `Rose`, `Sky`, `Teal`, `Violet`, `Yellow`)
+   - `chart_color`: `ThemeColor` (`Base(BaseColor)` or `Accent(Accent)`)
+   - `radius` / `radius_preset`: `Radius` (`None`, `Small`, `Medium`, `Large`, `Default`) or `f32` pixels
+   - `menu_color`: `MenuColor` (`Default`, `Inverted`, `DefaultTranslucent`, `InvertedTranslucent`)
+   - `menu_accent`: `MenuAccent` (`Subtle`, `Bold`)
+   - `palette(|p| ...)`: Direct mutation closure over `Palette`
+2. **Registration & `Extended` Palette Synthesis**
+   - `Config::build()` hashes the token configuration into a unique theme name
+   - Inserts `(name, tokens)` into the global `REGISTRY` (`RwLock<HashMap<String, Tokens>>`)
+   - Builds `Theme::custom_with_fn(...)` with a synthesized `iced::theme::palette::Extended` so built-in `iced` widgets match
+3. **Thread-Local Fast Path (`LAST`)**
+   - `tokens(&theme)` checks a thread-local `(Arc<Custom>, Tokens)` cache using `Arc::ptr_eq`
+   - Repeated lookups within a frame resolve in $O(1)$ without locking
+4. **Built-in Theme Fallback (`derive`)**
+   - Standard `iced::Theme` variants (e.g. `Theme::Dracula`) derive `Tokens` from `theme.extended_palette()`
+5. **Opacity Fading (`theme::faded`)**
+   - Quantizes opacity into 24 steps and caches faded `Theme` instances per thread for animated overlays
 
-### Shared Foundation (`shadcn_iced_core`)
+### Palette Conversion
 
-Both consumption modes depend on `shadcn_iced_core`, which provides the non-visual and foundational building blocks:
+- Presets in `crates/shadcn_iced_core/src/theme/presets.rs` are generated by `scripts/gen_themes.py`
+- Source values come from `shadcn/ui`'s official OKLCH registry (`apps/v4/registry/themes.ts`)
+- OKLCH colors are converted through Oklab and linear sRGB into `iced::Color` at generation time
 
-- **Design tokens and themes** (`theme`)
-- **Shared style constants** (`style`)
-- **Bundled fonts and icons** (`font`, `icon`)
-- **Transition and animation utilities** (`animation`)
-- **Headless widget primitives** (`primitive`)
+---
 
-### Self-Contained Component Modules (`shadcn_iced`)
+## Component Anatomy & State Management
 
-Each component in `crates/shadcn_iced/src/components/` lives in a single `.rs` file and follows a strict dependency rule:
+Every component in `crates/shadcn_iced/src/components/<name>.rs` exposes a builder function that converts into `iced::Element<'a, Message>`:
 
-- A component may only import from `iced`, `shadcn_iced_core`, and sibling components via `super::<component>`.
-- A component never references `crate::` or `shadcn_iced::` in code.
+```rust
+pub fn button<'a, Message>(content: impl Into<Element<'a, Message>>) -> Button<'a, Message>
+```
 
-Because of this constraint, copying a component file (along with any `super::` siblings it references) into a `src/ui/` directory produces a valid module hierarchy that compiles without the `shadcn_iced` crate.
+### Where Widget State Lives
 
-### CLI Registry (`cargo-shadcn-iced`)
+| State Category | Stored In | Examples |
+| :--- | :--- | :--- |
+| **Visual & Transient** | Widget tree (`tree.state`) | Hover/press states, focus rings, animations, and open/close state of<br/>`DropdownMenu`, `ContextMenu`, `Menubar`, `Popover`, `HoverCard`,<br/>`Tooltip`, `Select`, `Combobox`, `Collapsible`, and `Accordion`. |
+| **Controlled Values** | Caller model (`&str`, `bool`, `Option<T>`) | `input`, `textarea`, `checkbox`, `switch`, `slider`,<br/>`radio_group`, `tabs`, `calendar`, `date_picker`, `pagination`. |
+| **Shared Collections** | Caller model (`Vec<Toast>`, `State`) | `sonner::Toast`, `toast::Toast`, `questionnaire::State`,<br/>`resizable::Split`, and `sidebar` open state. |
 
-At build time (`crates/cargo-shadcn-iced/build.rs`), the CLI scans `crates/shadcn_iced/src/components/` and embeds every component's source string into the binary. When `cargo shadcn-iced add <name>` runs:
+### Self-Contained Portability Contract
 
-1. It parses `super::<sibling>` references to resolve transitive component dependencies.
-2. It rewrites `//! ```no_run` doctest attributes to `//! ```ignore` so that copied files do not require `shadcn_iced` during `cargo test --doc`.
-3. It writes each resolved `.rs` file into the target directory (`src/ui` by default) and ensures `pub mod <name>;` is declared in `src/ui/mod.rs`.
+- Component files under `crates/shadcn_iced/src/components/` never import from `crate::*`
+- Shared utilities come from `use shadcn_iced_core::*;`
+- Sibling components are imported via `use super::<sibling>::*;`
+- `scripts/check-copy.sh` verifies this in CI by running `cargo shadcn-iced add --all` in an isolated crate
 
-## Core Subsystems
+---
 
-### Theme and Token Bridge
+## Headless Primitives (`shadcn_iced_core::primitive`)
 
-`shadcn/ui` defines its appearance through CSS variables (`--background`, `--foreground`, `--primary`, `--muted`, `--accent`, `--destructive`, `--border`, `--input`, `--ring`, `--sidebar-*`, `--chart-1..5`, and `--radius`). `shadcn_iced_core::theme` mirrors these variables as a `Palette` struct paired with a corner radius (`Tokens`).
+`shadcn_iced_core::primitive` implements **17 headless primitives** on top of `iced::advanced::Widget` and `iced::advanced::Overlay`.
 
-- **OKLCH Presets**: All base colors, accent themes, and chart palettes are generated from `shadcn/ui`'s OKLCH token definitions across light and dark modes.
-- **`iced::Theme` Integration**: `theme::Config::build()` returns a standard `iced::Theme` (`Theme::Custom`). Its `iced` extended palette is derived from the `shadcn/ui` tokens so built-in `iced` widgets match the surrounding theme, while the full `Tokens` struct is stored in an internal registry keyed by the theme.
-- **Token Retrieval**: Components call `shadcn_iced::tokens(theme)` during rendering to read the active `Tokens`. If a standard built-in theme (such as `iced::Theme::Dracula`) is passed instead, `tokens(theme)` derives a compatible `Tokens` set from that theme's extended palette.
+```mermaid
+flowchart TD
+    Builder["Component Builder (dropdown_menu, select, chart, ...)"]
+    Primitive["Headless Primitive (shadcn_iced_core::primitive)"]
+    IcedWidget["iced::advanced::Widget & Overlay"]
 
-### Headless Primitives
+    Builder --> Primitive
+    Primitive --> IcedWidget
+```
 
-The `shadcn_iced_core::primitive` module provides the behavioral layer analogous to Base UI / Radix UI in the web ecosystem:
+| Primitive | Responsibility | Used By |
+| :--- | :--- | :--- |
+| `anchored` | Floating overlay positioning, viewport collision flipping,<br/>submenu safe-triangle hover tracking, and outside-click dismissal. | `DropdownMenu`, `ContextMenu`, `Menubar`,<br/>`Popover`, `HoverCard`, `Tooltip`, `Select`,<br/>`Combobox`, `DatePicker`, `NavigationMenu` |
+| `animated_width` | Smoothly interpolates container width between two target lengths. | `Sidebar` |
+| `breakpoint` | Responsive container (`SM = 640px`, `MD = 768px`) that switches<br/>layouts based on available width (`measure`, `either`). | Responsive shells, `Sidebar`, `NativeSelect` |
+| `disclosure` | Animated height reveal/collapse container that clips content<br/>during transitions and hides it when closed. | `Accordion`, `Collapsible`, `Trace` |
+| `focus` | Tracks direct (`Focus`) or descendant (`FocusWithin`) focus,<br/>drawing `shadcn/ui`'s 3px outset focus ring (`Ring`). | `Button`, `Checkbox`, `Switch`, `Input`,<br/>`Textarea`, `InputGroup`, `Slider`, `Toggle` |
+| `labelled` | HTML `<label>` behavior that focuses and activates<br/>the first interactive child control when clicked. | `Field`, `Label`, `Checkbox`,<br/>`RadioGroup`, `Switch` |
+| `layer` | Full-viewport modal stack and dimmed backdrop (`bg-black/50`)<br/>handling pointer trapping, `Escape`, and entry animation. | `AlertDialog`, `Dialog`, `Sheet`,<br/>`Drawer`, `CommandDialog` |
+| `listbox` | Keyboard-navigable option list (`ArrowUp`, `ArrowDown`,<br/>`Home`, `End`, `Enter`, typeahead) with auto-scroll. | `Select`, `Combobox`, `Command` |
+| `plot` | 2D chart engine computing scales, nice ticks, stacked series,<br/>splines, bars, pie/donut arcs, legends, and hover tooltips. | `Chart` (`Area`, `Bar`, `Line`, `Pie`) |
+| `pressable` | Low-level interactive wrapper exposing hover, press, focus,<br/>right-click, and cursor states without button chrome. | `Badge`, `Card`, `Table` rows,<br/>`Breadcrumb`, `TraceLine`, `Item` |
+| `roving` | WAI-ARIA roving tabindex (`Arrow` keys, `Home`, `End`)<br/>focus navigation across sibling controls. | `RadioGroup`, `ToggleGroup`, `Tabs`,<br/>`Accordion`, `ButtonGroup` |
+| `split` | Draggable two-pane split container with mouse/keyboard<br/>handle dragging and min/max size constraints. | `Resizable` |
+| `toaster` | Animated corner stack manager handling hover-to-expand,<br/>dismiss gestures, auto-dismiss timers, and stack transforms. | `Sonner`, `Toast` |
+| `track` | Horizontal/vertical sliding viewport with drag gestures<br/>and smooth index snapping. | `Carousel` |
+| `tracked` | Character-by-character text layout implementing CSS<br/>`letter-spacing` while supporting widget text lookup. | `Card` titles, `AlertTitle`,<br/>`Kbd`, `Table` headers |
+| `underline` | Draws a baseline-offset text underline (`underline-offset-4`)<br/>on hover or persistently. | `Button` (`Variant::Link`),<br/>`Breadcrumb`, `HoverCard` triggers |
+| `wheel` | Intercepts mouse wheel events for smooth pixel scrolling<br/>and maps `Shift + Wheel` to horizontal scrolling. | `ScrollArea`, `Table`, `CodeBlock` |
 
-| Primitive | Purpose |
-| :--- | :--- |
-| `anchored` | Positions floating content (`Popover`, `DropdownMenu`, `Select`, `Tooltip`, `HoverCard`) relative to a trigger widget with configurable `Side` and `Align`, viewport collision detection, and automatic flipping. |
-| `layer` | Renders modal backdrops and overlay stacks (`Dialog`, `AlertDialog`, `Sheet`, `Drawer`, `Toaster`) above the main layout tree. |
-| `listbox` | Manages keyboard navigation (<kbd>↑</kbd>, <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>Esc</kbd>) and item selection for menus, selects, comboboxes, and command palettes. |
-| `disclosure` | Handles expand/collapse state and layout transitions for `Accordion` and `Collapsible`. |
-| `focus` | Detects when a widget subtree holds keyboard focus (`focus_within`) to draw focus rings around composite inputs (`InputGroup`, `InputOtp`). |
-| `pressable` | Provides pointer press, release, and hover interaction tracking for custom interactive surfaces. |
-| `split` | Implements draggable, resizable pane dividers used by `Resizable`. |
-| `toaster` | Stacks, animates, expands, times out and swipes away the toasts of `Sonner` and `Toast`, porting sonner's transitions (`translateY`, `scale`, height and opacity, `400ms ease`). A `Motion` sets how toasts enter, leave and peek out of the collapsed stack, which is all that differs between the two. |
-| `plot` | The geometry of `Chart`, like the parts of d3 that Recharts uses: band and point scales, nice ticks, stacking, bar layout, natural curves, pies, hit testing and tooltip placement. Not a widget; the chart keeps its configuration and its drawing. |
-| `track` | Lays out the items of a `Carousel` on a track that slides to the current item and can be dragged (swiped). |
-| `animated_width` | Animates the width of its content when it changes, like the `Sidebar` collapsing to icons. |
-| `wheel` | Wraps a whole view to make wheel scrolling smooth (wheel notches are spread over a few frames) and horizontal with <kbd>Shift</kbd>, for every scrollable under it. |
+---
 
-`anchored` also keeps a submenu open while the pointer crosses the triangle between its trigger and the submenu (a pointer grace area, or "safe triangle", as in Radix), so that the pointer can move diagonally to it.
+## Fonts, Icons & Cargo Features
 
-### Native Animations
+`shadcn_iced_core` embeds fonts and icons into the binary for consistent rendering across desktop and WebAssembly.
 
-Because `iced` does not use a CSS engine, animations from `tw-animate-css` are implemented natively in `shadcn_iced_core::animation`:
+| Feature | Default | Bundled Asset | Size | Purpose |
+| :--- | :---: | :--- | :---: | :--- |
+| `lucide` | Yes | `fonts/lucide.ttf` | ~900 KB | 2,179 [Lucide](https://lucide.dev) icons exposed in `shadcn_iced::lucide::*`. |
+| `geist` | Yes | `Geist-*.ttf`,<br/>`GeistMono-*.ttf` | ~380 KB | Default sans-serif (`Geist`) and monospace (`Geist Mono`)<br/>typefaces (`Regular`, `Medium`, `SemiBold`, `Bold`). |
+| `inter` | Yes | `Inter-*.ttf` | ~1.3 MB | Alternative sans-serif typeface (`Inter`), selectable<br/>at runtime via `font::set_sans(FontFamily::Inter)`. |
+| `symbols` | Yes | `ShadcnIcedSymbols-Regular.ttf` | ~55 KB | Subset of Noto Sans Symbols / Math covering<br/>keyboard shortcut glyphs (`⌘ ⌥ ⌃ ⇧ ⏎ ⌫ ⎋ ⇥ ␣`) and arrows. |
 
-- **Stateful Transitions**: Animated widgets store a `Transition` in their internal widget state and request redraws until the transition completes, evaluated using CSS `cubic-bezier` timing functions.
-- **Spatial Transforms**: Scale (`zoom-in-95`) and translation (`slide-in-from-*` for overlays, sheets, drawers, and toasts) are applied at draw time via `iced::Transformation`.
-- **Opacity (`Fade`)**: Fade transitions render a widget subtree using a derived copy of the active theme with alpha-adjusted color tokens.
-- **Global Toggle**: Calling `shadcn_iced::animation::set_enabled(false)` disables all transitions globally for reduced-motion preferences or deterministic visual testing.
+- Call `.shadcn_iced()` on `iced::application` or `iced::daemon` to register all enabled fonts and set the default font
+- Alternatively, register fonts manually via `shadcn_iced::font::all()` and `shadcn_iced::font::sans()`
 
-## WebAssembly Previews (`examples/gallery-web`)
+---
 
-The documentation website (`site/`) renders live interactive widgets rather than static images:
+## Animation System
 
-- `examples/gallery-web` compiles the `gallery` examples to `wasm32-unknown-unknown`.
-- A single `iced::daemon` instance runs per documentation page. Each example on the page is mounted as an independent `iced` window backed by its own HTML `<canvas>`, drawn with WebGPU (or the `tiny-skia` software renderer as a fallback).
-- The web page communicates with the WASM runtime via exported bindings (`mount`, `unmount`, `set_theme`, `theme_code`), while the WASM runtime notifies the page of natural content height changes (`shadcnIcedPreviewResized`) and, during the dispatch of each wheel event, whether an example used it (`shadcnIcedPreviewWheel`), so the browser scrolls the page natively over a preview unless the example scrolls itself.
+`crates/shadcn_iced_core/src/animation.rs` drives frame-based transitions with `iced::time::Instant`:
 
-## Differences from Web `shadcn/ui`
+- **`SPRING` (`200ms`)**
+  - Critically damped spring curve for switches, accordions, drawers, sheets, and sidebar width
+- **`CUBIC_OUT` (`150ms`)**
+  - `cubic-bezier(0.22, 1, 0.36, 1)` curve for popover, menu, and dialog scale/fade transitions
+- **`FAST_OUT` (`100ms`)**
+  - Fast fade/slide curve for tooltips and immediate feedback
+- **`shadcn_iced::animation::set_enabled(false)`**
+  - Snaps all animations immediately to their target value for deterministic snapshots
 
-The [conformance suite](../conformance/README.md) measures how far every component is from the latest `shadcn/ui`, in snapshots and behavior; its `baseline.json` lists the accepted scores and the known behavioral differences. Text is shaped with kerning (iced's `advanced-shaping` feature, enabled by `shadcn_iced_core`) so that it measures like in browsers.
+---
 
-Because `iced` is a native retained/immediate-mode GUI library rather than a browser DOM environment, several aspects differ from the React implementation of `shadcn/ui`:
+## Multi-Window WebAssembly Architecture (`gallery-web`)
 
-- **Style Preset**: Only the default **Nova** (`base-nova`) style is implemented; alternative `shadcn/ui` visual styles (Vega, Maia, Lyra, Mira, Luma, Rhea, Sera) are not ported.
-- **Application vs. Widget State**: Following `iced`'s Elm architecture, application-level state—such as whether a `Dialog` is open, the selected value of a form control, or the visible month of a `Calendar`—is owned by your application state and updated via messages. Transient interaction state for `Popover`, `DropdownMenu`, `ContextMenu`, `Select`, `HoverCard`, `Tooltip`, `Collapsible`, and `Accordion` is managed internally by the widgets.
-- **Backdrop Blur**: `iced` does not support real-time backdrop blur filters; modal backdrops and translucent menus approximate the appearance using semi-transparent fills.
-- **Text Overflow and Highlighting**: Overflowing text is clipped rather than ellipsized, and `code_block` displays monospace code without built-in syntax highlighting.
-- **Keyboard Focus**: Text inputs and focusable controls, including checkboxes, switches, and toggles, display keyboard focus rings. Applications provide Tab traversal through iced's focus operations, as demonstrated by the conformance runner. Open menus, selects, and command palettes handle arrow-key and <kbd>Enter</kbd>/<kbd>Esc</kbd> navigation directly.
-- **React-Specific APIs**: `form` (React Hook Form integration) and `direction` have no equivalent; use `field`, `field_set`, and `field_separator` to structure forms.
+`examples/gallery-web` uses `iced::daemon` with `window::settings::PlatformSpecific` to render all `<canvas>` previews on a documentation page from a single WASM instance.
+
+```mermaid
+sequenceDiagram
+    participant Page as Astro Doc Page
+    participant WASM as gallery-web Daemon
+    participant Canvas as iced Canvas Window
+
+    Page->>WASM: mount(target, page, example)
+    WASM->>Canvas: window::open(target)
+    Canvas-->>WASM: window::Id
+    WASM->>WASM: gallery::view_example(page, example)
+    WASM-->>Page: shadcnIcedPreviewResized(target, height)
+    Page->>WASM: setTheme(dark, base, accent, radius)
+    WASM->>WASM: Update theme across all windows
+```
+
+---
+
+## Known Web (`shadcn/ui`) vs. Native (`iced`) Differences
+
+- **Font Hinting & Anti-Aliasing**
+  - Browser text rendering differs slightly in glyph weight and kerning from `cosmic-text` + `tiny-skia` / `wgpu`
+- **Backdrop Blur**
+  - Translucent menus (`MenuColor::DefaultTranslucent` / `InvertedTranslucent`) use higher surface alpha instead of CSS `backdrop-filter: blur(...)`
+- **CSS Box Shadows**
+  - Multi-layer CSS shadows (`shadow-xs`, `shadow-md`, `shadow-lg`) map to single-layer `iced::Shadow`
+- **DOM Portals vs. `iced::advanced::Overlay`**
+  - Floating menus and modals render via `iced::advanced::Overlay` within window bounds rather than `document.body` portals
