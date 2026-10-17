@@ -1,0 +1,108 @@
+{
+  "$schema": "./schema.json",
+  "component": "accordion",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [560, 280],
+      "steps": [
+        { "snapshot": "first-open" },
+        {
+          "expect": {
+            "visible": ["We offer standard and express shipping."],
+            "hidden": ["Returns are accepted within 30 days."]
+          }
+        },
+        { "hover": "Return Policy" },
+        { "snapshot": "hover-closed-trigger" },
+        { "click": "Return Policy" },
+        {
+          "expect": {
+            "visible": ["Returns are accepted within 30 days."],
+            "hidden": ["We offer standard and express shipping."]
+          }
+        },
+        { "snapshot": "second-open" },
+        { "click": "Return Policy" },
+        {
+          "expect": {
+            "hidden": [
+              "Returns are accepted within 30 days.",
+              "We offer standard and express shipping."
+            ]
+          }
+        },
+        { "snapshot": "all-closed" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [560, 280],
+      "steps": [
+        { "press": "Tab" },
+        { "press": "Tab" },
+        { "press": "Enter" },
+        {
+          "expect": {
+            "visible": ["Returns are accepted within 30 days."],
+            "hidden": ["We offer standard and express shipping."]
+          }
+        },
+        { "snapshot": "second-open" },
+        { "press": "Enter" },
+        { "expect": { "hidden": ["Returns are accepted within 30 days."] } },
+        { "snapshot": "all-closed" }
+      ]
+    },
+    {
+      "id": "multiple",
+      "viewport": [560, 280],
+      "steps": [
+        { "snapshot": "first-open" },
+        { "click": "Return Policy" },
+        {
+          "expect": {
+            "visible": [
+              "Our products are made to last.",
+              "Returns are accepted within 30 days."
+            ]
+          }
+        },
+        { "snapshot": "both-open" },
+        { "click": "Product Information" },
+        {
+          "expect": {
+            "visible": ["Returns are accepted within 30 days."],
+            "hidden": ["Our products are made to last."]
+          }
+        },
+        { "snapshot": "second-open" }
+      ]
+    },
+    {
+      "id": "disabled",
+      "viewport": [560, 280],
+      "steps": [
+        { "snapshot": "idle" },
+        { "click": "Premium feature" },
+        { "expect": { "hidden": ["Upgrade your plan to see this."] } },
+        { "snapshot": "after-click" }
+      ]
+    },
+    {
+      "id": "borders",
+      "viewport": [560, 280],
+      "steps": [
+        { "snapshot": "first-open" },
+        { "click": "Is my data secure?" },
+        {
+          "expect": {
+            "visible": ["Yes. Everything is encrypted."],
+            "hidden": ["Monthly and annual plans."]
+          }
+        },
+        { "snapshot": "second-open" }
+      ]
+    }
+  ]
+}

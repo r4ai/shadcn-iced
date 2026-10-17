@@ -14,11 +14,11 @@
 //! ```
 //!
 //! See [`sonner`](super::sonner) for the other toast of shadcn/ui.
-use super::button::{Size, Variant, button, icon_button};
+use super::button::{self as buttons, Size, Variant, button};
 
 use shadcn_iced_core::animation::{self, Appearance, Transition};
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::Layer;
+use shadcn_iced_core::primitive::{Layer, Pressable};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::advanced::layout::{self, Layout};
@@ -174,14 +174,15 @@ fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, close: Message) -> Elem
         .push((!toast.title.is_empty()).then(|| {
             text(toast.title.clone())
                 .size(style::text::SM)
+                .line_height(style::text::leading(style::text::SM))
                 .font(font::medium())
         }))
-        .push(
-            toast
-                .description
-                .clone()
-                .map(|description| text(description).size(style::text::SM).style(muted)),
-        )
+        .push(toast.description.clone().map(|description| {
+            text(description)
+                .size(style::text::SM)
+                .line_height(style::text::leading(style::text::SM))
+                .style(muted)
+        }))
         .spacing(4)
         .width(Length::Fill);
 
@@ -192,16 +193,32 @@ fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, close: Message) -> Elem
             .on_press(message)
     });
 
-    // `ToastClose`: `variant="ghost" size="icon-sm" text-muted-foreground`
-    let close = container(
-        icon_button(lucide::X)
-            .variant(Variant::Ghost)
-            .size(Size::IconSm)
-            .on_press(close),
+    // `ToastClose`: `variant="ghost" size="icon-sm" text-muted-foreground
+    // hover:text-foreground`
+    let size = Size::IconSm;
+    let close = Pressable::new(
+        container(lucide::X.sized(size.icon_size()))
+            .center_x(Length::Fill)
+            .center_y(Length::Fill),
     )
-    .style(|theme: &Theme| container::Style {
-        text_color: Some(tokens(theme).palette.muted_foreground),
-        ..container::Style::default()
+    .on_press(close)
+    .width(size.height())
+    .height(size.height())
+    .press_offset(1.0)
+    .clip_background(true)
+    .style(move |theme, status| {
+        let t = tokens(theme);
+        let mut style = buttons::style(theme, status, Variant::Ghost);
+
+        if !matches!(
+            status,
+            iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed
+        ) {
+            style.text_color = t.palette.muted_foreground;
+        }
+
+        style.border.radius = size.radius(&t).into();
+        style
     });
 
     // `ToastContent`: `flex items-center gap-3 p-4`
@@ -214,7 +231,8 @@ fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, close: Message) -> Elem
             .spacing(12)
             .align_y(Alignment::Center),
     )
-    .padding(16)
+    // Inside the 1px border.
+    .padding(17)
     .width(Length::Fill)
     .style(self::style)
     .into()
@@ -229,7 +247,12 @@ pub fn style(theme: &Theme) -> container::Style {
         background: Some(Background::Color(t.palette.popover)),
         text_color: Some(t.palette.popover_foreground),
         border: style::border(t.palette.border, t.radius_2xl()),
-        shadow: style::shadow_lg(),
+        // `shadow-lg`, whose layers shrink by their negative spread.
+        shadow: iced::Shadow {
+            color: iced::Color::from_rgba(0.0, 0.0, 0.0, 0.1),
+            offset: Vector::new(0.0, 6.0),
+            blur_radius: 10.0,
+        },
         ..container::Style::default()
     }
 }

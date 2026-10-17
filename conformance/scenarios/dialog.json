@@ -1,0 +1,74 @@
+{
+  "$schema": "./schema.json",
+  "component": "dialog",
+  "scenarios": [
+    {
+      "id": "default",
+      "description": "Opens with a click and closes with Escape.",
+      "viewport": [640, 400],
+      "steps": [
+        { "snapshot": "closed" },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "click": "Open Dialog" },
+        { "expect": { "visible": ["Edit profile", "Cancel", "Save changes"] } },
+        { "snapshot": "open" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Edit profile", "Save changes"] } },
+        { "snapshot": "closed-after-escape" }
+      ]
+    },
+    {
+      "id": "close-button",
+      "description": "Closes with the X button in the top-right corner.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open Dialog" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "hover": { "at": [490, 141] } },
+        { "snapshot": "close-button-hover" },
+        { "click": { "at": [490, 141] } },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "snapshot": "closed" }
+      ]
+    },
+    {
+      "id": "footer",
+      "description": "Closes with the Cancel button, then with Save changes.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open Dialog" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "click": "Cancel" },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "click": "Open Dialog" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "hover": "Save changes" },
+        { "snapshot": "save-hover" },
+        { "click": "Save changes" },
+        { "expect": { "hidden": ["Edit profile"] } }
+      ]
+    },
+    {
+      "id": "outside-click",
+      "description": "Closes when the backdrop is clicked.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open Dialog" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "click": { "at": [20, 380] } },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "snapshot": "closed" }
+      ]
+    },
+    {
+      "id": "narrow",
+      "description": "A viewport below the sm breakpoint, where the dialog is max-w-[calc(100%-2rem)] wide.",
+      "viewport": [480, 360],
+      "steps": [
+        { "click": "Open Dialog" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "snapshot": "open" }
+      ]
+    }
+  ]
+}

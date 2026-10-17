@@ -1,0 +1,20 @@
+{
+  "$schema": "./schema.json",
+  "component": "breadcrumb",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [320, 64],
+      "steps": [
+        { "snapshot": "idle" },
+        { "expect": { "visible": ["Home", "Components", "Breadcrumb"] } },
+        { "hover": "Home" },
+        { "snapshot": "hover-link" },
+        { "hover": "Breadcrumb" },
+        { "snapshot": "hover-page" }
+      ]
+    },
+    { "id": "ellipsis", "viewport": [400, 64] },
+    { "id": "custom-separator", "viewport": [320, 64] }
+  ]
+}

@@ -20,23 +20,40 @@
 //! ```
 use super::menu::{Kind, Menu};
 
-use shadcn_iced_core::Element;
 use shadcn_iced_core::primitive::{Align, Anchored, Side};
+use shadcn_iced_core::{Element, style, tokens};
 
 /// Creates a dropdown menu opened by clicking `trigger`.
 ///
 /// The menu is placed below the trigger, aligned with its start
 /// (`side="bottom" align="start" sideOffset={4}`). The returned
 /// [`Anchored`] can be customized further, e.g. with [`Anchored::side`] or
-/// [`Anchored::align`].
+/// [`Anchored::align`]. Once the menu is dismissed with the keyboard, the
+/// focus ring of a button (`rounded-lg`) is drawn around the trigger; use
+/// [`Anchored::focus_ring`] to change it.
 pub fn dropdown_menu<'a, Message: Clone + 'a>(
     trigger: impl Into<Element<'a, Message>>,
     menu: Menu<'a, Message>,
 ) -> Anchored<'a, Message> {
-    Anchored::new(trigger, menu.kind(Kind::Dropdown))
+    let menu = menu.kind(Kind::Dropdown);
+    let anchor_width = menu.anchor_min_width();
+
+    let anchored = Anchored::new(trigger, menu)
         .side(Side::Bottom)
         .align(Align::Start)
         .offset(4.0)
+        .outset(1.0)
         .close_on_select(true)
         .modal(true)
+        // `focus-visible:border-ring focus-visible:ring-3` of a button.
+        .focus_ring(|theme| {
+            let t = tokens(theme);
+            style::focus_visible(&t, t.radius_lg())
+        });
+
+    // `w-(--anchor-width) min-w-32`
+    match anchor_width {
+        Some(min) => anchored.anchor_width(min),
+        None => anchored,
+    }
 }

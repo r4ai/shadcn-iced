@@ -29,4 +29,6 @@ pub fn context_menu<'a, Message: Clone + 'a>(
     Anchored::new(area, menu.kind(Kind::Context))
         .context_menu()
         .offset(4.0)
+        // `ring-1` around the menu.
+        .outset(1.0)
 }

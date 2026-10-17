@@ -1,0 +1,59 @@
+{
+  "$schema": "./schema.json",
+  "component": "carousel",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [450, 420],
+      "steps": [
+        { "snapshot": "first" },
+        { "hover": { "at": [418, 182] } },
+        { "snapshot": "hover-next" },
+        { "click": { "at": [418, 182] } },
+        { "wait": 800 },
+        { "snapshot": "second" },
+        { "click": { "at": [418, 182] } },
+        { "wait": 800 },
+        { "snapshot": "third" },
+        { "click": { "at": [30, 182] } },
+        { "click": { "at": [30, 182] } },
+        { "wait": 800 },
+        { "snapshot": "back-to-first" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [450, 420],
+      "steps": [
+        { "click": { "at": [418, 182] } },
+        { "wait": 800 },
+        { "press": "ArrowRight" },
+        { "wait": 800 },
+        { "snapshot": "third" },
+        { "press": "ArrowLeft" },
+        { "wait": 800 },
+        { "snapshot": "second" }
+      ]
+    },
+    {
+      "id": "sizes",
+      "viewport": [520, 220],
+      "steps": [
+        { "snapshot": "first" },
+        { "click": { "at": [482, 79] } },
+        { "wait": 800 },
+        { "snapshot": "second" }
+      ]
+    },
+    {
+      "id": "vertical",
+      "viewport": [360, 360],
+      "steps": [
+        { "snapshot": "first" },
+        { "click": { "at": [176, 298] } },
+        { "wait": 800 },
+        { "snapshot": "second" }
+      ]
+    }
+  ]
+}

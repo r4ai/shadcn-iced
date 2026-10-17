@@ -92,12 +92,14 @@ fn muted_icon<'a, Message: 'a>(icon: Icon) -> Element<'a, Message> {
         .into()
 }
 
-/// Creates an `InputGroupButton`: a ghost `h-6 px-1.5` button. Change its
-/// variant with [`Button::variant`].
+/// Creates an `InputGroupButton`: a ghost `h-6 px-1.5 text-sm` button.
+/// Change its variant with [`Button::variant`].
 pub fn group_button<'a, Message: Clone + 'a>(label: impl Into<String>) -> Button<'a, Message> {
     button::button(label)
         .variant(button::Variant::Ghost)
         .size(button::Size::Xs)
+        .padding_x(6.0)
+        .text_size(style::text::SM)
 }
 
 /// Creates an icon-only `InputGroupButton` (`size="icon-xs"`).

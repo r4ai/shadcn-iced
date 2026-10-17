@@ -1,0 +1,9 @@
+{
+  "$schema": "./schema.json",
+  "component": "separator",
+  "scenarios": [
+    { "id": "demo", "viewport": [416, 130] },
+    { "id": "vertical", "viewport": [240, 52] },
+    { "id": "list", "viewport": [416, 130] }
+  ]
+}

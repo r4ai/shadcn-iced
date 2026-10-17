@@ -1,0 +1,46 @@
+{
+  "$schema": "./schema.json",
+  "component": "sidebar",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [800, 560],
+      "steps": [
+        { "snapshot": "initial" },
+        {
+          "expect": {
+            "visible": [
+              "Acme Inc",
+              "Platform",
+              "Playground",
+              "Projects",
+              "Support",
+              "Data Fetching"
+            ]
+          }
+        },
+        { "hover": "Models" },
+        { "snapshot": "hover-item" },
+        { "click": "Models" },
+        { "snapshot": "models-active" },
+        { "click": "Travel" },
+        { "snapshot": "travel-active" }
+      ]
+    },
+    {
+      "id": "collapse",
+      "viewport": [800, 560],
+      "steps": [
+        { "snapshot": "expanded" },
+        { "click": { "at": [303, 41] } },
+        { "snapshot": "collapsed" },
+        { "hover": { "at": [40, 120] } },
+        { "wait": 800 },
+        { "snapshot": "collapsed-hover" },
+        { "click": { "at": [95, 41] } },
+        { "expect": { "visible": ["Platform", "Playground"] } },
+        { "snapshot": "expanded-again" }
+      ]
+    }
+  ]
+}

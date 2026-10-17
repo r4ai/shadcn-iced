@@ -1,0 +1,40 @@
+{
+  "$schema": "./schema.json",
+  "component": "button",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [160, 64],
+      "steps": [{ "snapshot": "idle" }, { "hover": "Button" }, { "snapshot": "hover" }]
+    },
+    {
+      "id": "secondary",
+      "viewport": [160, 64],
+      "steps": [{ "snapshot": "idle" }, { "hover": "Secondary" }, { "snapshot": "hover" }]
+    },
+    {
+      "id": "destructive",
+      "viewport": [160, 64],
+      "steps": [{ "snapshot": "idle" }, { "hover": "Destructive" }, { "snapshot": "hover" }]
+    },
+    {
+      "id": "outline",
+      "viewport": [160, 64],
+      "steps": [{ "snapshot": "idle" }, { "hover": "Outline" }, { "snapshot": "hover" }]
+    },
+    {
+      "id": "ghost",
+      "viewport": [160, 64],
+      "steps": [{ "snapshot": "idle" }, { "hover": "Ghost" }, { "snapshot": "hover" }]
+    },
+    {
+      "id": "link",
+      "viewport": [160, 64],
+      "steps": [{ "snapshot": "idle" }, { "hover": "Link" }, { "snapshot": "hover" }]
+    },
+    { "id": "sizes", "viewport": [360, 72] },
+    { "id": "icon-sizes", "viewport": [200, 72] },
+    { "id": "with-icon", "viewport": [280, 64] },
+    { "id": "disabled", "viewport": [280, 64] }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "./schema.json",
+  "component": "field",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [768, 136],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "click": "Username"
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "type": "max"
+        },
+        {
+          "snapshot": "typed"
+        }
+      ]
+    },
+    {
+      "id": "error",
+      "viewport": [768, 136]
+    },
+    {
+      "id": "disabled",
+      "viewport": [768, 136]
+    },
+    {
+      "id": "horizontal",
+      "viewport": [768, 96],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "click": "Multi-factor authentication"
+        },
+        {
+          "snapshot": "checked"
+        }
+      ]
+    },
+    {
+      "id": "fieldset",
+      "viewport": [768, 256]
+    },
+    {
+      "id": "separator",
+      "viewport": [768, 200]
+    }
+  ]
+}

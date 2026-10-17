@@ -1,0 +1,128 @@
+{
+  "$schema": "./schema.json",
+  "component": "dropdown-menu",
+  "scenarios": [
+    {
+      "id": "basic",
+      "viewport": [480, 420],
+      "steps": [
+        { "snapshot": "closed" },
+        { "hover": "Open" },
+        { "snapshot": "trigger-hover" },
+        { "click": "Open" },
+        {
+          "expect": {
+            "visible": [
+              "My Account",
+              "⇧⌘P",
+              "⌘B",
+              "⌘S",
+              "Team",
+              "Invite users",
+              "⌘+T",
+              "GitHub",
+              "Support",
+              "API",
+              "⇧⌘Q"
+            ]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "⌘S" },
+        { "snapshot": "item-hover" },
+        { "hover": "API" },
+        { "snapshot": "disabled-item-hover" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["My Account", "⇧⌘P", "⇧⌘Q"] } },
+        { "snapshot": "closed-after-escape" }
+      ]
+    },
+    {
+      "id": "submenu",
+      "viewport": [480, 420],
+      "steps": [
+        { "click": "Open" },
+        { "expect": { "hidden": ["Email", "Message"] } },
+        { "hover": "Invite users" },
+        { "wait": 300 },
+        { "expect": { "visible": ["Email", "Message", "More..."] } },
+        { "snapshot": "submenu-open" },
+        { "hover": "Message" },
+        { "snapshot": "submenu-item-hover" },
+        { "click": "Message" },
+        { "expect": { "hidden": ["Email", "⇧⌘P"] } },
+        { "snapshot": "closed-after-select" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [480, 420],
+      "steps": [
+        { "click": "Open" },
+        { "expect": { "visible": ["My Account"] } },
+        { "snapshot": "open" },
+        { "press": "ArrowDown" },
+        { "snapshot": "first-highlighted" },
+        { "press": "ArrowDown" },
+        { "press": "ArrowDown" },
+        { "snapshot": "third-highlighted" },
+        { "press": "ArrowUp" },
+        { "snapshot": "second-highlighted" },
+        { "press": "End" },
+        { "snapshot": "last-highlighted" },
+        { "press": "Enter" },
+        { "expect": { "hidden": ["My Account", "⇧⌘Q"] } },
+        { "snapshot": "closed-after-enter" }
+      ]
+    },
+    {
+      "id": "checkboxes",
+      "viewport": [320, 240],
+      "steps": [
+        { "click": "Checkboxes" },
+        {
+          "expect": {
+            "visible": ["Appearance", "Status Bar", "Activity Bar", "Panel"]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "Panel" },
+        { "snapshot": "item-hover" },
+        { "click": "Panel" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Appearance"] } },
+        { "click": "Checkboxes" },
+        { "expect": { "visible": ["Appearance"] } },
+        { "snapshot": "reopened-after-toggle" }
+      ]
+    },
+    {
+      "id": "radio-group",
+      "viewport": [320, 240],
+      "steps": [
+        { "click": "Radio Group" },
+        {
+          "expect": { "visible": ["Panel Position", "Top", "Bottom", "Right"] }
+        },
+        { "snapshot": "open" },
+        { "click": "Right" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Panel Position"] } },
+        { "click": "Radio Group" },
+        { "expect": { "visible": ["Panel Position"] } },
+        { "snapshot": "reopened-after-select" }
+      ]
+    },
+    {
+      "id": "destructive",
+      "viewport": [320, 240],
+      "steps": [
+        { "click": "Destructive" },
+        { "expect": { "visible": ["Edit", "Share", "Delete"] } },
+        { "snapshot": "open" },
+        { "hover": "Delete" },
+        { "snapshot": "destructive-hover" }
+      ]
+    }
+  ]
+}

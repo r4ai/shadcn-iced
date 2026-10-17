@@ -1,0 +1,62 @@
+{
+  "$schema": "./schema.json",
+  "component": "command",
+  "scenarios": [
+    {
+      "id": "basic",
+      "viewport": [416, 360],
+      "steps": [
+        { "snapshot": "default" },
+        { "hover": "Billing" },
+        { "snapshot": "item-hover" },
+        { "hover": "Calculator" },
+        { "snapshot": "disabled-item-hover" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [416, 360],
+      "steps": [
+        { "click": { "at": [140, 37] } },
+        { "snapshot": "focused" },
+        { "press": "ArrowDown" },
+        { "snapshot": "second-highlighted" },
+        { "press": "ArrowDown" },
+        { "snapshot": "skips-disabled" },
+        { "press": "ArrowUp" },
+        { "press": "ArrowUp" },
+        { "snapshot": "back-to-first" }
+      ]
+    },
+    {
+      "id": "filter",
+      "viewport": [416, 360],
+      "steps": [
+        { "click": { "at": [140, 37] } },
+        { "type": "cal" },
+        {
+          "expect": {
+            "visible": ["Calendar", "Calculator", "Suggestions"],
+            "hidden": ["Profile", "Billing", "Search Emoji"]
+          }
+        },
+        { "snapshot": "filtered" }
+      ]
+    },
+    {
+      "id": "empty",
+      "viewport": [416, 360],
+      "steps": [
+        { "click": { "at": [140, 37] } },
+        { "type": "zzz" },
+        {
+          "expect": {
+            "visible": ["No results found."],
+            "hidden": ["Calendar", "Suggestions"]
+          }
+        },
+        { "snapshot": "empty" }
+      ]
+    }
+  ]
+}

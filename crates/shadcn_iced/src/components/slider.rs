@@ -11,13 +11,15 @@
 //! ```
 //!
 //! Several thumbs select a range ([`range_slider`]).
-use shadcn_iced_core::theme::alpha;
+use shadcn_iced_core::primitive::Focus;
+use shadcn_iced_core::theme::{alpha, mix};
 use shadcn_iced_core::{Element, style, tokens};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
-use iced::advanced::widget::{Tree, Widget, tree};
+use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell};
+use iced::keyboard::{self, key::Named};
 use iced::{
     Background, Border, Color, Event, Length, Rectangle, Size, Theme, border, mouse, touch,
 };
@@ -209,6 +211,15 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
 #[derive(Debug, Default)]
 struct State {
     dragging: Option<usize>,
+    /// The keyboard focus of each thumb.
+    focus: Vec<Focus>,
+}
+
+impl State {
+    fn focus(&mut self, count: usize) -> &mut [Focus] {
+        self.focus.resize(count, Focus::default());
+        &mut self.focus
+    }
 }
 
 impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Message> {
@@ -222,7 +233,7 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
 
     fn size(&self) -> Size<Length> {
         if self.vertical() {
-            Size::new(Length::Shrink, self.height)
+            Size::new(self.width, self.height)
         } else {
             Size::new(self.width, Length::Shrink)
         }
@@ -241,12 +252,38 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
                 height => height,
             };
 
-            limits.resolve(THUMB, height, Size::new(THUMB, 160.0))
+            // A block as wide as its parent (`w-auto`), with the track and
+            // thumbs centered in it (`items-center`).
+            limits.resolve(self.width, height, Size::new(THUMB, 160.0))
         } else {
-            limits.resolve(self.width, THUMB, Size::new(0.0, THUMB))
+            // As tall as the track (`h-1`): the thumbs overflow it.
+            limits.resolve(self.width, TRACK, Size::new(0.0, TRACK))
         };
 
         layout::Node::new(size)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        _renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        if self.disabled || self.on_change.is_none() {
+            return;
+        }
+
+        // Each thumb takes the keyboard focus (`tabindex="0"`).
+        let bounds = layout.bounds();
+        let state = tree.state.downcast_mut::<State>();
+
+        for (index, focus) in state.focus(self.values.len()).iter_mut().enumerate() {
+            let thumb = self.thumb(bounds, index);
+
+            operation.custom(None, thumb, focus);
+            operation.focusable(None, thumb, focus);
+        }
     }
 
     fn update(
@@ -270,6 +307,7 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
 
         let state = tree.state.downcast_mut::<State>();
         let bounds = layout.bounds();
+        let count = self.values.len();
 
         let change = |index: usize, position, shell: &mut Shell<'_, Message>| {
             let value = self.value_at(bounds, position);
@@ -278,6 +316,68 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
                 shell.publish(on_change(index, value));
             }
         };
+
+        // The keyboard moves the focused thumb: the arrow keys by a step
+        // (`largeStep`, ten steps, with Shift or the page keys), Home and
+        // End to the ends of the range.
+        if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event
+            && !shell.is_event_captured()
+            && let Some(index) = state.focus(count).iter().position(Focus::is_focused)
+        {
+            state.focus[index].key_pressed();
+            shell.request_redraw();
+
+            let (start, end) = (*self.range.start(), *self.range.end());
+            let step = if self.step > 0.0 {
+                self.step
+            } else {
+                (end - start) / 100.0
+            };
+            let large = step * 10.0;
+            let value = self.values[index];
+
+            let target = match key {
+                keyboard::Key::Named(Named::ArrowRight | Named::ArrowUp) => {
+                    Some(value + if modifiers.shift() { large } else { step })
+                }
+                keyboard::Key::Named(Named::ArrowLeft | Named::ArrowDown) => {
+                    Some(value - if modifiers.shift() { large } else { step })
+                }
+                keyboard::Key::Named(Named::PageUp) => Some(value + large),
+                keyboard::Key::Named(Named::PageDown) => Some(value - large),
+                keyboard::Key::Named(Named::Home) => Some(start),
+                keyboard::Key::Named(Named::End) => Some(end),
+                _ => None,
+            };
+
+            if let Some(target) = target {
+                // Thumbs cannot cross their neighbors.
+                let low = if index > 0 {
+                    self.values[index - 1]
+                } else {
+                    start
+                };
+                let high = self.values.get(index + 1).copied().unwrap_or(end);
+                let target = target.clamp(low.min(high), high.max(low));
+
+                if (target - value).abs() > f32::EPSILON {
+                    shell.publish(on_change(index, target));
+                }
+
+                shell.capture_event();
+            }
+
+            return;
+        }
+
+        // A press elsewhere takes the focus away.
+        if let Event::Mouse(mouse::Event::ButtonPressed(_))
+        | Event::Touch(touch::Event::FingerPressed { .. }) = event
+        {
+            for focus in state.focus(count) {
+                focus.blur();
+            }
+        }
 
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
@@ -304,6 +404,7 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
                 });
 
                 state.dragging = Some(index);
+                state.focus(count)[index].focus_with_pointer();
                 change(index, position, shell);
                 shell.capture_event();
                 shell.request_redraw();
@@ -356,6 +457,10 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
             1.0
         };
 
+        // `data-disabled:opacity-50` fades the control as a whole: the
+        // thumbs stay opaque over the track.
+        let fade = |color: Color| mix(p.background, color, opacity);
+
         // `bg-muted rounded-full h-1 w-full`
         let track = if self.vertical() {
             Rectangle {
@@ -377,7 +482,7 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
                 border: border::rounded(f32::MAX),
                 ..renderer::Quad::default()
             },
-            Background::Color(alpha(p.muted, opacity)),
+            Background::Color(fade(p.muted)),
         );
 
         // `bg-primary`: from the start (or the first thumb) to the last thumb.
@@ -410,7 +515,7 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
                     border: border::rounded(if ratios.len() > 1 { 0.0 } else { f32::MAX }),
                     ..renderer::Quad::default()
                 },
-                Background::Color(alpha(p.primary, opacity)),
+                Background::Color(fade(p.primary)),
             );
         }
 
@@ -421,7 +526,9 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
         for index in 0..self.values.len() {
             let thumb = self.thumb(bounds, index);
 
-            // `hover:ring-3 active:ring-3 ring-ring/50`
+            // `hover:ring-3 active:ring-3 ring-ring/50`. Its
+            // `focus-visible:ring-3` never applies: the focus is on the
+            // `<input>` inside the thumb.
             if state.dragging == Some(index) || (state.dragging.is_none() && hovered == Some(index))
             {
                 renderer.fill_quad(
@@ -439,13 +546,13 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
                 renderer::Quad {
                     bounds: thumb,
                     border: Border {
-                        color: alpha(p.ring, opacity),
+                        color: fade(p.ring),
                         width: 1.0,
                         radius: border::radius(f32::MAX),
                     },
                     ..renderer::Quad::default()
                 },
-                Background::Color(alpha(Color::WHITE, opacity)),
+                Background::Color(fade(Color::WHITE)),
             );
         }
     }

@@ -1,0 +1,147 @@
+{
+  "$schema": "./schema.json",
+  "component": "menubar",
+  "scenarios": [
+    {
+      "id": "basic",
+      "viewport": [480, 320],
+      "steps": [
+        { "snapshot": "closed" },
+        { "hover": "Edit" },
+        { "snapshot": "trigger-hover" },
+        { "click": "File" },
+        {
+          "expect": {
+            "visible": ["⌘T", "⌘N", "New Incognito Window", "Share", "⌘P"]
+          }
+        },
+        { "snapshot": "file-open" },
+        { "hover": "⌘N" },
+        { "snapshot": "item-hover" },
+        { "hover": "New Incognito Window" },
+        { "snapshot": "disabled-item-hover" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["⌘T", "Share"] } },
+        { "snapshot": "closed-after-escape" }
+      ]
+    },
+    {
+      "id": "submenu",
+      "viewport": [480, 320],
+      "steps": [
+        { "click": "Edit" },
+        {
+          "expect": {
+            "visible": ["Find", "Cut", "Copy", "Paste"],
+            "hidden": ["Search the web"]
+          }
+        },
+        { "hover": "Find" },
+        { "wait": 300 },
+        {
+          "expect": {
+            "visible": [
+              "Search the web",
+              "Find...",
+              "Find Next",
+              "Find Previous"
+            ]
+          }
+        },
+        { "snapshot": "submenu-open" },
+        { "hover": "Find Next" },
+        { "snapshot": "submenu-item-hover" },
+        { "click": "Find Next" },
+        { "expect": { "hidden": ["Search the web", "Cut"] } }
+      ]
+    },
+    {
+      "id": "switch-menus",
+      "viewport": [480, 320],
+      "steps": [
+        { "click": "File" },
+        { "expect": { "visible": ["⌘T"] } },
+        { "hover": "Edit" },
+        { "wait": 200 },
+        { "expect": { "visible": ["Cut", "Copy"], "hidden": ["⌘T"] } },
+        { "snapshot": "edit-open-by-hover" },
+        { "hover": "Profiles" },
+        { "wait": 200 },
+        {
+          "expect": { "visible": ["Andy", "Benoit", "Luis"], "hidden": ["Cut"] }
+        },
+        { "snapshot": "profiles-open-by-hover" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [480, 320],
+      "steps": [
+        { "click": "Edit" },
+        { "press": "ArrowDown" },
+        { "snapshot": "first-highlighted" },
+        { "press": "ArrowDown" },
+        { "press": "ArrowDown" },
+        { "snapshot": "third-highlighted" },
+        { "press": "ArrowUp" },
+        { "snapshot": "second-highlighted" },
+        { "press": "ArrowRight" },
+        { "wait": 200 },
+        {
+          "expect": {
+            "visible": ["Bookmarks Bar", "Full URLs"],
+            "hidden": ["Cut"]
+          }
+        },
+        { "snapshot": "next-menu-by-arrow-right" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Bookmarks Bar"] } }
+      ]
+    },
+    {
+      "id": "checkboxes",
+      "viewport": [480, 320],
+      "steps": [
+        { "click": "View" },
+        {
+          "expect": {
+            "visible": [
+              "Bookmarks Bar",
+              "Full URLs",
+              "Toggle Fullscreen",
+              "Hide Sidebar"
+            ]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "Bookmarks Bar" },
+        { "snapshot": "item-hover" },
+        { "click": "Bookmarks Bar" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Bookmarks Bar"] } },
+        { "click": "View" },
+        { "expect": { "visible": ["Bookmarks Bar"] } },
+        { "snapshot": "reopened-after-toggle" }
+      ]
+    },
+    {
+      "id": "radio-group",
+      "viewport": [480, 320],
+      "steps": [
+        { "click": "Profiles" },
+        {
+          "expect": {
+            "visible": ["Andy", "Benoit", "Luis", "Edit...", "Add Profile..."]
+          }
+        },
+        { "snapshot": "open" },
+        { "click": "Luis" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Andy"] } },
+        { "click": "Profiles" },
+        { "expect": { "visible": ["Andy"] } },
+        { "snapshot": "reopened-after-select" }
+      ]
+    }
+  ]
+}

@@ -16,12 +16,17 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::Icon;
-use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::focus::Ring;
+use shadcn_iced_core::primitive::roving::Keys;
+use shadcn_iced_core::primitive::{Pressable, Roving};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Tree, Widget, tree};
 use iced::widget::button::{Status, Style};
-use iced::widget::{Column, Row, container, space, text};
+use iced::widget::{Column, Row, container, text};
 use iced::{Alignment, Background, Border, Color, Length, Theme, border};
 
 /// The visual style of the tab list.
@@ -148,9 +153,11 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
 
             // `justify-center`, or `justify-start` when vertical.
             let content: Element<'a, Message> = if vertical {
-                let hidden = labels
-                    .iter()
-                    .map(|(icon, label)| trigger_label(*icon, label.clone(), false));
+                let hidden = labels.iter().map(|(icon, label)| {
+                    Element::new(Ghost {
+                        content: trigger_label(*icon, label.clone(), false),
+                    })
+                });
 
                 // The labels overlap (`spacing(-20)`); the visible one
                 // comes last.
@@ -167,50 +174,53 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
                 container(content).center(Length::Fill).into()
             };
 
+            // Roving focus: the active tab is the one in the tab order.
             let trigger = Pressable::new(content)
                 .on_press_maybe((!disabled && !active).then(|| (tabs.on_select)(value)))
                 .disabled(disabled)
+                .focusable(true)
+                .tab_stop(active)
                 .width(if fill { Length::Fill } else { Length::Shrink })
                 .height(if vertical { 26.0 } else { TRIGGER_HEIGHT })
-                .padding([2, 6])
-                .style(move |theme, status| trigger(theme, status, active, variant));
+                // `px-1.5 py-0.5` inside a `border`
+                .padding([3, 7])
+                .focus_style(move |theme, status, focused| {
+                    let mut style = trigger(theme, status, active, variant);
+
+                    // `focus-visible:border-ring`
+                    if focused {
+                        style.border.color = tokens(theme).palette.ring;
+                    }
+
+                    style
+                })
+                // `focus-visible:ring-[3px] focus-visible:ring-ring/50`
+                .ring(|theme, _status, focused| {
+                    focused.then(|| {
+                        let t = tokens(theme);
+
+                        style::ring(&t, t.radius_md())
+                    })
+                })
+                // `focus-visible:outline-1 focus-visible:outline-ring`
+                .outline(|theme, _status, focused| {
+                    focused.then(|| {
+                        let t = tokens(theme);
+
+                        Ring {
+                            color: t.palette.ring,
+                            width: 1.0,
+                            radius: t.radius_md(),
+                        }
+                    })
+                });
 
             if variant == Variant::Line {
-                // `after:h-0.5 after:bg-foreground after:bottom-[-5px]`
-                // (`after:w-0.5 after:-right-1` when vertical)
-                let underline = container(space())
-                    .width(if vertical {
-                        Length::Fixed(2.0)
-                    } else {
-                        Length::Fill
-                    })
-                    .height(if vertical {
-                        Length::Fill
-                    } else {
-                        Length::Fixed(2.0)
-                    })
-                    .style(move |theme: &Theme| container::Style {
-                        background: active
-                            .then(|| Background::Color(tokens(theme).palette.foreground)),
-                        ..container::Style::default()
-                    });
-
-                if vertical {
-                    Row::new()
-                        .push(trigger)
-                        .push(space().width(2))
-                        .push(underline)
-                        .height(26)
-                        .width(Length::Shrink)
-                        .into()
-                } else {
-                    Column::new()
-                        .push(trigger)
-                        .push(space().height(3))
-                        .push(underline)
-                        .width(if fill { Length::Fill } else { Length::Shrink })
-                        .into()
-                }
+                Element::new(ActiveLine {
+                    content: trigger.into(),
+                    active,
+                    vertical,
+                })
             } else {
                 Element::from(trigger)
             }
@@ -222,6 +232,8 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
             Variant::Line => 4,
         };
 
+        // The arrow keys move the focus between triggers; Enter or Space
+        // activates the focused one (`activateOnFocus={false}`).
         let list: Element<'a, Message> = if vertical {
             container(
                 Column::with_children(triggers)
@@ -251,6 +263,12 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
             .style(move |theme| self::list(theme, variant))
             .into()
         };
+
+        let list = Roving::new(list).keys(if vertical {
+            Keys::Vertical
+        } else {
+            Keys::Horizontal
+        });
 
         let has_content = tabs.content.is_some();
 
@@ -393,4 +411,184 @@ pub fn trigger(theme: &Theme, status: Status, active: bool, variant: Variant) ->
     }
 
     style
+}
+
+/// Takes the space of its content without showing it, nor exposing it to
+/// operations (`aria-hidden`): the hidden labels that size vertical
+/// triggers are not texts to find.
+struct Ghost<'a, Message> {
+    content: Element<'a, Message>,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Ghost<'_, Message> {
+    fn tag(&self) -> tree::Tag {
+        self.content.as_widget().tag()
+    }
+
+    fn state(&self) -> tree::State {
+        self.content.as_widget().state()
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        self.content.as_widget().children()
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        self.content.as_widget().diff(tree);
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content.as_widget_mut().layout(tree, renderer, limits)
+    }
+
+    fn draw(
+        &self,
+        _tree: &Tree,
+        _renderer: &mut iced::Renderer,
+        _theme: &Theme,
+        _style: &renderer::Style,
+        _layout: Layout<'_>,
+        _cursor: iced::mouse::Cursor,
+        _viewport: &iced::Rectangle,
+    ) {
+    }
+}
+
+/// Draws the line of the active trigger of the line variant, overflowing
+/// the trigger like its `::after`: `after:h-0.5 after:bottom-[-5px]`, or
+/// `after:w-0.5 after:-right-1` when vertical.
+struct ActiveLine<'a, Message> {
+    content: Element<'a, Message>,
+    active: bool,
+    vertical: bool,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for ActiveLine<'_, Message> {
+    fn tag(&self) -> tree::Tag {
+        self.content.as_widget().tag()
+    }
+
+    fn state(&self) -> tree::State {
+        self.content.as_widget().state()
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        self.content.as_widget().children()
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        self.content.as_widget().diff(tree);
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn size_hint(&self) -> iced::Size<Length> {
+        self.content.as_widget().size_hint()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content.as_widget_mut().layout(tree, renderer, limits)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(tree, layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &iced::Event,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn iced::advanced::Clipboard,
+        shell: &mut iced::advanced::Shell<'_, Message>,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget_mut().update(
+            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        use iced::advanced::Renderer as _;
+
+        self.content
+            .as_widget()
+            .draw(tree, renderer, theme, style, layout, cursor, viewport);
+
+        if !self.active {
+            return;
+        }
+
+        let bounds = layout.bounds();
+
+        let line = if self.vertical {
+            iced::Rectangle {
+                x: bounds.x + bounds.width + 2.0,
+                width: 2.0,
+                ..bounds
+            }
+        } else {
+            iced::Rectangle {
+                y: bounds.y + bounds.height + 3.0,
+                height: 2.0,
+                ..bounds
+            }
+        };
+
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds: line,
+                ..renderer::Quad::default()
+            },
+            Background::Color(tokens(theme).palette.foreground),
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> iced::mouse::Interaction {
+        self.content
+            .as_widget()
+            .mouse_interaction(tree, layout, cursor, viewport, renderer)
+    }
 }

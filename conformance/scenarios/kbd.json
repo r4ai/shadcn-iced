@@ -1,0 +1,17 @@
+{
+  "$schema": "./schema.json",
+  "component": "kbd",
+  "scenarios": [
+    { "id": "demo", "viewport": [240, 100] },
+    { "id": "group", "viewport": [420, 56] },
+    {
+      "id": "button",
+      "viewport": [160, 80],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": { "at": [40, 36] } },
+        { "snapshot": "hover" }
+      ]
+    }
+  ]
+}

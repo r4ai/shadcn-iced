@@ -15,7 +15,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::listbox;
+use shadcn_iced_core::primitive::{listbox, tracked};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -239,8 +239,9 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                         ..container::Style::default()
                     },
                 ))
-                // `-mx-1`, through the padding of the list.
-                .padding(Padding::ZERO.left(-8.0).right(-8.0))
+                // `-mx-1`: through the `p-1` of the groups, clipped by the
+                // list (`overflow-x-hidden`).
+                .padding(Padding::ZERO.left(-4.0).right(-4.0))
             };
 
         for (heading, items) in command.groups {
@@ -306,19 +307,25 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
                     .spacing(8)
                     .align_y(Alignment::Center);
 
+                // `ml-auto text-xs tracking-widest text-muted-foreground
+                // group-data-selected:text-foreground`; `tracking-widest` is
+                // `0.1em`.
                 let shortcut = item.shortcut.map(|shortcut| {
-                    text(shortcut)
-                        .size(style::text::XS)
-                        .line_height(iced::Pixels(16.0))
-                        .style(|theme: &Theme| text::Style {
-                            color: Some(tokens(theme).palette.muted_foreground),
-                        })
-                        .into()
+                    tracked(shortcut, style::text::XS, iced::Pixels(16.0), None, 1.2).into()
                 });
 
                 // `gap-2 px-2 py-1.5`
                 list = list.item(
-                    listbox::row(row, shortcut).spacing(16.0).padding([6, 8]),
+                    listbox::row(row, shortcut)
+                        .spacing(16.0)
+                        .padding([6, 8])
+                        .trailing_color(|theme, highlighted| {
+                            if highlighted {
+                                highlight(theme).text_color
+                            } else {
+                                tokens(theme).palette.muted_foreground
+                            }
+                        }),
                     item.on_select,
                 );
             }
@@ -352,9 +359,9 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
 
         let bordered = command.bordered;
 
-        // `rounded-xl bg-popover p-1`
+        // `rounded-xl bg-popover p-1`, inside the border.
         container(Column::new().push(input).push(body).width(Length::Fill))
-            .padding(4)
+            .padding(if bordered { 5 } else { 4 })
             .width(command.width)
             .style(move |theme: &Theme| {
                 let t = tokens(theme);

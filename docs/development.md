@@ -102,6 +102,19 @@ Available flags for `snapshot`:
   - `--customize`: Open the theme customizer sheet
   - `--animations`: Enable animations during the run
 
+## Conformance with `shadcn/ui`
+
+[`conformance/`](../conformance/README.md) runs the same scenarios (pointer and keyboard interactions, expected texts, snapshots) against the latest `shadcn/ui`, in Chromium, and against `shadcn_iced`, headlessly, then compares them. It needs Node.js 24+ and pnpm:
+
+```sh
+cd conformance
+pnpm install
+pnpm exec playwright install chromium
+pnpm qa        # render with iced, run shadcn/ui, compare, write out/report/index.html
+```
+
+A run fails when a snapshot differs from `shadcn/ui` more than its accepted score in `conformance/baseline.json`, or when an expectation fails that is not listed there as known. After improving a component, record its new scores with `pnpm baseline <component>/` and commit them with the fix. `pnpm shadcn:update` updates the reference to the latest `shadcn/ui`; the `Conformance` workflow does it every week to catch upstream changes.
+
 ## Documentation Website (`site/`)
 
 The website in `site/` is built with TanStack Start, Solid, Vite, and Tailwind CSS. It displays each gallery example alongside its extracted Rust source code and a live WebAssembly preview.

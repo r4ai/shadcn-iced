@@ -26,8 +26,8 @@ use iced::{
 
 /// `size-8`
 const SLOT: f32 = 32.0;
-/// A `size-4` minus icon with a `gap-2` on each side.
-const SEPARATOR: f32 = 32.0;
+/// A `size-4` minus icon, without any gap (`flex items-center`).
+const SEPARATOR: f32 = 16.0;
 
 /// A one-time password input. See the [module documentation](self).
 pub struct InputOtp<'a, Message> {
@@ -123,11 +123,10 @@ impl<'a, Message: Clone + 'a> InputOtp<'a, Message> {
 
             for _ in 0..group {
                 slots.push(Rectangle::new(Point::new(x, 0.0), Size::new(SLOT, SLOT)));
-                x += SLOT - 1.0;
+                x += SLOT;
             }
 
             remaining -= group;
-            x += 1.0;
 
             if index + 1 < self.groups.len() && remaining > 0 {
                 x += SEPARATOR;
@@ -136,7 +135,7 @@ impl<'a, Message: Clone + 'a> InputOtp<'a, Message> {
 
         while slots.len() < self.length {
             slots.push(Rectangle::new(Point::new(x, 0.0), Size::new(SLOT, SLOT)));
-            x += SLOT - 1.0;
+            x += SLOT;
         }
 
         slots
@@ -227,6 +226,14 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
             renderer,
             operation,
         );
+
+        // The characters of the slots are texts of their own.
+        let offset = layout.bounds().position() - Point::ORIGIN;
+        let mut buffer = [0; 4];
+
+        for (slot, c) in self.slots().into_iter().zip(self.value.chars()) {
+            operation.text(None, slot + offset, c.encode_utf8(&mut buffer));
+        }
     }
 
     fn update(
@@ -371,9 +378,33 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
                 );
             }
 
+            // `dark:bg-input/30`
+            if t.is_dark() {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds,
+                        border: border::rounded(corners),
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(alpha(p.input, 0.3)),
+                );
+            }
+
+            // `border-y border-r first:border-l`: the left border of the
+            // other slots is the right border of the previous one.
+            let frame = if first {
+                bounds
+            } else {
+                Rectangle {
+                    x: bounds.x - 1.0,
+                    width: bounds.width + 1.0,
+                    ..bounds
+                }
+            };
+
             renderer.fill_quad(
                 renderer::Quad {
-                    bounds,
+                    bounds: frame,
                     border: Border {
                         color: if self.invalid {
                             p.destructive
@@ -387,13 +418,15 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
                     },
                     ..renderer::Quad::default()
                 },
-                // `dark:bg-input/30`
-                Background::Color(if t.is_dark() {
-                    alpha(p.input, 0.3)
-                } else {
-                    Color::TRANSPARENT
-                }),
+                Background::Color(Color::TRANSPARENT),
             );
+
+            // The content box, inside the borders.
+            let content = Rectangle {
+                x: bounds.x + if first { 1.0 } else { 0.0 },
+                width: bounds.width - if first { 2.0 } else { 1.0 },
+                ..bounds
+            };
 
             if let Some(c) = chars.get(i) {
                 renderer.fill_text(
@@ -408,12 +441,12 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for InputOt
                         shaping: advanced_text::Shaping::Basic,
                         wrapping: advanced_text::Wrapping::None,
                     },
-                    bounds.center(),
+                    content.center(),
                     p.foreground,
                     bounds,
                 );
             } else if is_active && (state.since.elapsed().as_millis() / 500).is_multiple_of(2) {
-                let center = bounds.center();
+                let center = content.center();
 
                 renderer.fill_quad(
                     renderer::Quad {

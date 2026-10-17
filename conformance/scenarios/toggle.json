@@ -1,0 +1,135 @@
+{
+  "$schema": "./schema.json",
+  "component": "toggle",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [160, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": "Italic"
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": "Italic"
+        },
+        {
+          "snapshot": "pressed"
+        }
+      ]
+    },
+    {
+      "id": "outline",
+      "viewport": [160, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": "Italic"
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": "Italic"
+        },
+        {
+          "snapshot": "pressed"
+        }
+      ]
+    },
+    {
+      "id": "icon",
+      "viewport": [120, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [32, 32]
+          }
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": {
+            "at": [32, 32]
+          }
+        },
+        {
+          "snapshot": "pressed"
+        }
+      ]
+    },
+    {
+      "id": "sizes",
+      "viewport": [320, 72]
+    },
+    {
+      "id": "disabled",
+      "viewport": [320, 64]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [200, 96],
+      "steps": [
+        {
+          "expect": {
+            "visible": ["Italic is off"],
+            "hidden": ["Italic is on"]
+          }
+        },
+        {
+          "click": "Italic"
+        },
+        {
+          "expect": {
+            "visible": ["Italic is on"],
+            "hidden": ["Italic is off"]
+          }
+        },
+        {
+          "snapshot": "pressed-focused"
+        },
+        {
+          "press": "Space"
+        },
+        {
+          "expect": {
+            "visible": ["Italic is off"],
+            "hidden": ["Italic is on"]
+          }
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "Enter"
+        },
+        {
+          "expect": {
+            "visible": ["Italic is on"],
+            "hidden": ["Italic is off"]
+          }
+        },
+        {
+          "click": "Italic"
+        },
+        {
+          "expect": {
+            "visible": ["Italic is off"],
+            "hidden": ["Italic is on"]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -10,13 +10,13 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::Pressable;
 use shadcn_iced_core::primitive::focus::{self, FocusWithin};
-use shadcn_iced_core::theme::alpha;
+use shadcn_iced_core::primitive::{Labelled, Pressable};
+use shadcn_iced_core::theme::{alpha, mix};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::widget::{Column, Row, container, text};
-use iced::{Alignment, Background, Color, Font, Padding, Theme, mouse};
+use iced::{Alignment, Background, Color, Font, Padding, Theme};
 
 /// A checkbox. See the [module documentation](self).
 pub struct Checkbox<'a, Message> {
@@ -96,7 +96,12 @@ impl<'a, Message: Clone + 'a> From<Checkbox<'a, Message>> for Element<'a, Messag
         };
 
         // `has-[>[data-slot=field-content]]:[&>[role=checkbox]]:mt-px`
-        let indicator = container(indicator(checked, disabled, invalid)).padding(Padding {
+        let on_toggle = checkbox
+            .on_toggle
+            .filter(|_| !disabled)
+            .map(|f| f(!checked));
+
+        let indicator = container(control(checked, invalid, on_toggle)).padding(Padding {
             top: if has_description { 1.0 } else { 0.0 },
             ..Padding::ZERO
         });
@@ -135,43 +140,101 @@ impl<'a, Message: Clone + 'a> From<Checkbox<'a, Message>> for Element<'a, Messag
                 .spacing(2)
         });
 
-        let on_press = checkbox.on_toggle.map(|f| f(!checked));
-
         // `Field orientation="horizontal"`: `gap-2 items-center`, or
-        // `items-start` with a description.
-        Pressable::new(Row::new().push(indicator).push(labels).spacing(8).align_y(
+        // `items-start` with a description. The labels toggle the checkbox
+        // (`htmlFor`).
+        Labelled::new(Row::new().push(indicator).push(labels).spacing(8).align_y(
             if has_description {
                 Alignment::Start
             } else {
                 Alignment::Center
             },
         ))
-        .on_press_maybe(if disabled { None } else { on_press })
-        .disabled(disabled)
-        .interaction(if disabled {
-            mouse::Interaction::NotAllowed
-        } else {
-            mouse::Interaction::Pointer
-        })
-        .style(|_, _| iced::widget::button::Style::default())
         .into()
     }
 }
 
 /// The checkbox square alone (`size-4 rounded-[4px] border`), with its
-/// `ring-3` when invalid.
+/// `ring-3` when invalid. It is not interactive; see [`control`].
 pub fn indicator<'a, Message: 'a>(
     checked: bool,
     disabled: bool,
     invalid: bool,
 ) -> Element<'a, Message> {
-    // `[&>svg]:size-3.5`
-    let check = container(checked.then(|| lucide::CHECK.sized(14))).center(16);
-
-    FocusWithin::new(check, move |theme, _status| {
+    FocusWithin::new(check(checked), move |theme, _status| {
         self::style(theme, checked, disabled, invalid)
     })
     .into()
+}
+
+/// The checkbox square as a control: focusable, pressed by a click or
+/// <kbd>Space</kbd>, with the `focus-visible:ring-3` of shadcn/ui. It
+/// produces `on_toggle`; without it, the control is disabled.
+///
+/// Wrap it with its label in a [`Labelled`] for the label to toggle it.
+pub fn control<'a, Message: Clone + 'a>(
+    checked: bool,
+    invalid: bool,
+    on_toggle: Option<Message>,
+) -> Element<'a, Message> {
+    let disabled = on_toggle.is_none();
+
+    Pressable::new(check(checked))
+        .on_press_maybe(on_toggle)
+        .disabled(disabled)
+        .focusable(true)
+        .activate_on_enter(false)
+        .focus_style(move |theme, _status, focused| {
+            let style = focused_style(theme, checked, disabled, invalid, focused);
+
+            iced::widget::button::Style {
+                background: style.background,
+                text_color: style.text_color.unwrap_or(Color::TRANSPARENT),
+                border: style.border,
+                ..iced::widget::button::Style::default()
+            }
+        })
+        .ring(move |theme, _status, focused| {
+            focused_style(theme, checked, disabled, invalid, focused).ring
+        })
+        .into()
+}
+
+/// `[&>svg]:size-3.5`
+fn check<'a, Message: 'a>(checked: bool) -> Element<'a, Message> {
+    container(checked.then(|| lucide::CHECK.sized(14)))
+        .center(16)
+        .into()
+}
+
+/// The style of the checkbox square, when its keyboard focus is visible or
+/// not.
+pub fn focused_style(
+    theme: &Theme,
+    checked: bool,
+    disabled: bool,
+    invalid: bool,
+    focused: bool,
+) -> focus::Style {
+    let mut style = self::style(theme, checked, disabled, invalid);
+
+    if focused {
+        let t = tokens(theme);
+
+        // `focus-visible:border-ring`, below `data-checked:border-primary`
+        // and `aria-invalid:border-destructive`.
+        if !checked && !invalid {
+            style.border.color = t.palette.ring;
+        }
+
+        // `focus-visible:ring-3 focus-visible:ring-ring/50`, below
+        // `aria-invalid:ring-destructive/20`.
+        if style.ring.is_none() {
+            style.ring = Some(style::ring(&t, 4.0));
+        }
+    }
+
+    style
 }
 
 /// The style of the checkbox square.
@@ -207,15 +270,25 @@ pub fn style(theme: &Theme, checked: bool, disabled: bool, invalid: bool) -> foc
         )
     };
 
+    // `disabled:opacity-50` fades the checked square as a whole: its
+    // border and check are opaque over its background.
+    let fade = |color: Color| {
+        if checked {
+            mix(p.background, color, opacity)
+        } else {
+            alpha(color, opacity)
+        }
+    };
+
     focus::Style {
-        background: Some(Background::Color(alpha(background, opacity))),
-        border: style::border(alpha(border, opacity), radius),
+        background: Some(Background::Color(fade(background))),
+        border: style::border(fade(border), radius),
         // `aria-invalid:ring-3 aria-invalid:ring-destructive/20`
         ring: invalid.then(|| {
             let mut ring = style::invalid_outset_ring(&t, radius);
             ring.color = alpha(ring.color, opacity);
             ring
         }),
-        text_color: Some(alpha(p.primary_foreground, opacity)),
+        text_color: Some(fade(p.primary_foreground)),
     }
 }

@@ -1,0 +1,8 @@
+{
+  "$schema": "./schema.json",
+  "component": "marker",
+  "scenarios": [
+    { "id": "variants", "viewport": [416, 170] },
+    { "id": "with-icon", "viewport": [416, 170] }
+  ]
+}

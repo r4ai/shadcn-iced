@@ -1,0 +1,69 @@
+{
+  "$schema": "./schema.json",
+  "component": "questionnaire",
+  "scenarios": [
+    {
+      "id": "flow",
+      "viewport": [656, 560],
+      "steps": [
+        { "snapshot": "first" },
+        {
+          "expect": {
+            "visible": ["What should the agent build next?"],
+            "hidden": ["Previous", "Skip", "Submit"]
+          }
+        },
+        { "click": "Next" },
+        { "expect": { "visible": ["Choose an answer to continue."] } },
+        { "snapshot": "invalid" },
+        { "hover": "Approval checkpoints" },
+        { "snapshot": "choice-hover" },
+        { "click": "Approval checkpoints" },
+        { "expect": { "hidden": ["Choose an answer to continue."] } },
+        { "snapshot": "selected" },
+        { "click": "Next" },
+        {
+          "expect": {
+            "visible": [
+              "What should every progress update include?",
+              "Previous",
+              "Skip"
+            ],
+            "hidden": ["What should the agent build next?"]
+          }
+        },
+        { "click": "Progress" },
+        { "click": "Risks" },
+        { "snapshot": "multiple" },
+        { "click": "Next" },
+        {
+          "expect": {
+            "visible": ["When should work begin?", "Submit"],
+            "hidden": ["Next", "Skip"]
+          }
+        },
+        { "snapshot": "last" },
+        { "click": "Previous" },
+        {
+          "expect": {
+            "visible": ["What should every progress update include?"]
+          }
+        },
+        { "click": "Previous" },
+        { "expect": { "visible": ["What should the agent build next?"] } },
+        { "snapshot": "back" }
+      ]
+    },
+    {
+      "id": "skip",
+      "viewport": [656, 560],
+      "steps": [
+        { "click": "Sub-agent handoffs" },
+        { "click": "Next" },
+        { "click": "Skip" },
+        { "expect": { "visible": ["When should work begin?"] } },
+        { "snapshot": "skipped" }
+      ]
+    }
+  ]
+}

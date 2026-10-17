@@ -1,0 +1,54 @@
+{
+  "$schema": "./schema.json",
+  "component": "tooltip",
+  "scenarios": [
+    {
+      "id": "default",
+      "description": "Shows on hover (TooltipProvider delay 0); hides when the pointer leaves and on Escape.",
+      "viewport": [240, 140],
+      "steps": [
+        { "snapshot": "closed" },
+        { "expect": { "hidden": ["Add to library"] } },
+        { "hover": "Hover" },
+        { "wait": 100 },
+        { "expect": { "visible": ["Add to library"] } },
+        { "snapshot": "open" },
+        { "hover": { "at": [220, 120] } },
+        { "wait": 100 },
+        { "expect": { "hidden": ["Add to library"] } },
+        { "snapshot": "closed-after-leave" },
+        { "hover": "Hover" },
+        { "wait": 100 },
+        { "expect": { "visible": ["Add to library"] } },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Add to library"] } }
+      ]
+    },
+    {
+      "id": "sides",
+      "description": "A tooltip on each side of its trigger.",
+      "viewport": [640, 240],
+      "steps": [
+        { "hover": "Left" },
+        { "wait": 100 },
+        { "expect": { "visible": ["Add to library"] } },
+        { "snapshot": "left" },
+        { "hover": "Top" },
+        { "wait": 100 },
+        { "expect": { "visible": ["Add to library"] } },
+        { "snapshot": "top" },
+        { "hover": "Bottom" },
+        { "wait": 100 },
+        { "expect": { "visible": ["Add to library"] } },
+        { "snapshot": "bottom" },
+        { "hover": "Right" },
+        { "wait": 100 },
+        { "expect": { "visible": ["Add to library"] } },
+        { "snapshot": "right" },
+        { "hover": { "at": [600, 220] } },
+        { "wait": 100 },
+        { "expect": { "hidden": ["Add to library"] } }
+      ]
+    }
+  ]
+}

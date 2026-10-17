@@ -1,0 +1,58 @@
+{
+  "$schema": "./schema.json",
+  "component": "calendar",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [260, 300],
+      "steps": [
+        { "snapshot": "june-12-selected" },
+        {
+          "expect": {
+            "visible": ["June 2025", "Su", "Mo", "Sa"],
+            "hidden": ["July 2025"]
+          }
+        },
+        { "hover": "20" },
+        { "snapshot": "hover-day" },
+        { "click": "20" },
+        { "snapshot": "june-20-selected" },
+        { "click": { "at": [207, 39] } },
+        { "expect": { "visible": ["July 2025"], "hidden": ["June 2025"] } },
+        { "snapshot": "july" },
+        { "click": { "at": [39, 39] } },
+        { "click": { "at": [39, 39] } },
+        {
+          "expect": {
+            "visible": ["May 2025"],
+            "hidden": ["July 2025", "June 2025"]
+          }
+        },
+        { "snapshot": "may" }
+      ]
+    },
+    {
+      "id": "range",
+      "viewport": [800, 300],
+      "steps": [
+        { "snapshot": "range" },
+        { "expect": { "visible": ["June 2025", "July 2025"] } },
+        { "click": "20" },
+        { "snapshot": "extended" }
+      ]
+    },
+    { "id": "dropdowns", "viewport": [260, 300] },
+    { "id": "week-numbers", "viewport": [300, 300] },
+    {
+      "id": "booked",
+      "viewport": [260, 300],
+      "steps": [
+        { "snapshot": "idle" },
+        { "click": { "at": [178, 181] } },
+        { "snapshot": "disabled-day-clicked" },
+        { "click": "10" },
+        { "snapshot": "june-10-selected" }
+      ]
+    }
+  ]
+}
