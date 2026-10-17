@@ -2,3 +2,26 @@
 **/*.rs.bk
 .claude/worktrees/
 /target-*/
+
+# Local credentials (keep sanitized examples shareable).
+.env
+.env.*
+!.env.example
+!.env.*.example
+.npmrc
+.netrc
+.pypirc
+credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+id_rsa
+id_ed25519
+
+# Local session notes and browser test output.
+.claude/HANDOFF*.md
+.claude/settings.local.json
+test-results/
+playwright-report/
