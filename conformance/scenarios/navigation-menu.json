@@ -42,7 +42,7 @@
     },
     {
       "id": "components",
-      "viewport": [640, 360],
+      "viewport": [800, 400],
       "steps": [
         { "hover": "Components" },
         { "wait": 300 },
