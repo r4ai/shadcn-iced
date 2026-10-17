@@ -15,7 +15,7 @@
 //!     .into()
 //! # }
 //! ```
-use super::button::{Size, Variant, icon_button};
+use super::button::{Button, Size, Variant};
 use super::menu::{self, menu_tokens};
 
 use shadcn_iced_core::icon::lucide;
@@ -146,8 +146,15 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
         }
 
         // `InputGroupButton size="icon-xs" variant="ghost"` at `pr-2
-        // mr-[-0.3rem]`.
-        let trigger = icon_button(lucide::CHEVRON_DOWN)
+        // mr-[-0.3rem]`, its chevron `size-4 text-muted-foreground`.
+        let trigger =
+            Button::new(
+                lucide::CHEVRON_DOWN
+                    .sized(16)
+                    .style(|theme: &Theme| text::Style {
+                        color: Some(tokens(theme).palette.muted_foreground),
+                    }),
+            )
             .variant(Variant::Ghost)
             .size(Size::IconXs)
             .disabled(disabled);
