@@ -1,9 +1,9 @@
 use super::Fixture;
 use crate::store::{Msg, Store, Value};
 
-use shadcn_iced::native_select::{invalid, native_select, small};
+use shadcn_iced::native_select::{NativeSelect, invalid, native_select, small};
 
-use iced::widget::{PickList, column};
+use iced::widget::column;
 
 const OPTIONS: &[&str] = &["Todo", "In Progress", "Done", "Cancelled"];
 
@@ -23,9 +23,7 @@ pub fn get(id: &str) -> Option<Fixture> {
         }),
         "keyboard" => Fixture::new(|store| status(store).into()),
         "states" => Fixture::new(|store| {
-            // The API has no disabled native select: the first one is
-            // an enabled select, only approximating the `disabled` one.
-            column![status(store), invalid(status(store))]
+            column![status(store).disabled(true), invalid(status(store))]
                 .spacing(12)
                 .into()
         })
@@ -36,7 +34,7 @@ pub fn get(id: &str) -> Option<Fixture> {
     })
 }
 
-type Select<'a> = PickList<'a, &'static str, &'static [&'static str], &'static str, Msg>;
+type Select<'a> = NativeSelect<'a, &'static str, Msg>;
 
 fn selected(store: &Store) -> Option<&'static str> {
     let value = store.opt("status")?;
