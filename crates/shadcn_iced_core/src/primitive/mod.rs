@@ -8,6 +8,7 @@ pub mod focus;
 pub mod labelled;
 pub mod layer;
 pub mod listbox;
+pub mod plot;
 pub mod pressable;
 pub mod roving;
 pub mod split;

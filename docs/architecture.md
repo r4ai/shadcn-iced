@@ -74,7 +74,8 @@ The `shadcn_iced_core::primitive` module provides the behavioral layer analogous
 | `focus` | Detects when a widget subtree holds keyboard focus (`focus_within`) to draw focus rings around composite inputs (`InputGroup`, `InputOtp`). |
 | `pressable` | Provides pointer press, release, and hover interaction tracking for custom interactive surfaces. |
 | `split` | Implements draggable, resizable pane dividers used by `Resizable`. |
-| `toaster` | Stacks, animates, expands, times out and swipes away the toasts of `Sonner`, porting sonner's transitions (`translateY`, `scale`, height and opacity, `400ms ease`). |
+| `toaster` | Stacks, animates, expands, times out and swipes away the toasts of `Sonner` and `Toast`, porting sonner's transitions (`translateY`, `scale`, height and opacity, `400ms ease`). A `Motion` sets how toasts enter, leave and peek out of the collapsed stack, which is all that differs between the two. |
+| `plot` | The geometry of `Chart`, like the parts of d3 that Recharts uses: band and point scales, nice ticks, stacking, bar layout, natural curves, pies, hit testing and tooltip placement. Not a widget; the chart keeps its configuration and its drawing. |
 | `track` | Lays out the items of a `Carousel` on a track that slides to the current item and can be dragged (swiped). |
 | `animated_width` | Animates the width of its content when it changes, like the `Sidebar` collapsing to icons. |
 | `wheel` | Wraps a whole view to make wheel scrolling smooth (wheel notches are spread over a few frames) and horizontal with <kbd>Shift</kbd>, for every scrollable under it. |
