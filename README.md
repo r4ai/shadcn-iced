@@ -10,6 +10,8 @@ Use **65+ components**—from forms, overlays, and data tables to charts and AI 
 
 ## Showcase
 
+![dashboard-01 recreated with shadcn-iced, dark](docs/screenshots/dashboard-dark.png)
+
 | | |
 | :---: | :---: |
 | ![Stacked Area Chart (Blue, Dark)](docs/screenshots/chart-blue-dark.png)<br/>**Charts** — Area, Bar, Line & Pie / Donut | ![Card & Form Inputs (Violet, Dark)](docs/screenshots/card-violet-dark.png)<br/>**Card & Inputs** — Tokens, focus rings & presets |
