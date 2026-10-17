@@ -35,6 +35,7 @@ pub fn get(id: &str) -> Option<Fixture> {
                     (!value.is_empty()).then(|| {
                         text(format!("Typed: {value}"))
                             .size(14)
+                            .line_height(iced::Pixels(20.0))
                             .style(|theme: &Theme| text::Style {
                                 color: Some(tokens(theme).palette.muted_foreground),
                             })

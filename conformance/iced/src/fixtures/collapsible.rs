@@ -37,7 +37,8 @@ fn repository<'a>(name: &'a str) -> Element<'a, Msg> {
             .font(font::mono())
             .line_height(iced::Pixels(20.0)),
     )
-    .padding([8, 16])
+    // `px-4 py-2` inside the `border`
+    .padding([9, 17])
     .width(Fill)
     .style(|theme: &Theme| {
         let t = tokens(theme);

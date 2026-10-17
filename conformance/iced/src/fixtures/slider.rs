@@ -24,6 +24,7 @@ pub fn get(id: &str) -> Option<Fixture> {
                 slider(0.0..=100.0, value, set_value).step(1.0),
                 text(format!("Value: {value}"))
                     .size(14)
+                    .line_height(iced::Pixels(20.0))
                     .style(|theme: &Theme| text::Style {
                         color: Some(tokens(theme).palette.muted_foreground),
                     }),

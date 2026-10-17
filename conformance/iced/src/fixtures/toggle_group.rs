@@ -44,6 +44,7 @@ pub fn get(id: &str) -> Option<Fixture> {
                 .spacing(0.0),
                 text(format!("Selected: {}", selected.unwrap_or("none")))
                     .size(14)
+                    .line_height(iced::Pixels(20.0))
                     .style(|theme: &Theme| text::Style {
                         color: Some(tokens(theme).palette.muted_foreground),
                     }),
