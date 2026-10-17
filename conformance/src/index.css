@@ -139,3 +139,12 @@
   animation: none !important;
   caret-color: transparent !important;
 }
+
+/*
+ * Sonner injects a system font stack (`ui-sans-serif, system-ui, ...`), which
+ * differs from machine to machine. Use the bundled font, like shadcn_iced, so
+ * that no text depends on the fonts of the system.
+ */
+html [data-sonner-toaster] {
+  font-family: var(--font-sans);
+}

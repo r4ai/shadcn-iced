@@ -48,13 +48,13 @@ and commit `baseline.json` with the fix. On CI, a snapshot without a baseline fa
 
 Snapshots must not depend on the machine running the suite:
 
-- **Fonts**: both sides only use the bundled Geist and Geist Mono (`@fontsource-variable/*` on the web, `shadcn_iced::font` in iced); the page loads them before rendering and the runner checks that Geist is loaded, so no text falls back to a system font.
+- **Fonts**: both sides only use the bundled Geist and Geist Mono (`@fontsource-variable/*` on the web, `shadcn_iced::font` in iced); the page loads them before rendering and the runner checks that Geist is loaded, so no text falls back to a system font. Sonner's system font stack is overridden with Geist for the same reason. Glyphs that no bundled font has (⌘ ⇧ and other symbols, emoji) still come from the fallback fonts of the system on both sides: they are the one part of the snapshots that depends on the machine, which is why the baseline is recorded by CI.
 - **Rasterization**: Chromium runs with `--font-render-hinting=none --disable-lcd-text --disable-gpu --force-color-profile=srgb --hide-scrollbars` (no hinting, grayscale anti-aliasing, software rendering, sRGB, no native scrollbars); iced always renders with `tiny-skia` at a scale factor of 2 with no system dependency. Playwright, hence Chromium, is pinned to an exact version.
 - **Time and locale**: the browser clock is fixed at `2025-06-15T12:00:00Z` (`NOW` in `tests/spec.ts`; iced fixtures must use this date as "today"), with the `en-US` locale, the `UTC` timezone and reduced motion. Animations are disabled on both sides.
 - **Server**: the suite runs against a production build served by `vite preview` on `CONFORMANCE_PORT` (4517 by default), never reusing a running server, which could serve another checkout.
 - **Scoring**: the comparison tolerates anti-aliasing and sub-pixel offsets (see above). On the platform the baseline was produced on (`platform` in `baseline.json`, Linux like CI), scores may get worse by `max(0.01, 10%)` before failing; elsewhere by `max(0.05, 20%)`, since browsers still rasterize text a bit differently on each operating system (measured between Windows and Linux: 0.0015 median, 0.01 at the 90th percentile, 0.05 at most). `CONFORMANCE_STRICT=1` forces the strict allowance.
 
-Produce the baseline on Linux (natively, in WSL or in CI): the `Conformance` workflow uploads the `baseline.json` of its run with its report, ready to be committed.
+Record the baseline with CI: the `Conformance` workflow uploads the `baseline.json` of its run with its report, ready to be committed. A local Linux run is close, but differs where the installed fallback fonts differ.
 
 ## Writing scenarios
 
