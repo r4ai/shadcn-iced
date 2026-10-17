@@ -90,7 +90,7 @@ The documentation website (`site/`) renders live interactive widgets rather than
 
 - `examples/gallery-web` compiles the `gallery` examples to `wasm32-unknown-unknown`.
 - A single `iced::daemon` instance runs per documentation page. Each example on the page is mounted as an independent `iced` window backed by its own HTML `<canvas>`, drawn with WebGPU (or the `tiny-skia` software renderer as a fallback).
-- The web page communicates with the WASM runtime via exported bindings (`mount`, `unmount`, `set_theme`, `theme_code`), while the WASM runtime notifies the page of natural content height changes (`shadcnIcedPreviewResized`) and unhandled mouse wheel events (`shadcnIcedPreviewScroll`) so page scrolling remains seamless.
+- The web page communicates with the WASM runtime via exported bindings (`mount`, `unmount`, `set_theme`, `theme_code`), while the WASM runtime notifies the page of natural content height changes (`shadcnIcedPreviewResized`) and, during the dispatch of each wheel event, whether an example used it (`shadcnIcedPreviewWheel`), so the browser scrolls the page natively over a preview unless the example scrolls itself.
 
 ## Differences from Web `shadcn/ui`
 
