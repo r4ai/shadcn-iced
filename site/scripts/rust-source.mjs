@@ -52,9 +52,7 @@ export function tokenize(src) {
       push("string", j + 1);
     } else if (c === "'" || rest.startsWith("b'")) {
       const offset = c === "'" ? 0 : 1;
-      const char = src
-        .slice(i + offset, i + offset + 12)
-        .match(/^'(\\u\{[0-9a-fA-F]+\}|\\.|[^\\'\n])'/);
+      const char = src.slice(i + offset, i + offset + 12).match(/^'(\\u\{[0-9a-fA-F]+\}|\\.|[^\\'\n])'/);
       if (char) {
         push("char", i + offset + char[0].length);
       } else {
@@ -124,9 +122,7 @@ function parseUse(tokens) {
 /** Keeps the parts of a `use` tree that bring a name of `used` in scope. */
 function pruneUse(tree, used, parent = null) {
   if (tree.children) {
-    const children = tree.children
-      .map((child) => pruneUse(child, used, tree.path.at(-1) ?? parent))
-      .filter(Boolean);
+    const children = tree.children.map((child) => pruneUse(child, used, tree.path.at(-1) ?? parent)).filter(Boolean);
     return children.length ? { ...tree, children } : null;
   }
 
@@ -142,9 +138,7 @@ function printUse(tree) {
   if (tree.children) {
     const children = tree.children.map(printUse);
     const nested =
-      children.length === 1 && tree.children[0].path[0] !== "self"
-        ? children[0]
-        : `{${children.join(", ")}}`;
+      children.length === 1 && tree.children[0].path[0] !== "self" ? children[0] : `{${children.join(", ")}}`;
     path = path ? `${path}::${nested}` : nested;
   }
 
@@ -177,9 +171,7 @@ const CLOSE = new Set([")", "]", "}"]);
 /** Removes the common indentation of `text`. */
 function dedent(text) {
   const lines = text.replace(/\s+$/, "").split("\n");
-  const indent = Math.min(
-    ...lines.filter((line) => line.trim()).map((line) => line.match(/^ */)[0].length),
-  );
+  const indent = Math.min(...lines.filter((line) => line.trim()).map((line) => line.match(/^ */)[0].length));
   return lines.map((line) => line.slice(indent)).join("\n");
 }
 
@@ -289,11 +281,7 @@ function item(src, tokens, from, to) {
     // The names a `use` declaration brings in scope.
     provides:
       kind === "use"
-        ? useNames(
-            parseUse(
-              tokens.slice(k + 1, to - 1).filter((t) => t.type !== "ws" && t.type !== "comment"),
-            ),
-          )
+        ? useNames(parseUse(tokens.slice(k + 1, to - 1).filter((t) => t.type !== "ws" && t.type !== "comment")))
         : new Set([name]),
   };
 }
@@ -362,7 +350,10 @@ function lets(src, tokens, open, until) {
  */
 export function exampleSource(src, line, column) {
   const tokens = tokenize(src);
-  const lineStart = src.split("\n").slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+  const lineStart = src
+    .split("\n")
+    .slice(0, line - 1)
+    .reduce((n, l) => n + l.length + 1, 0);
   const offset = lineStart + column - 1;
 
   const at = tokens.findIndex((t) => t.start === offset);
@@ -402,7 +393,7 @@ export function exampleSource(src, line, column) {
 
   // The `let` bindings it needs, from the innermost block outwards.
   const bindings = [];
-  for (const open of stack.filter((k) => tokens[k].text === "{").reverse()) {
+  for (const open of stack.filter((index) => tokens[index].text === "{").toReversed()) {
     bindings.unshift(...lets(src, tokens, open, at));
   }
 
@@ -443,9 +434,7 @@ export function exampleSource(src, line, column) {
   }
 
   const imports = [
-    ...fileItems
-      .filter((i) => i.kind === "use")
-      .map((i) => useDeclaration(tokens, i.useFrom, i.to, used)),
+    ...fileItems.filter((i) => i.kind === "use").map((i) => useDeclaration(tokens, i.useFrom, i.to, used)),
     ...bindings.filter((b) => b.use).map((b) => useDeclaration(tokens, b.from, b.to, used)),
   ].filter(Boolean);
 

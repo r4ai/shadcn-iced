@@ -1,0 +1,28 @@
+# Supply-chain hardening of the dependencies of the site
+# (https://pnpm.io/supply-chain-security).
+
+# Only install versions published at least 7 days ago (in minutes), so a
+# compromised release is usually caught and pulled before it reaches us; the
+# same cooldown as Dependabot (`.github/dependabot.yml`).
+minimumReleaseAge: 10080
+
+# Fail when a package loses the provenance or trusted publisher it had in
+# earlier versions, a sign that its publishing was taken over.
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  # A security backport to the 6.x line, published after 7.x releases that
+  # had provenance: older line, not a takeover.
+  - semver@6.3.1
+
+# Transitive dependencies may only come from the registry, not from git
+# repositories or tarball URLs.
+blockExoticSubdeps: true
+
+# Install scripts are not run, and a new package with one fails the install
+# until it is reviewed and listed here.
+strictDepBuilds: true
+ignoredBuiltDependencies:
+  # Their scripts only check the binaries that their platform packages
+  # (optional dependencies) already install.
+  - esbuild
+  - workerd

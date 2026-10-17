@@ -1,0 +1,81 @@
+// The components of the gallery (see `plugins/site-data.ts`).
+import { components, loaders } from "virtual:site/components";
+
+export interface ComponentSummary {
+  id: string;
+  title: string;
+  description: string;
+  examples: { index: number; title: string }[];
+}
+
+export interface Example {
+  index: number;
+  title: string;
+  /** The gallery file that builds the example, relative to the repository. */
+  file: string;
+  line: number;
+  code: string;
+  html: string;
+  lang: string;
+  /** The highlighted first lines of the code. */
+  preview: string;
+}
+
+export interface ComponentDetail {
+  id: string;
+  title: string;
+  description: string;
+  install: { cli: Highlighted; library: Highlighted };
+  /** The source of the component, for the manual installation. */
+  source: ({ file: string } & Highlighted) | null;
+  examples: Example[];
+}
+
+export { components };
+
+/** Loads a component with its highlighted code, or `undefined`. */
+export async function loadComponent(id: string): Promise<ComponentDetail | undefined> {
+  return (await loaders[id]?.())?.default;
+}
+
+export const REPOSITORY = "https://github.com/r4ai/shadcn-iced";
+
+export function githubUrl(file: string, line?: number) {
+  return `${REPOSITORY}/blob/main/${file}${line ? `#L${line}` : ""}`;
+}
+
+/** The module of a component (`dropdown-menu` → `dropdown_menu`). */
+export const moduleName = (id: string) => id.replaceAll("-", "_");
+
+/**
+ * The height a preview starts from (it grows to fit its example): overlays
+ * need room to open inside their canvas.
+ */
+export function minHeight(id: string) {
+  const tall: Record<string, number> = {
+    sheet: 560,
+    drawer: 520,
+    dialog: 480,
+    "alert-dialog": 400,
+    command: 480,
+    "dropdown-menu": 480,
+    "context-menu": 420,
+    menubar: 440,
+    "navigation-menu": 440,
+    combobox: 440,
+    select: 420,
+    "date-picker": 460,
+    popover: 400,
+    sonner: 400,
+    toast: 400,
+  };
+
+  return tall[id] ?? 320;
+}
+
+/** The anchor of a heading (`Area Chart - Stacked` → `area-chart-stacked`). */
+export const slug = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");

@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "sortImports": {
+    "internalPattern": ["~/"]
+  },
+  "sortTailwindcss": {
+    "stylesheet": "./src/styles/global.css",
+    "functions": ["cn", "tv", "clsx"]
+  },
+  "sortPackageJson": true,
+  "ignorePatterns": ["src/routeTree.gen.ts", "src/data/", "public/wasm/", "pnpm-lock.yaml"]
+}
