@@ -1,0 +1,130 @@
+{
+  "$schema": "./schema.json",
+  "component": "slider",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [320, 56],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [160, 20]
+          }
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "drag": {
+            "from": {
+              "at": [160, 20]
+            },
+            "to": {
+              "at": [60, 20]
+            }
+          }
+        },
+        {
+          "snapshot": "dragged"
+        }
+      ]
+    },
+    {
+      "id": "controlled",
+      "viewport": [320, 88],
+      "steps": [
+        {
+          "expect": {
+            "visible": ["Value: 50"]
+          }
+        },
+        {
+          "click": {
+            "at": [160, 20]
+          }
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "ArrowRight"
+        },
+        {
+          "press": "ArrowRight"
+        },
+        {
+          "expect": {
+            "visible": ["Value: 52"],
+            "hidden": ["Value: 50"]
+          }
+        },
+        {
+          "press": "Home"
+        },
+        {
+          "expect": {
+            "visible": ["Value: 0"]
+          }
+        },
+        {
+          "press": "End"
+        },
+        {
+          "expect": {
+            "visible": ["Value: 100"]
+          }
+        },
+        {
+          "snapshot": "end"
+        },
+        {
+          "drag": {
+            "from": {
+              "at": [298, 20]
+            },
+            "to": {
+              "at": [0, 20]
+            }
+          }
+        },
+        {
+          "expect": {
+            "visible": ["Value: 0"],
+            "hidden": ["Value: 100"]
+          }
+        },
+        {
+          "snapshot": "dragged"
+        }
+      ]
+    },
+    {
+      "id": "range",
+      "viewport": [320, 56],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [91, 20]
+          }
+        },
+        {
+          "snapshot": "hover"
+        }
+      ]
+    },
+    {
+      "id": "vertical",
+      "viewport": [64, 192]
+    },
+    {
+      "id": "disabled",
+      "viewport": [320, 56]
+    }
+  ]
+}

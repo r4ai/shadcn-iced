@@ -1,0 +1,59 @@
+{
+  "$schema": "./schema.json",
+  "component": "label",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [288, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "click": "Accept terms and conditions"
+        },
+        {
+          "snapshot": "checked"
+        }
+      ]
+    },
+    {
+      "id": "with-input",
+      "viewport": [768, 128],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "click": "Email"
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "type": "a@b.c"
+        },
+        {
+          "expect": {
+            "visible": ["Typed: a@b.c"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "disabled",
+      "viewport": [288, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "click": "Accept terms and conditions"
+        },
+        {
+          "snapshot": "after-click"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "$schema": "./schema.json",
+  "component": "checkbox",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [288, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": "Accept terms and conditions"
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": "Accept terms and conditions"
+        },
+        {
+          "snapshot": "checked"
+        }
+      ]
+    },
+    {
+      "id": "states",
+      "viewport": [320, 264]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [288, 88],
+      "steps": [
+        {
+          "expect": {
+            "visible": ["Not accepted"],
+            "hidden": ["Accepted"]
+          }
+        },
+        {
+          "click": {
+            "at": [24, 26]
+          }
+        },
+        {
+          "expect": {
+            "visible": ["Accepted"],
+            "hidden": ["Not accepted"]
+          }
+        },
+        {
+          "snapshot": "checked-focused"
+        },
+        {
+          "press": "Space"
+        },
+        {
+          "expect": {
+            "visible": ["Not accepted"],
+            "hidden": ["Accepted"]
+          }
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "Space"
+        },
+        {
+          "expect": {
+            "visible": ["Accepted"],
+            "hidden": ["Not accepted"]
+          }
+        },
+        {
+          "click": "Accept terms and conditions"
+        },
+        {
+          "expect": {
+            "visible": ["Not accepted"],
+            "hidden": ["Accepted"]
+          }
+        },
+        {
+          "snapshot": "unchecked"
+        }
+      ]
+    },
+    {
+      "id": "disabled",
+      "viewport": [288, 88],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "click": "Accept terms and conditions"
+        },
+        {
+          "expect": {
+            "visible": ["Not accepted"],
+            "hidden": ["Accepted"]
+          }
+        },
+        {
+          "snapshot": "after-click"
+        }
+      ]
+    }
+  ]
+}

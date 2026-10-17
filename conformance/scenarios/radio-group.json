@@ -1,0 +1,102 @@
+{
+  "$schema": "./schema.json",
+  "component": "radio-group",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [200, 128],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": "Compact"
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": "Compact"
+        },
+        {
+          "snapshot": "selected"
+        }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [200, 152],
+      "steps": [
+        {
+          "expect": {
+            "visible": ["Selected: comfortable"]
+          }
+        },
+        {
+          "click": "Comfortable"
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "ArrowDown"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: compact"],
+            "hidden": ["Selected: comfortable"]
+          }
+        },
+        {
+          "snapshot": "arrow-down"
+        },
+        {
+          "press": "ArrowUp"
+        },
+        {
+          "press": "ArrowUp"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: default"],
+            "hidden": ["Selected: compact"]
+          }
+        },
+        {
+          "snapshot": "arrow-up"
+        },
+        {
+          "click": "Comfortable"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: comfortable"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "description",
+      "viewport": [320, 144]
+    },
+    {
+      "id": "disabled",
+      "viewport": [200, 128],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "click": "Compact"
+        },
+        {
+          "snapshot": "after-click"
+        }
+      ]
+    },
+    {
+      "id": "invalid",
+      "viewport": [200, 128]
+    }
+  ]
+}

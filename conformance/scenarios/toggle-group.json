@@ -1,0 +1,127 @@
+{
+  "$schema": "./schema.json",
+  "component": "toggle-group",
+  "scenarios": [
+    {
+      "id": "multiple",
+      "viewport": [160, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [64, 32]
+          }
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": {
+            "at": [32, 32]
+          }
+        },
+        {
+          "snapshot": "bold"
+        },
+        {
+          "click": {
+            "at": [96, 32]
+          }
+        },
+        {
+          "snapshot": "bold-underline"
+        }
+      ]
+    },
+    {
+      "id": "single",
+      "viewport": [260, 96],
+      "steps": [
+        {
+          "expect": {
+            "visible": ["Selected: none"]
+          }
+        },
+        {
+          "click": "Left"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: left"],
+            "hidden": ["Selected: none"]
+          }
+        },
+        {
+          "snapshot": "left"
+        },
+        {
+          "press": "ArrowRight"
+        },
+        {
+          "press": "Space"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: center"],
+            "hidden": ["Selected: left"]
+          }
+        },
+        {
+          "snapshot": "center"
+        },
+        {
+          "click": "Right"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: right"],
+            "hidden": ["Selected: center"]
+          }
+        },
+        {
+          "snapshot": "right"
+        },
+        {
+          "click": "Right"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: none"],
+            "hidden": ["Selected: right"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sizes",
+      "viewport": [280, 72]
+    },
+    {
+      "id": "spacing",
+      "viewport": [160, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [64, 32]
+          }
+        },
+        {
+          "snapshot": "hover"
+        }
+      ]
+    },
+    {
+      "id": "vertical",
+      "viewport": [96, 144]
+    },
+    {
+      "id": "disabled",
+      "viewport": [160, 64]
+    }
+  ]
+}
