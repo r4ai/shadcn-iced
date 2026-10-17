@@ -19,7 +19,7 @@ const json = execFileSync("cargo", ["run", "--quiet", "-p", "gallery", "--bin", 
   stdio: ["ignore", "pipe", "inherit"],
 });
 
-const { widths, pages, charts: chartPages } = JSON.parse(json);
+const { widths, pages, charts: chartPages, apps: appPages } = JSON.parse(json);
 const sources = new Map();
 const read = (file) => {
   if (!sources.has(file)) {
@@ -65,9 +65,32 @@ const charts = chartPages.map((page) => ({
   })),
 }));
 
+// The example apps (`/examples`): a crate each, whose code is the whole
+// `src/lib.rs` (the gallery only maps its view).
+const apps = appPages.map((page) => {
+  const file = `examples/${page.id}/src/lib.rs`;
+
+  return {
+    id: page.id,
+    title: page.title,
+    description: page.description,
+    command: `cargo run -p ${page.id}`,
+    examples: [
+      {
+        index: 0,
+        title: page.title,
+        file,
+        line: 1,
+        code: read(file).trimEnd(),
+        heights: page.examples[0]?.heights,
+      },
+    ],
+  };
+});
+
 const out = join(site, "src/data/components.json");
 mkdirSync(dirname(out), { recursive: true });
-writeFileSync(out, JSON.stringify({ widths, components, charts }, null, 2) + "\n");
+writeFileSync(out, JSON.stringify({ widths, components, charts, apps }, null, 2) + "\n");
 
 const count = components.reduce((n, c) => n + c.examples.length, 0);
 console.log(`${components.length} components, ${count} examples → ${out}`);

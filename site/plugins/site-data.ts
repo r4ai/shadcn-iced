@@ -7,6 +7,8 @@
 // - `virtual:site/component/<id>`: a component, with its highlighted code,
 // - `virtual:site/charts`: the pages of the chart showcase, with their
 //   highlighted code,
+// - `virtual:site/apps`: the example apps (`/examples`), with their
+//   highlighted code,
 // - `./file.rs?highlight` (or `.toml`, `.sh`): a snippet next to the page that
 //   shows it, as `{ code, html }`.
 import { readFileSync } from "node:fs";
@@ -18,6 +20,7 @@ import type { Plugin } from "vite";
 const LIST = "virtual:site/components";
 const COMPONENT = "virtual:site/component/";
 const CHARTS = "virtual:site/charts";
+const APPS = "virtual:site/apps";
 const HIGHLIGHT = "?highlight";
 
 const LANGS: Record<string, string> = { ".rs": "rust", ".toml": "toml", ".sh": "shellscript" };
@@ -32,6 +35,7 @@ interface Data {
     examples: Example[];
   }[];
   charts?: { id: string; title: string; description: string; examples: Example[] }[];
+  apps?: { id: string; title: string; description: string; command: string; examples: Example[] }[];
 }
 
 interface Example {
@@ -102,7 +106,7 @@ export function siteData(): Plugin {
     enforce: "pre",
 
     resolveId(id) {
-      if (id === LIST || id === CHARTS || id.startsWith(COMPONENT)) return `\0${id}`;
+      if (id === LIST || id === CHARTS || id === APPS || id.startsWith(COMPONENT)) return `\0${id}`;
     },
 
     async load(id) {
@@ -166,6 +170,19 @@ export function siteData(): Plugin {
         );
 
         return `export const charts = ${JSON.stringify(charts)};`;
+      }
+
+      if (id === `\0${APPS}`) {
+        this.addWatchFile(file);
+        const apps = await Promise.all(
+          (read().apps ?? []).map(async (app) => ({
+            ...app,
+            command: await highlight(app.command, "shellscript"),
+            examples: await Promise.all(app.examples.map(highlightExample)),
+          })),
+        );
+
+        return `export const apps = ${JSON.stringify(apps)};`;
       }
 
       if (id.endsWith(HIGHLIGHT)) {

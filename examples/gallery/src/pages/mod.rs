@@ -1,5 +1,6 @@
 //! One page per component.
 pub mod agent;
+pub mod apps;
 mod basics;
 mod button;
 pub mod charts;
@@ -25,9 +26,17 @@ pub struct Page {
 /// not components.
 pub const CHARTS: &[Page] = &[charts::AREA, charts::BAR, charts::LINE, charts::PIE];
 
-/// Finds a page of [`PAGES`] or [`CHARTS`].
+/// The example apps of the website (`/examples`), which are not
+/// components either: one example each, the whole app.
+pub const APPS: &[Page] = &[apps::DASHBOARD, apps::SETTINGS];
+
+/// Finds a page of [`PAGES`], [`CHARTS`] or [`APPS`].
 pub fn find(id: &str) -> Option<&'static Page> {
-    PAGES.iter().chain(CHARTS).find(|page| page.id == id)
+    PAGES
+        .iter()
+        .chain(CHARTS)
+        .chain(APPS)
+        .find(|page| page.id == id)
 }
 
 pub const PAGES: &[Page] = &[

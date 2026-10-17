@@ -19,6 +19,12 @@ declare module "virtual:site/charts" {
   export const charts: ChartPage[];
 }
 
+declare module "virtual:site/apps" {
+  import type { AppPage } from "~/lib/components";
+
+  export const apps: AppPage[];
+}
+
 declare module "virtual:site/components" {
   import type { ComponentDetail, ComponentSummary } from "~/lib/components";
 

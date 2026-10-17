@@ -6,7 +6,7 @@
 //! ```sh
 //! cargo run -p gallery --bin site_data > site/src/data/gallery.json
 //! ```
-use gallery::{CHARTS, Gallery, PAGES, Page};
+use gallery::{APPS, CHARTS, Gallery, PAGES, Page};
 use shadcn_iced::Mode;
 
 use iced::advanced::layout::Limits;
@@ -19,9 +19,11 @@ use std::borrow::Cow;
 
 /// The widths of a preview (its frame, padding included) that the heights
 /// of the examples are measured at: phones, the column of the docs (638px
-/// from a tablet up) and the cards of the home page and the charts.
-const WIDTHS: [f32; 11] = [
-    300.0, 320.0, 340.0, 360.0, 380.0, 400.0, 440.0, 480.0, 560.0, 638.0, 720.0,
+/// from a tablet up), the cards of the home page and the charts, and the
+/// example apps, as wide as the page.
+const WIDTHS: [f32; 14] = [
+    300.0, 320.0, 340.0, 360.0, 380.0, 400.0, 440.0, 480.0, 560.0, 638.0, 720.0, 960.0, 1200.0,
+    1350.0,
 ];
 
 /// The padding of a preview (`PADDING` of `gallery-web`).
@@ -142,9 +144,10 @@ fn main() {
     let widths: Vec<String> = WIDTHS.iter().map(f32::to_string).collect();
 
     println!(
-        "{{\"widths\":[{}],\"pages\":[\n{}\n],\"charts\":[\n{}\n]}}",
+        "{{\"widths\":[{}],\"pages\":[\n{}\n],\"charts\":[\n{}\n],\"apps\":[\n{}\n]}}",
         widths.join(","),
         pages(&renderer, &gallery, PAGES),
         pages(&renderer, &gallery, CHARTS),
+        pages(&renderer, &gallery, APPS),
     );
 }
