@@ -12,7 +12,7 @@
 //! ```
 use shadcn_iced_core::icon::Icon;
 use shadcn_iced_core::primitive::Pressable;
-use shadcn_iced_core::theme::alpha;
+use shadcn_iced_core::theme::{alpha, over};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::widget::button::{Status, Style};
@@ -97,6 +97,7 @@ pub struct Toggle<'a, Message> {
     padding: Option<f32>,
     disabled: bool,
     width: Length,
+    tab_stop: bool,
 }
 
 /// Creates a [`Toggle`].
@@ -113,6 +114,7 @@ pub fn toggle<'a, Message: Clone + 'a>(on: bool) -> Toggle<'a, Message> {
         padding: None,
         disabled: false,
         width: Length::Shrink,
+        tab_stop: true,
     }
 }
 
@@ -178,6 +180,13 @@ impl<'a, Message: Clone + 'a> Toggle<'a, Message> {
         self.width = width.into();
         self
     }
+
+    /// Sets whether the toggle is reached with <kbd>Tab</kbd>. Defaults to
+    /// `true`; groups only keep one of their items in the tab order.
+    pub fn tab_stop(mut self, tab_stop: bool) -> Self {
+        self.tab_stop = tab_stop;
+        self
+    }
 }
 
 impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message> {
@@ -188,6 +197,7 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
         let position = toggle.position;
         let vertical = toggle.vertical;
         let disabled = toggle.disabled || toggle.on_toggle.is_none();
+        let icon_only = toggle.icon.is_some() && toggle.label.is_none();
 
         // `gap-1`
         let content = Row::new()
@@ -202,14 +212,39 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
             .align_y(Alignment::Center)
             .height(Length::Fill);
 
+        // The padding sits inside the border of outline toggles.
+        let border = match variant {
+            Variant::Default => 0.0,
+            Variant::Outline => 1.0,
+        };
+        let horizontal = toggle.padding.unwrap_or(size.padding()) + border;
+
         let padding = Padding {
-            left: toggle.padding.unwrap_or(size.padding()),
-            right: toggle.padding.unwrap_or(size.padding()),
+            left: horizontal,
+            right: horizontal,
             ..Padding::ZERO
         };
 
+        // Joined outline toggles overlap the border of the previous one
+        // (`border-l-0`, `border-t-0`), so they are a pixel longer.
+        let overlap = if variant == Variant::Outline
+            && matches!(position, Position::Middle | Position::Last)
+        {
+            1.0
+        } else {
+            0.0
+        };
+
         // Icon-only toggles are at least square (`min-w-*`).
-        let content: Element<'a, Message> = if toggle.width == Length::Shrink {
+        let width = if icon_only && !vertical && toggle.width == Length::Shrink {
+            Length::Fixed((size.icon_size() + 2.0 * horizontal).max(size.height() + overlap))
+        } else {
+            toggle.width
+        };
+
+        let height = size.height() + if vertical { overlap } else { 0.0 };
+
+        let content: Element<'a, Message> = if width == Length::Shrink {
             iced::widget::container(content)
                 .center_x(Length::Shrink)
                 .height(Length::Fill)
@@ -221,21 +256,38 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
                 .into()
         };
 
+        // Joined group items: `first:rounded-l-lg last:rounded-r-lg`
+        let radius = move |t: &shadcn_iced_core::Tokens| {
+            if position == Position::Alone {
+                size.radius(t)
+            } else {
+                t.radius_lg()
+            }
+        };
+
         Pressable::new(content)
             .on_press_maybe(toggle.on_toggle.map(|f| f(!on)))
             .disabled(disabled)
-            .width(toggle.width)
-            .height(size.height())
+            .focusable(true)
+            .tab_stop(toggle.tab_stop)
+            .width(width)
+            .height(height)
             .padding(padding)
-            .style(move |theme, status| {
+            .focus_style(move |theme, status, focused| {
                 let mut style = self::style(theme, status, on, variant, position);
                 let t = tokens(theme);
-                // Joined group items: `first:rounded-l-lg last:rounded-r-lg`
-                let radius = if position == Position::Alone {
-                    size.radius(&t)
-                } else {
-                    t.radius_lg()
-                };
+                let radius = radius(&t);
+
+                // `focus-visible:border-ring`
+                if focused {
+                    style.border.color = t.palette.ring;
+                }
+
+                // Joined items overlap their borders, drawn once in
+                // shadcn/ui (`border-l-0`): opaque, they blend in as one.
+                if variant == Variant::Outline && position != Position::Alone {
+                    style.border.color = over(style.border.color, t.palette.background);
+                }
 
                 style.border.radius = if vertical {
                     position.vertical_radius(radius)
@@ -244,6 +296,21 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
                 };
 
                 style
+            })
+            // `focus-visible:ring-[3px] focus-visible:ring-ring/50`
+            .ring(move |theme, _status, focused| {
+                focused.then(|| {
+                    let t = tokens(theme);
+
+                    style::ring(
+                        &t,
+                        if position == Position::Middle {
+                            0.0
+                        } else {
+                            radius(&t)
+                        },
+                    )
+                })
             })
             .into()
     }

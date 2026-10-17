@@ -10,7 +10,7 @@ use iced::{Element, Theme};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
-        "default" | "keyboard" => Fixture::new(account).init(|s| {
+        "default" | "keyboard" | "tab" => Fixture::new(account).init(|s| {
             s.set("tab", "account");
         }),
         "line" => Fixture::new(|s| {

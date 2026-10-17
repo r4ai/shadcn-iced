@@ -11,13 +11,14 @@ use iced::widget::{column, text};
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
         "default" => Fixture::new(|store| density(store).into()).init(init),
-        "keyboard" => Fixture::new(|store| {
+        "keyboard" | "tab" => Fixture::new(|store| {
             let value = store.str("value");
 
             column![
                 density(store),
                 text(format!("Selected: {value}"))
                     .size(14)
+                    .line_height(iced::Pixels(20.0))
                     .style(|theme: &Theme| text::Style {
                         color: Some(tokens(theme).palette.muted_foreground),
                     }),

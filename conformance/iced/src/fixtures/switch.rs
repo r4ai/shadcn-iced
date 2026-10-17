@@ -51,7 +51,7 @@ pub fn get(id: &str) -> Option<Fixture> {
             .spacing(12)
             .into()
         }),
-        "keyboard" => Fixture::new(controlled),
+        "keyboard" | "tab" => Fixture::new(controlled),
         _ => return None,
     })
 }
@@ -69,6 +69,7 @@ fn controlled(store: &Store) -> Element<'_, Msg> {
             "Airplane mode is off"
         })
         .size(14)
+        .line_height(iced::Pixels(20.0))
         .style(|theme: &Theme| text::Style {
             color: Some(tokens(theme).palette.muted_foreground),
         }),

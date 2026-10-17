@@ -117,6 +117,23 @@
         },
         { "snapshot": "code" }
       ]
+    },
+    {
+      "id": "tab",
+      "viewport": [440, 120],
+      "steps": [
+        { "press": "Tab" },
+        { "snapshot": "focused" },
+        { "press": "End" },
+        { "press": "Space" },
+        {
+          "expect": {
+            "visible": ["Change your password here."],
+            "hidden": ["Make changes to your account here."]
+          }
+        },
+        { "snapshot": "password" }
+      ]
     }
   ]
 }

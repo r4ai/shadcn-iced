@@ -89,6 +89,30 @@
           "snapshot": "unchecked"
         }
       ]
+    },
+    {
+      "id": "tab",
+      "viewport": [240, 96],
+      "steps": [
+        {
+          "press": "Tab"
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "Space"
+        },
+        {
+          "expect": {
+            "visible": ["Airplane mode is on"],
+            "hidden": ["Airplane mode is off"]
+          }
+        },
+        {
+          "snapshot": "checked"
+        }
+      ]
     }
   ]
 }

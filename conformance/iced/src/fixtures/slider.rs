@@ -17,13 +17,14 @@ pub fn get(id: &str) -> Option<Fixture> {
         .init(|store| {
             store.set("value", 50.0f32);
         }),
-        "controlled" => Fixture::new(|store| {
+        "controlled" | "keyboard" => Fixture::new(|store| {
             let value = store.num("value");
 
             column![
                 slider(0.0..=100.0, value, set_value).step(1.0),
                 text(format!("Value: {value}"))
                     .size(14)
+                    .line_height(iced::Pixels(20.0))
                     .style(|theme: &Theme| text::Style {
                         color: Some(tokens(theme).palette.muted_foreground),
                     }),

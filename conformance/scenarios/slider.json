@@ -125,6 +125,43 @@
     {
       "id": "disabled",
       "viewport": [320, 56]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [320, 88],
+      "steps": [
+        {
+          "press": "Tab"
+        },
+        {
+          "press": "ArrowLeft"
+        },
+        {
+          "expect": {
+            "visible": ["Value: 49"],
+            "hidden": ["Value: 50"]
+          }
+        },
+        {
+          "press": "PageUp"
+        },
+        {
+          "expect": {
+            "visible": ["Value: 59"]
+          }
+        },
+        {
+          "press": "Shift+ArrowRight"
+        },
+        {
+          "expect": {
+            "visible": ["Value: 69"]
+          }
+        },
+        {
+          "snapshot": "moved"
+        }
+      ]
     }
   ]
 }

@@ -13,10 +13,13 @@
 //!     .into()
 //! # }
 //! ```
-use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::{Labelled, Pressable};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Tree, Widget};
 use iced::widget::button::{Status, Style};
 use iced::widget::{Column, Row, container, text};
 use iced::{Alignment, Background, Font, Length, Padding, Theme};
@@ -184,10 +187,12 @@ impl<'a, Message: 'a> From<Field<'a, Message>> for Element<'a, Message> {
         };
 
         // `has-[>[data-slot=field-content]]:items-start` and
-        // `[&>[role=checkbox],[role=radio]]:mt-px`.
-        let control = |control| {
+        // `[&>[role=checkbox],[role=radio]]:mt-px`, for the checkboxes and
+        // radios on the left of horizontal fields (controls on the right
+        // of responsive fields are usually switches).
+        let control = |control, nudge: bool| {
             container(control).padding(Padding {
-                top: if has_description { 1.0 } else { 0.0 },
+                top: if has_description && nudge { 1.0 } else { 0.0 },
                 ..Padding::ZERO
             })
         };
@@ -198,7 +203,7 @@ impl<'a, Message: 'a> From<Field<'a, Message>> for Element<'a, Message> {
         };
 
         // `gap-2`
-        match field.orientation {
+        let field: Element<'a, Message> = match field.orientation {
             Orientation::Vertical => Column::new()
                 .push(label)
                 .push(field.control)
@@ -208,18 +213,21 @@ impl<'a, Message: 'a> From<Field<'a, Message>> for Element<'a, Message> {
                 .width(Length::Fill)
                 .into(),
             Orientation::Horizontal => Row::new()
-                .push(control(field.control))
+                .push(control(field.control, true))
                 .push(content(label, description, error))
                 .spacing(8)
                 .align_y(align)
                 .into(),
             Orientation::Responsive => Row::new()
                 .push(content(label, description, error))
-                .push(control(field.control))
+                .push(control(field.control, false))
                 .spacing(8)
                 .align_y(align)
                 .into(),
-        }
+        };
+
+        // The label focuses (or toggles) the control (`htmlFor`).
+        Labelled::new(field).into()
     }
 }
 
@@ -295,11 +303,14 @@ impl<'a, Message: 'a> From<FieldSet<'a, Message>> for Element<'a, Message> {
         // `-mt-1.5`.
         let header = Column::new()
             .push(set.legend.map(|legend| {
+                let size = match variant {
+                    LegendVariant::Legend => style::text::BASE,
+                    LegendVariant::Label => style::text::SM,
+                };
+
                 text(legend)
-                    .size(match variant {
-                        LegendVariant::Legend => style::text::BASE,
-                        LegendVariant::Label => style::text::SM,
-                    })
+                    .size(size)
+                    .line_height(style::text::leading(size))
                     .font(font::medium())
             }))
             .push(set.description.map(description))
@@ -355,10 +366,87 @@ pub fn field_separator<'a, Message: 'a>(label: Option<&str>) -> Element<'a, Mess
             .into(),
     };
 
-    container(content)
-        .center_y(Length::Fixed(4.0))
-        .width(Length::Fill)
-        .into()
+    Element::new(Overflow {
+        content,
+        height: 4.0,
+    })
+}
+
+/// Lays out its content at its natural height, centered on a slot of the
+/// given height that it overflows (`-my-2 h-5`).
+struct Overflow<'a, Message> {
+    content: Element<'a, Message>,
+    height: f32,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Overflow<'_, Message> {
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        iced::Size::new(Length::Fill, Length::Fixed(self.height))
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let width = limits.max().width;
+        let content = self.content.as_widget_mut().layout(
+            &mut tree.children[0],
+            renderer,
+            &layout::Limits::new(iced::Size::ZERO, iced::Size::new(width, f32::INFINITY)),
+        );
+        let offset = (self.height - content.size().height) / 2.0;
+
+        layout::Node::with_children(
+            iced::Size::new(width, self.height),
+            vec![content.move_to(iced::Point::new(0.0, offset))],
+        )
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+        );
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            operation,
+        );
+    }
 }
 
 /// A selectable card around a field (`FieldLabel` wrapping a horizontal

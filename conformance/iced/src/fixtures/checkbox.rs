@@ -42,7 +42,7 @@ pub fn get(id: &str) -> Option<Fixture> {
             .spacing(12)
             .into()
         }),
-        "keyboard" => Fixture::new(|store| controlled(store, false)),
+        "keyboard" | "tab" => Fixture::new(|store| controlled(store, false)),
         "disabled" => Fixture::new(|store| controlled(store, true)),
         _ => return None,
     })
@@ -58,6 +58,7 @@ fn controlled(store: &Store, disabled: bool) -> Element<'_, Msg> {
             .disabled(disabled),
         text(if checked { "Accepted" } else { "Not accepted" })
             .size(14)
+            .line_height(iced::Pixels(20.0))
             .style(|theme: &Theme| text::Style {
                 color: Some(tokens(theme).palette.muted_foreground),
             }),

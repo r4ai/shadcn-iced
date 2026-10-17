@@ -64,4 +64,5 @@ export default {
     </div>
   ),
   keyboard: () => <Controlled />,
+  tab: () => <Controlled />,
 } satisfies Fixtures

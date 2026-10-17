@@ -45,6 +45,7 @@ function Formatting(props: React.ComponentProps<typeof ToggleGroup>) {
 export default {
   multiple: () => <Formatting multiple variant="outline" spacing={0} />,
   single: () => <Single />,
+  tab: () => <Single />,
   sizes: () => (
     <div className="flex items-center gap-4">
       <Formatting multiple variant="outline" size="sm" spacing={0} />

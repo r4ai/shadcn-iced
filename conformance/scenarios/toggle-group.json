@@ -122,6 +122,33 @@
     {
       "id": "disabled",
       "viewport": [160, 64]
+    },
+    {
+      "id": "tab",
+      "viewport": [260, 96],
+      "steps": [
+        {
+          "press": "Tab"
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "ArrowRight"
+        },
+        {
+          "press": "Enter"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: center"],
+            "hidden": ["Selected: none"]
+          }
+        },
+        {
+          "snapshot": "center"
+        }
+      ]
     }
   ]
 }
