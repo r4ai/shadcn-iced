@@ -347,9 +347,11 @@ pub const SLIDER: Page = Page {
             example(
                 "Range",
                 narrow(
-                    shadcn_iced::slider::range_slider(0.0..=100.0, &[25.0, 50.0], |_, _| Message::Noop)
-                        .step(5.0)
-                        .into()
+                    shadcn_iced::slider::range_slider(0.0..=100.0, &[25.0, 50.0], |_, _| {
+                        Message::Noop
+                    })
+                    .step(5.0)
+                    .into()
                 )
             ),
             example(
@@ -380,8 +382,10 @@ pub const SLIDER: Page = Page {
                             muted("0.3, 0.7"),
                         ]
                         .align_y(Center),
-                        shadcn_iced::slider::range_slider(0.0..=1.0, &[0.3, 0.7], |_, _| Message::Noop)
-                            .step(0.1),
+                        shadcn_iced::slider::range_slider(0.0..=1.0, &[0.3, 0.7], |_, _| {
+                            Message::Noop
+                        })
+                        .step(0.1),
                     ]
                     .spacing(12)
                     .into()

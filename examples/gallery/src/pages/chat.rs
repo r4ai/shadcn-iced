@@ -235,7 +235,9 @@ pub const MESSAGE: Page = Page {
                                     .size(12)
                                     .style(|theme: &iced::Theme| {
                                         text::Style {
-                                            color: Some(shadcn_iced::tokens(theme).palette.destructive),
+                                            color: Some(
+                                                shadcn_iced::tokens(theme).palette.destructive,
+                                            ),
                                         }
                                     }),
                                 ghost_icon(lucide::REFRESH_CCW, Size::IconXs),

@@ -377,7 +377,10 @@ mod tests {
                 .filter(|line| !line.trim_start().starts_with("//"))
             {
                 assert!(!line.contains("crate::"), "{name} uses `crate::`: {line}");
-                assert!(!line.contains("shadcn_iced::"), "{name} uses `shadcn_iced`: {line}");
+                assert!(
+                    !line.contains("shadcn_iced::"),
+                    "{name} uses `shadcn_iced`: {line}"
+                );
             }
         }
     }

@@ -4,6 +4,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "shadcn-iced",
   "compatibility_date": "2026-10-01",
+  // Served only on the custom domain. Adding or changing it needs a token with
+  // Workers Routes Write on the zone, so it is set up once in the dashboard;
+  // deploys that leave it as is only need Editor on the Worker.
+  "routes": [{ "pattern": "shadcn-iced.r4ai.dev", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page",
