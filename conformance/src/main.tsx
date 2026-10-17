@@ -56,6 +56,15 @@ function Fixture() {
   )
 }
 
+// Load the fonts before rendering, so that no text is laid out with a
+// fallback font of the system first.
+await Promise.all(
+  ["400", "500", "600", "700"].flatMap((weight) => [
+    document.fonts.load(`${weight} 16px "Geist Variable"`),
+    document.fonts.load(`${weight} 16px "Geist Mono Variable"`),
+  ])
+)
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <TooltipProvider>{component ? <Fixture /> : <Index />}</TooltipProvider>

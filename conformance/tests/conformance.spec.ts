@@ -16,6 +16,7 @@ import { expect, test, type Page } from "@playwright/test"
 import { compare } from "./compare.ts"
 import {
   DEFAULT_VIEWPORT,
+  NOW,
   THEMES,
   allowance,
   out,
@@ -36,7 +37,11 @@ function icedOutcome(
   scenario: string,
   theme: string
 ): IcedOutcome | undefined {
-  const path = join(out, "iced/runs", `${component}--${scenario}--${theme}.json`)
+  const path = join(
+    out,
+    "iced/runs",
+    `${component}--${scenario}--${theme}.json`
+  )
   return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined
 }
 
@@ -99,11 +104,20 @@ for (const file of readScenarios()) {
 
           try {
             await page.setViewportSize({ width, height })
+            // "Today" is fixed: iced fixtures use the same date.
+            await page.clock.setFixedTime(NOW)
             await page.goto(
               `/?component=${file.component}&scenario=${scenario.id}&theme=${theme}&static`
             )
             await expect(page.locator("#missing")).toHaveCount(0)
             await page.evaluate(() => document.fonts.ready)
+            // Text must never fall back to a font of the system.
+            expect(
+              await page.evaluate(() =>
+                document.fonts.check(`14px "Geist Variable"`)
+              ),
+              "Geist is loaded"
+            ).toBe(true)
 
             for (const [index, step] of steps(scenario).entries()) {
               if ("snapshot" in step) {
@@ -115,6 +129,8 @@ for (const file of readScenarios()) {
                 )
                 const referencePath = join(out, "reference", path)
                 mkdirSync(dirname(referencePath), { recursive: true })
+                // Fonts of overlays load when they are first shown.
+                await page.evaluate(() => document.fonts.ready)
                 await page.screenshot({
                   path: referencePath,
                   animations: "disabled",

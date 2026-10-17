@@ -117,3 +117,9 @@ export interface RunRecord {
     iced: Box | null
   }[]
 }
+
+/**
+ * The current time of every page (`Date.now()`), so that "today" does not
+ * depend on when the suite runs. iced fixtures must use the same date.
+ */
+export const NOW = new Date("2025-06-15T12:00:00Z")
