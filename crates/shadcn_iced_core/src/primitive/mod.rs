@@ -7,6 +7,7 @@ pub mod layer;
 pub mod listbox;
 pub mod pressable;
 pub mod split;
+pub mod underline;
 
 pub use anchored::{Align, Anchored, Side, anchored};
 pub use disclosure::{Disclosure, disclosure};
@@ -15,3 +16,4 @@ pub use layer::{Layer, layer};
 pub use listbox::Listbox;
 pub use pressable::{Pressable, pressable};
 pub use split::Split;
+pub use underline::{Underline, underline};

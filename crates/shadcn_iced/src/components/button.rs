@@ -15,7 +15,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::Icon;
-use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::{Pressable, underline};
 use shadcn_iced_core::theme::{alpha, mix, tokens};
 use shadcn_iced_core::{Element, font, style};
 
@@ -293,6 +293,20 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             content.into()
         };
 
+        // `hover:underline underline-offset-4`
+        let content = if button.variant == Variant::Link && !button.disabled {
+            underline(content)
+                .text_size(size.text_size())
+                .hover_area(Padding {
+                    left: padding.left,
+                    right: padding.right,
+                    ..Padding::ZERO
+                })
+                .into()
+        } else {
+            content
+        };
+
         let variant = button.variant;
         let position = button.position;
         let vertical = button.vertical;
@@ -305,6 +319,8 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             .height(height)
             .padding(padding)
             .press_offset(1.0)
+            // `border border-transparent bg-clip-padding`
+            .clip_background(true)
             .style(move |theme, status| {
                 let mut style = self::style(theme, status, variant);
                 let radius = if rounded {
@@ -347,7 +363,7 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
                 p.primary
             })),
             text_color: p.primary_foreground,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
         Variant::Destructive => Style {
@@ -360,7 +376,7 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
                 },
             ))),
             text_color: p.destructive,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
         Variant::Outline => Style {
@@ -382,29 +398,57 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
                 p.secondary
             })),
             text_color: p.secondary_foreground,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
         Variant::Ghost => Style {
             background: hovered
                 .then(|| Background::Color(if dark { alpha(p.muted, 0.5) } else { p.muted })),
             text_color: p.foreground,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
         Variant::Link => Style {
             background: None,
             text_color: p.primary,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
     };
 
     if status == Status::Disabled {
-        style = disabled(style);
+        style = disabled_over(style, p.background);
     }
 
     style
+}
+
+/// `border border-transparent`: invisible, but it insets the background
+/// (`bg-clip-padding`).
+fn transparent_border(radius: f32) -> iced::Border {
+    iced::Border {
+        width: 1.0,
+        ..style::border(iced::Color::TRANSPARENT, radius)
+    }
+}
+
+/// Applies `opacity-50` to a style, for a button drawn over `background`.
+///
+/// CSS applies the opacity to the button as a whole, so its label blends
+/// with the page rather than with its own translucent background: the label
+/// stays opaque, mixed with `background` instead.
+pub fn disabled_over(style: Style, background: iced::Color) -> Style {
+    let opacity = style::DISABLED_OPACITY;
+    let text = style.text_color;
+
+    Style {
+        text_color: if text.a >= 1.0 {
+            mix(background, text, opacity)
+        } else {
+            alpha(text, opacity)
+        },
+        ..disabled(style)
+    }
 }
 
 /// Applies `opacity-50` to a style.
