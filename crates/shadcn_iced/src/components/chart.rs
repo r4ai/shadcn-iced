@@ -4,7 +4,10 @@
 //! Recharts; this module draws the same kinds of charts (bar, line, area and
 //! pie) with the same geometry and look: a faint horizontal grid, muted axis
 //! labels, the `--chart-*` colors, a legend and a tooltip on hover
-//! (`ChartTooltipContent`, `ChartLegendContent`).
+//! (`ChartTooltipContent`, `ChartLegendContent`). The scales, the stacking,
+//! the curves, the pie and the hit testing live in
+//! [`shadcn_iced_core::primitive::plot`]; this module configures and draws
+//! them with the theme.
 //!
 //! ```no_run
 //! # use shadcn_iced::chart::{self, Series};
@@ -16,6 +19,7 @@
 //!     .into()
 //! # }
 //! ```
+use shadcn_iced_core::primitive::plot::{self, Bars, Categories, Linear, Pie, Spread};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, Tokens, font, style, tokens};
 
@@ -25,7 +29,7 @@ use iced::advanced::renderer::{self, Renderer as _};
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell};
 use iced::alignment;
-use iced::widget::canvas::{Frame, Path, Stroke, Text, path};
+use iced::widget::canvas::{Frame, Path, Stroke, Text};
 use iced::widget::text::{Alignment as TextAlignment, LineHeight};
 use iced::widget::{Column, Row, Space, container, row, text};
 use iced::{
@@ -237,23 +241,11 @@ impl Chart {
     }
 
     fn max(&self) -> f32 {
-        let max = if self.stacked {
-            (0..self.categories.len())
-                .map(|i| {
-                    self.series
-                        .iter()
-                        .map(|s| s.values.get(i).copied().unwrap_or(0.0))
-                        .sum::<f32>()
-                })
-                .fold(0.0, f32::max)
-        } else {
-            self.series
-                .iter()
-                .flat_map(|s| s.values.iter().copied())
-                .fold(0.0, f32::max)
-        };
-
-        nice(max)
+        plot::nice(plot::max(
+            self.series.iter().map(|s| s.values.as_slice()),
+            self.categories.len(),
+            self.stacked,
+        ))
     }
 
     fn tick(&self, category: &str) -> String {
@@ -270,34 +262,6 @@ fn color(colors: &[Option<Color>], tokens: &Tokens, index: usize) -> Color {
         .copied()
         .flatten()
         .unwrap_or(tokens.palette.chart[index % 5])
-}
-
-/// The top of the value axis: the last of 5 "nice" ticks starting at 0,
-/// like Recharts' `getNiceTickValues`.
-fn nice(max: f32) -> f32 {
-    const TICKS: f64 = 5.0;
-
-    if max <= 0.0 {
-        return 1.0;
-    }
-
-    let max = f64::from(max);
-    let rough = max / (TICKS - 1.0);
-    let digits = rough.log10().floor() + 1.0;
-    let magnitude = 10f64.powf(digits);
-    let scale = if digits == 1.0 { 0.1 } else { 0.05 };
-
-    let mut correction = 0.0;
-
-    loop {
-        let step = (((rough / magnitude) / scale).ceil() + correction) * scale * magnitude;
-
-        if (max / step).ceil() + 1.0 <= TICKS {
-            return (step * (TICKS - 1.0)) as f32;
-        }
-
-        correction += 1.0;
-    }
 }
 
 /// Formats a value like `toLocaleString()` does in English.
@@ -348,68 +312,29 @@ impl Chart {
         }
     }
 
-    /// The horizontal position of a category: the center of its band for
-    /// bars, and spread edge to edge for lines and areas (a point scale).
-    fn x(&self, plot: Rectangle, index: usize) -> f32 {
-        let count = self.categories.len().max(1);
-
-        match self.kind {
-            Kind::Line | Kind::Area => {
-                if count == 1 {
-                    plot.center_x()
-                } else {
-                    plot.x + plot.width * index as f32 / (count - 1) as f32
-                }
-            }
-            _ => plot.x + plot.width / count as f32 * (index as f32 + 0.5),
-        }
-    }
-
-    fn category_at(&self, plot: Rectangle, point: Point) -> Option<usize> {
-        let count = self.categories.len();
-
-        if count == 0 || !plot.contains(point) {
-            return None;
-        }
-
-        let index = match self.kind {
-            Kind::Line | Kind::Area if count > 1 => {
-                let step = plot.width / (count - 1) as f32;
-                ((point.x - plot.x) / step + 0.5).floor()
-            }
-            _ => ((point.x - plot.x) / (plot.width / count as f32)).floor(),
+    /// The scale of the categories: bands for bars, and spread edge to edge
+    /// for lines and areas (a point scale).
+    fn categories(&self, plot: Rectangle) -> Categories {
+        let spread = match self.kind {
+            Kind::Line | Kind::Area => Spread::Point,
+            _ => Spread::Band,
         };
 
-        Some((index.max(0.0) as usize).min(count - 1))
+        Categories::new(plot, self.categories.len(), spread)
     }
 
-    fn slice_at(&self, plot: Rectangle, point: Point) -> Option<usize> {
-        let values = &self.series.first()?.values;
-        let total: f32 = values.iter().sum();
-        let center = plot.center();
-        let radius = plot.width.min(plot.height) / 2.0;
-        let offset = point - center;
-        let distance = (offset.x * offset.x + offset.y * offset.y).sqrt();
+    fn pie_geometry(&self, plot: Rectangle) -> Pie {
+        Pie::new(plot, if self.donut { 0.6 } else { 0.0 })
+    }
 
-        if distance > radius || (self.donut && distance < radius * 0.6) || total <= 0.0 {
-            return None;
+    /// The hovered category, or slice of a pie.
+    fn hovered(&self, plot: Rectangle, point: Point) -> Option<usize> {
+        match self.kind {
+            Kind::Pie => self
+                .pie_geometry(plot)
+                .slice_at(&self.series.first()?.values, point),
+            _ => self.categories(plot).at(point),
         }
-
-        let mut angle = offset.y.atan2(offset.x) + std::f32::consts::FRAC_PI_2;
-        if angle < 0.0 {
-            angle += std::f32::consts::TAU;
-        }
-
-        let mut start = 0.0;
-        for (index, value) in values.iter().enumerate() {
-            let sweep = value / total * std::f32::consts::TAU;
-            if angle >= start && angle < start + sweep {
-                return Some(index);
-            }
-            start += sweep;
-        }
-
-        None
     }
 
     /// Where the tooltip goes: past the hovered category (or the pointer)
@@ -423,22 +348,12 @@ impl Chart {
     ) -> Point {
         let anchor = match self.kind {
             Kind::Pie => cursor,
-            _ => Point::new(self.x(plot, hovered), cursor.y),
-        };
-
-        let place = |anchor: f32, size: f32, start: f32, length: f32| {
-            let positive = anchor + TOOLTIP_OFFSET;
-
-            if positive + size > start + length {
-                (anchor - size - TOOLTIP_OFFSET).max(start)
-            } else {
-                positive.max(start)
-            }
+            _ => Point::new(self.categories(plot).position(hovered), cursor.y),
         };
 
         Point::new(
-            place(anchor.x, size.width, plot.x, plot.width),
-            place(anchor.y, size.height, plot.y, plot.height),
+            plot::place(anchor.x, size.width, TOOLTIP_OFFSET, plot.x, plot.width),
+            plot::place(anchor.y, size.height, TOOLTIP_OFFSET, plot.y, plot.height),
         )
     }
 
@@ -456,15 +371,15 @@ impl Chart {
             return;
         }
 
-        let max = self.max();
-        let y = |value: f32| plot.y + plot.height - value / max * plot.height;
-        let band = plot.width / count as f32;
+        let scale = Linear::new(plot, self.max());
+        let y = |value: f32| scale.position(value);
+        let x = self.categories(plot);
+        let band = x.band_width();
 
         // `CartesianGrid vertical={false}`: a line per tick
         // (`stroke-border/50`).
         if self.grid {
-            for step in 0..=4 {
-                let line_y = plot.y + plot.height * step as f32 / 4.0;
+            for line_y in scale.ticks(4) {
                 frame.stroke(
                     &Path::line(
                         Point::new(plot.x, line_y),
@@ -481,12 +396,12 @@ impl Chart {
             match self.kind {
                 // `.recharts-tooltip-cursor`: `fill-muted`
                 Kind::Bar => frame.fill_rectangle(
-                    Point::new(plot.x + band * hovered as f32, plot.y),
+                    Point::new(x.band_start(hovered), plot.y),
                     Size::new(band, plot.height),
                     p.muted,
                 ),
                 _ => {
-                    let x = self.x(plot, hovered);
+                    let x = x.position(hovered);
                     frame.stroke(
                         &Path::line(Point::new(x, plot.y), Point::new(x, plot.y + plot.height)),
                         Stroke::default().with_color(p.border).with_width(1.0),
@@ -498,83 +413,63 @@ impl Chart {
         match self.kind {
             Kind::Bar => {
                 // `barCategoryGap="10%"`, `barGap={4}`, and whole widths.
-                let groups = if self.stacked {
-                    1
-                } else {
-                    self.series.len().max(1)
-                } as f32;
-                let offset = band * 0.1;
-                let mut gap = 4.0;
-
-                if band - 2.0 * offset - (groups - 1.0) * gap <= 0.0 {
-                    gap = 0.0;
-                }
-
-                let mut bar_width = (band - 2.0 * offset - (groups - 1.0) * gap) / groups;
-                if bar_width > 1.0 {
-                    bar_width = bar_width.floor();
-                }
+                let groups = if self.stacked { 1 } else { self.series.len() };
+                let bars = Bars::new(band, groups, 0.1, 4.0);
+                let bases = plot::baselines(
+                    self.series.iter().map(|s| s.values.as_slice()),
+                    count,
+                    self.stacked,
+                );
 
                 for category in 0..count {
-                    let mut base = 0.0;
-
-                    for (index, series) in self.series.iter().enumerate() {
-                        let value = series.values.get(category).copied().unwrap_or(0.0);
+                    for ((index, series), bases) in self.series.iter().enumerate().zip(&bases) {
+                        let value = plot::value(&series.values, category);
+                        let base = bases[category];
                         let slot = if self.stacked { 0 } else { index };
-                        let x = plot.x
-                            + band * category as f32
-                            + offset
-                            + slot as f32 * (bar_width + gap);
                         let top = y(base + value);
-                        let bottom = y(base);
-                        let height = bottom - top;
+                        let height = y(base) - top;
 
                         // `radius={4}`
-                        let radius = 4.0_f32.min(bar_width / 2.0).min(height / 2.0).max(0.0);
+                        let radius = 4.0_f32.min(bars.width / 2.0).min(height / 2.0).max(0.0);
 
                         frame.fill(
                             &Path::rounded_rectangle(
-                                Point::new(x, top),
-                                Size::new(bar_width, height),
+                                Point::new(bars.x(x.band_start(category), slot), top),
+                                Size::new(bars.width, height),
                                 radius.into(),
                             ),
                             self.color(t, index),
                         );
-
-                        if self.stacked {
-                            base += value;
-                        }
                     }
                 }
             }
             Kind::Line | Kind::Area => {
-                let mut bases = vec![0.0; count];
+                let stacked = self.stacked && self.kind == Kind::Area;
+                let bases = plot::baselines(
+                    self.series.iter().map(|s| s.values.as_slice()),
+                    count,
+                    stacked,
+                );
                 let mut active = Vec::new();
 
-                for (index, series) in self.series.iter().enumerate() {
+                for ((index, series), bases) in self.series.iter().enumerate().zip(&bases) {
                     let color = self.color(t, index);
-                    let stacked = self.stacked && self.kind == Kind::Area;
-                    let value = |i: usize| series.values.get(i).copied().unwrap_or(0.0);
+                    let value = |i: usize| plot::value(&series.values, i);
 
                     let points: Vec<Point> = (0..count)
-                        .map(|i| {
-                            let base = if stacked { bases[i] } else { 0.0 };
-                            Point::new(self.x(plot, i), y(base + value(i)))
-                        })
+                        .map(|i| Point::new(x.position(i), y(bases[i] + value(i))))
                         .collect();
 
                     if self.kind == Kind::Area {
                         let lower: Vec<Point> = (0..count)
                             .rev()
-                            .map(|i| {
-                                Point::new(self.x(plot, i), y(if stacked { bases[i] } else { 0.0 }))
-                            })
+                            .map(|i| Point::new(x.position(i), y(bases[i])))
                             .collect();
 
                         // `fillOpacity={0.4}`, down to the series below.
                         let fill = Path::new(|builder| {
-                            natural(builder, &points, true);
-                            natural(builder, &lower, false);
+                            plot::natural(builder, &points, true);
+                            plot::natural(builder, &lower, false);
                             builder.close();
                         });
 
@@ -583,7 +478,7 @@ impl Chart {
 
                     // `type="natural"`, `strokeWidth={2}` for lines.
                     frame.stroke(
-                        &Path::new(|builder| natural(builder, &points, true)),
+                        &Path::new(|builder| plot::natural(builder, &points, true)),
                         Stroke::default()
                             .with_color(color)
                             .with_width(if self.kind == Kind::Line { 2.0 } else { 1.0 }),
@@ -599,12 +494,6 @@ impl Chart {
                     if let Some(hovered) = hovered {
                         active.push((points[hovered], color));
                     }
-
-                    if stacked {
-                        for (i, base) in bases.iter_mut().enumerate() {
-                            *base += value(i);
-                        }
-                    }
                 }
 
                 // `activeDot`, over every series.
@@ -618,9 +507,7 @@ impl Chart {
         // The labels of the categories (`tickLine={false} axisLine={false}`,
         // `fill-muted-foreground`), with their baseline `0.71em` below the
         // tick.
-        let skip = ((count as f32 * 48.0) / plot.width.max(1.0))
-            .ceil()
-            .max(1.0) as usize;
+        let skip = x.label_step(48.0);
 
         for (index, category) in self.categories.iter().enumerate() {
             if index % skip != 0 {
@@ -630,7 +517,7 @@ impl Chart {
             frame.fill_text(Text {
                 content: self.tick(category),
                 position: Point::new(
-                    self.x(plot, index),
+                    x.position(index),
                     plot.y + plot.height + TICK_SIZE + self.tick_margin + TICK_BASELINE,
                 ),
                 color: p.muted_foreground,
@@ -648,57 +535,17 @@ impl Chart {
         let Some(series) = self.series.first() else {
             return;
         };
-        let total: f32 = series.values.iter().sum();
+        let pie = self.pie_geometry(plot);
 
-        if total <= 0.0 {
-            return;
-        }
-
-        let center = plot.center();
-        let radius = plot.width.min(plot.height) / 2.0;
-        let inner = if self.donut { radius * 0.6 } else { 0.0 };
-        let mut start = -std::f32::consts::FRAC_PI_2;
-
-        for (index, value) in series.values.iter().enumerate() {
-            let sweep = value / total * std::f32::consts::TAU;
-            let outer = if hovered == Some(index) {
-                radius + 4.0
-            } else {
-                radius
-            };
-
-            let slice = Path::new(|builder| {
-                let steps = ((sweep / std::f32::consts::TAU) * 128.0).ceil().max(2.0) as usize;
-                let point = |radius: f32, angle: f32| {
-                    Point::new(
-                        center.x + radius * angle.cos(),
-                        center.y + radius * angle.sin(),
-                    )
-                };
-
-                builder.move_to(point(outer, start));
-
-                for step in 1..=steps {
-                    builder.line_to(point(outer, start + sweep * step as f32 / steps as f32));
-                }
-
-                if inner > 0.0 {
-                    for step in (0..=steps).rev() {
-                        builder.line_to(point(inner, start + sweep * step as f32 / steps as f32));
-                    }
-                } else {
-                    builder.line_to(center);
-                }
-
-                builder.close();
-            });
+        for (index, slice) in Pie::slices(&series.values).into_iter().enumerate() {
+            let grow = if hovered == Some(index) { 4.0 } else { 0.0 };
+            let slice = Path::new(|builder| pie.slice(builder, slice, grow));
 
             frame.fill(&slice, self.color(t, index));
             frame.stroke(
                 &slice,
                 Stroke::default().with_color(t.palette.card).with_width(2.0),
             );
-            start += sweep;
         }
     }
 
@@ -861,84 +708,6 @@ fn swatch<'a, Message: 'a>(
             ..container::Style::default()
         })
         .into()
-}
-
-/// A d3 `curveNatural`: a natural cubic spline through the points.
-fn natural(builder: &mut path::Builder, points: &[Point], move_first: bool) {
-    let Some(first) = points.first() else { return };
-
-    if move_first {
-        builder.move_to(*first);
-    } else {
-        builder.line_to(*first);
-    }
-
-    let n = points.len();
-
-    if n == 2 {
-        builder.line_to(points[1]);
-        return;
-    }
-
-    if n < 2 {
-        return;
-    }
-
-    let xs: Vec<f32> = points.iter().map(|p| p.x).collect();
-    let ys: Vec<f32> = points.iter().map(|p| p.y).collect();
-    let (ax, bx) = control_points(&xs);
-    let (ay, by) = control_points(&ys);
-
-    for i in 0..n - 1 {
-        builder.bezier_curve_to(
-            Point::new(ax[i], ay[i]),
-            Point::new(bx[i], by[i]),
-            points[i + 1],
-        );
-    }
-}
-
-/// The control points of a natural cubic spline along one axis, as d3
-/// computes them.
-fn control_points(x: &[f32]) -> (Vec<f32>, Vec<f32>) {
-    let n = x.len() - 1;
-    let mut a = vec![0.0; n];
-    let mut b = vec![0.0; n];
-    let mut r = vec![0.0; n];
-
-    a[0] = 0.0;
-    b[0] = 2.0;
-    r[0] = x[0] + 2.0 * x[1];
-
-    for i in 1..n - 1 {
-        a[i] = 1.0;
-        b[i] = 4.0;
-        r[i] = 4.0 * x[i] + 2.0 * x[i + 1];
-    }
-
-    a[n - 1] = 2.0;
-    b[n - 1] = 7.0;
-    r[n - 1] = 8.0 * x[n - 1] + x[n];
-
-    for i in 1..n {
-        let m = a[i] / b[i - 1];
-        b[i] -= m;
-        r[i] -= m * r[i - 1];
-    }
-
-    a[n - 1] = r[n - 1] / b[n - 1];
-
-    for i in (0..n - 1).rev() {
-        a[i] = (r[i] - a[i + 1]) / b[i];
-    }
-
-    b[n - 1] = (x[n] + a[n - 1]) / 2.0;
-
-    for i in 0..n - 1 {
-        b[i] = 2.0 * x[i + 1] - a[i + 1];
-    }
-
-    (a, b)
 }
 
 impl<'a, Message: 'a> From<Chart> for Element<'a, Message> {
@@ -1124,10 +893,7 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
         let position = cursor.position_in(bounds);
         let plot = self.chart.plot(bounds.size());
 
-        let hovered = position.and_then(|point| match self.chart.kind {
-            Kind::Pie => self.chart.slice_at(plot, point),
-            _ => self.chart.category_at(plot, point),
-        });
+        let hovered = position.and_then(|point| self.chart.hovered(plot, point));
 
         let state = tree.state.downcast_mut::<State>();
 
@@ -1293,16 +1059,7 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Between<'_, Message> {
 
 #[cfg(test)]
 mod tests {
-    use super::{format_value, nice};
-
-    #[test]
-    fn nice_maxima() {
-        assert_eq!(nice(305.0), 320.0);
-        assert_eq!(nice(186.0), 200.0);
-        assert_eq!(nice(505.0), 600.0);
-        assert_eq!(nice(0.0), 1.0);
-        assert_eq!(nice(10.0), 12.0);
-    }
+    use super::format_value;
 
     #[test]
     fn values_are_grouped() {

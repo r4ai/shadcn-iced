@@ -3,7 +3,10 @@
 //! Port of <https://ui.shadcn.com/docs/components/toast> (Base UI toast).
 //! Toasts live in your state; the [`toaster`] stacks them in the bottom
 //! right corner of the window, expands the stack on hover, and asks you to
-//! remove each toast once its timeout has elapsed or when it is closed:
+//! remove each toast once its timeout has elapsed, when it is closed or when
+//! it is swiped away. The behavior and the animations live in
+//! [`shadcn_iced_core::primitive::toaster`], shared with
+//! [`sonner`](super::sonner):
 //!
 //! ```no_run
 //! # use shadcn_iced::toast::{toaster, Toast};
@@ -16,23 +19,15 @@
 //! See [`sonner`](super::sonner) for the other toast of shadcn/ui.
 use super::button::{self as buttons, Size, Variant, button};
 
-use shadcn_iced_core::animation::{self, Appearance, Transition};
+use shadcn_iced_core::animation;
 use shadcn_iced_core::icon::{Icon, lucide};
+use shadcn_iced_core::primitive::toaster::{self as stack, Action, Direction, Motion, Origin};
 use shadcn_iced_core::primitive::{Layer, Pressable};
 use shadcn_iced_core::{Element, font, style, tokens};
 
-use iced::advanced::layout::{self, Layout};
-use iced::advanced::renderer::{self, Renderer as _};
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
-use iced::advanced::{Clipboard, Shell, overlay};
-use iced::time::{Duration, Instant};
+use iced::time::Duration;
 use iced::widget::{Column, Row, container, text};
-use iced::{
-    Alignment, Background, Event, Length, Point, Rectangle, Size as Bounds, Theme, Vector, mouse,
-    window,
-};
-
-use std::collections::HashMap;
+use iced::{Alignment, Background, Length, Theme, Vector};
 
 /// The type of a [`Toast`], which decides its icon (`type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -159,7 +154,7 @@ fn muted(theme: &Theme) -> text::Style {
     }
 }
 
-fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, close: Message) -> Element<'a, Message> {
+fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>) -> Element<'a, Action<Message>> {
     let kind = toast.kind;
 
     // `ToastIcon`: `size-4`, `text-destructive` for errors
@@ -190,7 +185,7 @@ fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, close: Message) -> Elem
         button(label)
             .variant(Variant::Outline)
             .size(Size::Sm)
-            .on_press(message)
+            .on_press(Action::Publish(message))
     });
 
     // `ToastClose`: `variant="ghost" size="icon-sm" text-muted-foreground
@@ -201,7 +196,7 @@ fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, close: Message) -> Elem
             .center_x(Length::Fill)
             .center_y(Length::Fill),
     )
-    .on_press(close)
+    .on_press(Action::Dismiss)
     .width(size.height())
     .height(size.height())
     .press_offset(1.0)
@@ -231,10 +226,9 @@ fn view<'a, Message: Clone + 'a>(toast: &Toast<Message>, close: Message) -> Elem
             .spacing(12)
             .align_y(Alignment::Center),
     )
-    // Inside the 1px border.
+    // Inside the 1px border, drawn by the stack.
     .padding(17)
     .width(Length::Fill)
-    .style(self::style)
     .into()
 }
 
@@ -257,455 +251,65 @@ pub fn style(theme: &Theme) -> container::Style {
     }
 }
 
-impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message> {
-    fn from(toaster: Toaster<'a, Message>) -> Self {
-        let open = !toaster.toasts.is_empty();
-        let skip = toaster.toasts.len().saturating_sub(toaster.limit);
-
-        let toasts: Vec<_> = toaster
-            .toasts
-            .iter()
-            .skip(skip)
-            .map(|toast| {
-                (
-                    toast.id,
-                    (toast.kind != Kind::Loading).then_some(toast.timeout),
-                    view(toast, (toaster.on_close)(toast.id)),
-                )
-            })
-            .collect();
-
-        let stack = Stack {
-            toasts,
-            on_close: toaster.on_close,
-        };
-
-        // `fixed bottom-4 right-4 max-w-sm w-full`
-        Layer::new(
-            toaster.base,
-            container(Element::new(stack)).max_width(384),
-            open,
-        )
-        .backdrop(None)
-        .modal(false)
-        .animation(shadcn_iced_core::primitive::layer::Animation::None)
-        .align_x(iced::alignment::Horizontal::Right)
-        .align_y(iced::alignment::Vertical::Bottom)
-        .padding(16)
-        .into()
-    }
-}
-
 /// `[--gap:0.75rem]`, between expanded toasts.
 const GAP: f32 = 12.0;
 
 /// `[--peek:0.75rem]`, how much each toast behind the front one shows.
 const PEEK: f32 = 12.0;
 
-/// How long a toast takes to slide in or out (`500ms`).
-const SLIDE: Duration = Duration::from_millis(500);
-
-/// How long the stack takes to expand or collapse.
-const EXPAND: Duration = Duration::from_millis(400);
-
 /// `cubic-bezier(0.22, 1, 0.36, 1)`
 fn ease(t: f32) -> f32 {
     animation::cubic_bezier(0.22, 1.0, 0.36, 1.0, t)
 }
 
-/// Stacks toasts like Base UI: collapsed behind the newest one, expanded
-/// while hovered. Dismisses them once their timeout has elapsed; timers
-/// pause while the stack is hovered.
-struct Stack<'a, Message> {
-    toasts: Vec<(u64, Option<Duration>, Element<'a, Message>)>,
-    on_close: Box<dyn Fn(u64) -> Message + 'a>,
-}
-
-#[derive(Default)]
-struct State {
-    elapsed: HashMap<u64, Duration>,
-    presence: HashMap<u64, Transition>,
-    exiting: Vec<u64>,
-    closed: Vec<u64>,
-    expanded: bool,
-    /// From collapsed (0) to expanded (1).
-    expand: Transition,
-    last: Option<Instant>,
-}
-
-impl<Message> Stack<'_, Message> {
-    /// The bounds of the collapsed stack: the front toast and the peeks.
-    fn collapsed(&self, layout: Layout<'_>) -> Rectangle {
-        let bounds = layout.bounds();
-        let front = layout
-            .children()
-            .last()
-            .map_or(Rectangle::default(), |layout| layout.bounds());
-        let peeks = self.toasts.len().saturating_sub(1) as f32 * PEEK;
-
-        Rectangle {
-            y: front.y - peeks,
-            height: front.height + peeks,
-            ..bounds
-        }
+/// How the toasts of Base UI move: they slide in from `translateY(150%)` in
+/// 500ms without fading, and the toasts behind the front one take its
+/// height, peek out by `--peek` and shrink by 10% each from their top.
+fn motion() -> Motion {
+    Motion {
+        travel: 1.5,
+        fade: false,
+        presence: Duration::from_millis(500),
+        duration: Duration::from_millis(400),
+        easing: ease,
+        peek: Some(PEEK),
+        shrink: 0.1,
+        origin: Origin::Top,
+        unmount: Duration::from_millis(500),
     }
 }
 
-impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Stack<'a, Message> {
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<State>()
-    }
+impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message> {
+    fn from(toaster: Toaster<'a, Message>) -> Self {
+        let open = !toaster.toasts.is_empty();
+        let skip = toaster.toasts.len().saturating_sub(toaster.limit);
 
-    fn state(&self) -> tree::State {
-        tree::State::new(State::default())
-    }
-
-    fn children(&self) -> Vec<Tree> {
-        self.toasts
-            .iter()
-            .map(|(_, _, toast)| Tree::new(toast))
-            .collect()
-    }
-
-    fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(
-            &self
-                .toasts
-                .iter()
-                .map(|(_, _, toast)| toast)
-                .collect::<Vec<_>>(),
-        );
-    }
-
-    fn size(&self) -> Bounds<Length> {
-        Bounds::new(Length::Fill, Length::Shrink)
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &iced::Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        let width = limits.max().width;
-        let child_limits = layout::Limits::new(Bounds::ZERO, limits.max()).width(width);
-
-        let nodes: Vec<_> = self
+        let toasts = toaster
             .toasts
-            .iter_mut()
-            .zip(&mut tree.children)
-            .map(|((_, _, toast), tree)| {
-                toast.as_widget_mut().layout(tree, renderer, &child_limits)
+            .iter()
+            .skip(skip)
+            .map(|toast| {
+                stack::Toast::new(toast.id, view(toast))
+                    .duration((toast.kind != Kind::Loading).then_some(toast.timeout))
             })
             .collect();
 
-        // Expanded positions, the newest toast at the bottom.
-        let total: f32 = nodes.iter().map(|node| node.size().height).sum::<f32>()
-            + nodes.len().saturating_sub(1) as f32 * GAP;
-        let mut y = total;
-        let mut placed = Vec::with_capacity(nodes.len());
+        // `swipeDirection={['down', 'right']}`
+        let stack = stack::Toaster::new(toasts, toaster.on_close)
+            .gap(GAP)
+            .visible(toaster.limit)
+            .swipe_directions([Direction::Down, Direction::Right])
+            .motion(motion())
+            .surface(self::style);
 
-        for node in nodes.into_iter().rev() {
-            y -= node.size().height;
-            placed.push(node.move_to(Point::new(0.0, y)));
-            y -= GAP;
-        }
-
-        placed.reverse();
-
-        layout::Node::with_children(Bounds::new(width, total), placed)
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &iced::Renderer,
-        operation: &mut dyn Operation,
-    ) {
-        for (((_, _, toast), tree), layout) in self
-            .toasts
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-        {
-            toast
-                .as_widget_mut()
-                .operate(tree, layout, renderer, operation);
-        }
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &iced::Renderer,
-        clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) {
-        let (expanded, exiting) = {
-            let state = tree.state.downcast_ref::<State>();
-            (state.expanded, state.exiting.clone())
-        };
-        let count = self.toasts.len();
-
-        for (index, (((id, _, toast), child), layout)) in self
-            .toasts
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-            .enumerate()
-        {
-            // Only the front toast is interactive while collapsed.
-            if !exiting.contains(id) && (expanded || index + 1 == count) {
-                toast.as_widget_mut().update(
-                    child, event, layout, cursor, renderer, clipboard, shell, viewport,
-                );
-            }
-        }
-
-        let hovered = if expanded {
-            cursor.is_over(layout.bounds())
-        } else {
-            cursor.is_over(self.collapsed(layout))
-        };
-
-        let state = tree.state.downcast_mut::<State>();
-
-        if hovered != state.expanded {
-            state.expanded = hovered;
-            state.expand.go(
-                if hovered { 1.0 } else { 0.0 },
-                EXPAND,
-                ease,
-                Instant::now(),
-            );
-            shell.invalidate_layout();
-            shell.request_redraw();
-        }
-
-        let Event::Window(window::Event::RedrawRequested(now)) = event else {
-            return;
-        };
-
-        let delta = state
-            .last
-            .map(|last| now.saturating_duration_since(last))
-            .unwrap_or_default();
-        state.last = Some(*now);
-
-        let ids: Vec<u64> = self.toasts.iter().map(|(id, _, _)| *id).collect();
-        state.elapsed.retain(|id, _| ids.contains(id));
-        state.presence.retain(|id, _| ids.contains(id));
-        state.exiting.retain(|id| ids.contains(id));
-        state.closed.retain(|id| ids.contains(id));
-
-        let mut next: Option<Duration> = None;
-        let mut animating = state.expand.is_animating(*now);
-
-        for (id, timeout, _) in &self.toasts {
-            let presence = state.presence.entry(*id).or_insert_with(|| {
-                let mut presence = Transition::new(0.0);
-                presence.go(1.0, SLIDE, ease, *now);
-                presence
-            });
-
-            if state.exiting.contains(id) {
-                if !presence.is_animating(*now) && !state.closed.contains(id) {
-                    state.closed.push(*id);
-                    shell.publish((self.on_close)(*id));
-                }
-            } else if let Some(timeout) = timeout {
-                let elapsed = state.elapsed.entry(*id).or_default();
-
-                if !state.expanded {
-                    *elapsed += delta;
-                }
-
-                if *elapsed >= *timeout {
-                    state.exiting.push(*id);
-                    presence.go(0.0, SLIDE, ease, *now);
-
-                    if !animation::enabled() && !state.closed.contains(id) {
-                        state.closed.push(*id);
-                        shell.publish((self.on_close)(*id));
-                    }
-                } else {
-                    let remaining = *timeout - *elapsed;
-                    next = Some(next.map_or(remaining, |next| next.min(remaining)));
-                }
-            }
-
-            animating |= presence.is_animating(*now);
-        }
-
-        if animating {
-            shell.request_redraw();
-        } else if let Some(next) = next {
-            shell.request_redraw_at(*now + next.min(Duration::from_millis(250)));
-        }
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut iced::Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        let state = tree.state.downcast_ref::<State>();
-        let now = Instant::now();
-        let count = self.toasts.len();
-        let front = layout
-            .children()
-            .last()
-            .map_or(Rectangle::default(), |layout| layout.bounds());
-
-        for (index, (((id, _, toast), child), layout)) in self
-            .toasts
-            .iter()
-            .zip(&tree.children)
-            .zip(layout.children())
-            .enumerate()
-        {
-            let progress = state
-                .presence
-                .get(id)
-                .map_or(1.0, |presence| presence.value(now));
-            // `data-starting-style:[transform:translateY(150%)]`
-            let slide = Vector::new(0.0, layout.bounds().height * 1.5 * (1.0 - progress));
-            let behind = count - 1 - index;
-
-            let expand = state.expand.value(now);
-
-            if expand >= 1.0 || behind == 0 {
-                animation::draw(
-                    toast,
-                    child,
-                    renderer,
-                    theme,
-                    style,
-                    layout,
-                    cursor,
-                    viewport,
-                    Appearance {
-                        opacity: 1.0,
-                        scale: 1.0,
-                        offset: slide,
-                    },
-                );
-                continue;
-            }
-
-            // Behind the front toast: an empty card of the front height,
-            // `scale(1 - index * 0.1)` from the bottom and raised by
-            // `index * peek` (`data-behind:opacity-0` hides its content).
-            let scale = (1.0 - behind as f32 * 0.1).max(0.0);
-            let width = front.width * scale;
-            let top = front.y - behind as f32 * PEEK;
-            let bounds = Rectangle {
-                x: front.x + (front.width - width) / 2.0,
-                y: top + slide.y,
-                width,
-                height: front.height * scale,
-            };
-            let card_style = self::style(theme);
-
-            // Expanding: the card moves and grows from its place in the
-            // stack to its own, while its content fades in.
-            let target = layout.bounds() + slide;
-            let lerp = |a: f32, b: f32| a + (b - a) * expand;
-            let card = Rectangle {
-                x: lerp(bounds.x, target.x),
-                y: lerp(bounds.y, target.y),
-                width: lerp(bounds.width, target.width),
-                height: lerp(bounds.height, target.height),
-            };
-
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: card,
-                    border: card_style.border,
-                    shadow: card_style.shadow,
-                    ..renderer::Quad::default()
-                },
-                card_style
-                    .background
-                    .unwrap_or(Background::Color(iced::Color::TRANSPARENT)),
-            );
-
-            if expand > 0.0 {
-                animation::draw(
-                    toast,
-                    child,
-                    renderer,
-                    theme,
-                    style,
-                    layout,
-                    cursor,
-                    viewport,
-                    Appearance {
-                        opacity: expand,
-                        scale: card.width / target.width.max(1.0),
-                        offset: card.center() - layout.bounds().center(),
-                    },
-                );
-            }
-        }
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-        renderer: &iced::Renderer,
-    ) -> mouse::Interaction {
-        let expanded = tree.state.downcast_ref::<State>().expanded;
-        let count = self.toasts.len();
-
-        self.toasts
-            .iter()
-            .zip(&tree.children)
-            .zip(layout.children())
-            .enumerate()
-            .filter(|(index, _)| expanded || index + 1 == count)
-            .map(|(_, (((_, _, toast), tree), layout))| {
-                toast
-                    .as_widget()
-                    .mouse_interaction(tree, layout, cursor, viewport, renderer)
-            })
-            .max()
-            .unwrap_or_default()
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &iced::Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
-        let overlays: Vec<_> = self
-            .toasts
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-            .filter_map(|(((_, _, toast), tree), layout)| {
-                toast
-                    .as_widget_mut()
-                    .overlay(tree, layout, renderer, viewport, translation)
-            })
-            .collect();
-
-        (!overlays.is_empty()).then(|| overlay::Group::with_children(overlays).overlay())
+        // `fixed bottom-4 right-4 max-w-sm w-full`
+        Layer::new(toaster.base, container(stack).max_width(384), open)
+            .backdrop(None)
+            .modal(false)
+            .animation(shadcn_iced_core::primitive::layer::Animation::None)
+            .align_x(iced::alignment::Horizontal::Right)
+            .align_y(iced::alignment::Vertical::Bottom)
+            .padding(16)
+            .into()
     }
 }

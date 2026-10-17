@@ -1,6 +1,6 @@
 //! A stack of toasts that behaves like [sonner](https://sonner.emilkowal.ski).
 //!
-//! [`Toaster`] is the headless part of the Sonner component: it measures the
+//! [`Toaster`] is the headless part of the Sonner and Toast components: it measures the
 //! toasts, stacks them, animates them in and out, expands them on hover,
 //! dismisses them once their duration has elapsed and lets them be swiped
 //! away. The look of a toast is its content plus a [`Toaster::surface`].
@@ -20,7 +20,11 @@
 //!
 //! The content of a toast produces [`Action`]s, so that its buttons can
 //! dismiss it with the exit animation.
-use crate::animation::{self, Fade, Transition};
+//!
+//! These are the motions of sonner, the defaults; a [`Motion`] changes how
+//! the toasts enter and leave and how the collapsed stack is drawn, which is
+//! how the toasts of Base UI are made from the same stack.
+use crate::animation::{self, Easing, Fade, Transition};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -51,6 +55,9 @@ const UNMOUNT: Duration = Duration::from_millis(200);
 /// The duration of the transitions of a toast (`transition: transform 400ms,
 /// opacity 400ms, height 400ms`).
 const TRANSITION: Duration = Duration::from_millis(400);
+
+/// The duration of the swipe-out animation (`swipe-out-*: 200ms`).
+const SWIPE_OUT: Duration = Duration::from_millis(200);
 
 /// How far a toast must be swiped to be dismissed (`SWIPE_THRESHOLD`).
 const SWIPE_THRESHOLD: f32 = 45.0;
@@ -86,6 +93,76 @@ pub enum Direction {
     Down,
     /// To the left.
     Left,
+}
+
+/// The point of a toast that it is scaled around.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Origin {
+    /// The center (`transform-origin: center`).
+    #[default]
+    Center,
+    /// The middle of its top edge (`transform-origin: top`).
+    Top,
+    /// The middle of its bottom edge (`transform-origin: bottom`).
+    Bottom,
+}
+
+/// How the toasts of a [`Toaster`] move. The default is sonner's.
+///
+/// ```
+/// use shadcn_iced_core::primitive::toaster::{Motion, Origin};
+///
+/// // Toasts that slide in from further away without fading, and whose
+/// // stack shrinks from the top, like Base UI's.
+/// let motion = Motion {
+///     travel: 1.5,
+///     fade: false,
+///     shrink: 0.1,
+///     origin: Origin::Top,
+///     ..Motion::default()
+/// };
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct Motion {
+    /// How far a toast slides from the edge when it enters, and towards it
+    /// when it leaves, in its own height (`translateY(100%)`).
+    pub travel: f32,
+    /// Whether a toast fades in and out as it enters and leaves.
+    pub fade: bool,
+    /// How long a toast takes to enter or leave.
+    pub presence: Duration,
+    /// How long the other transitions take: stacking, expanding and
+    /// collapsing.
+    pub duration: Duration,
+    /// The easing of every transition.
+    pub easing: Easing,
+    /// How far each toast behind the front one peeks out of the collapsed
+    /// stack; `None` uses the gap.
+    pub peek: Option<f32>,
+    /// How much each toast behind the front one shrinks, as a fraction of
+    /// its size.
+    pub shrink: f32,
+    /// The point the toasts behind the front one are scaled around.
+    pub origin: Origin,
+    /// How long a dismissed toast stays before `on_dismiss` is published;
+    /// at least as long as `presence` to let it leave.
+    pub unmount: Duration,
+}
+
+impl Default for Motion {
+    fn default() -> Self {
+        Self {
+            travel: 1.0,
+            fade: true,
+            presence: TRANSITION,
+            duration: TRANSITION,
+            easing: animation::ease,
+            peek: None,
+            shrink: SCALE_STEP,
+            origin: Origin::Center,
+            unmount: UNMOUNT,
+        }
+    }
 }
 
 /// What the content of a toast asks the [`Toaster`] to do.
@@ -142,6 +219,7 @@ pub struct Toaster<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> 
     gap: f32,
     visible: usize,
     expand: bool,
+    motion: Motion,
     surface: Box<dyn Fn(&Theme) -> container::Style + 'a>,
 }
 
@@ -160,6 +238,7 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
             gap: GAP,
             visible: VISIBLE,
             expand: false,
+            motion: Motion::default(),
             surface: Box::new(|_| container::Style::default()),
         }
     }
@@ -192,6 +271,12 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
     /// Always shows the toasts expanded (`expand`).
     pub fn expand(mut self, expand: bool) -> Self {
         self.expand = expand;
+        self
+    }
+
+    /// Sets how the toasts move.
+    pub fn motion(mut self, motion: Motion) -> Self {
+        self.motion = motion;
         self
     }
 
@@ -382,43 +467,51 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
             before += height;
         }
 
-        let ease = animation::ease;
+        let motion = self.motion;
+        let ease = motion.easing;
+        let peek = motion.peek.unwrap_or(self.gap);
 
         for (index, id) in live.iter().enumerate() {
             let Some(entry) = state.entries.get_mut(id) else {
                 continue;
             };
 
-            if !entry.mounted {
+            // The transitions started on the first frame are the enter
+            // animation.
+            let entering = !entry.mounted;
+
+            if entering {
                 // The first frame: `translateY(100%)`, transparent.
                 entry.mounted = true;
-                entry.y.set(-lift * entry.height);
-                entry.opacity.set(0.0);
+                entry.y.set(-lift * motion.travel * entry.height);
+                entry.opacity.set(if motion.fade { 0.0 } else { 1.0 });
                 entry.size.set(entry.height);
             }
 
             let front = index == 0;
             let shown = if index < self.visible { 1.0 } else { 0.0 };
             let height = entry.height;
+            let away = -lift * motion.travel * height;
+            let gone = if motion.fade { 0.0 } else { 1.0 };
+            let presence = motion.presence;
+            let duration = if entering { presence } else { motion.duration };
 
             match entry.removed {
                 // Animated once, when released.
                 Some(Removal { swiped: true, .. }) => {}
                 Some(_) if front => {
-                    entry.y.go(-lift * height, TRANSITION, ease, now);
-                    entry.scale.go(1.0, TRANSITION, ease, now);
-                    entry.opacity.go(0.0, TRANSITION, ease, now);
-                    entry.size.go(height, TRANSITION, ease, now);
+                    entry.y.go(away, presence, ease, now);
+                    entry.scale.go(1.0, presence, ease, now);
+                    entry.opacity.go(gone, presence, ease, now);
+                    entry.size.go(height, presence, ease, now);
                 }
                 Some(_) if expanded => {
-                    entry
-                        .y
-                        .go(lift * entry.offset - lift * height, TRANSITION, ease, now);
-                    entry.scale.go(1.0, TRANSITION, ease, now);
-                    entry.opacity.go(0.0, TRANSITION, ease, now);
-                    entry.size.go(height, TRANSITION, ease, now);
+                    entry.y.go(lift * entry.offset + away, presence, ease, now);
+                    entry.scale.go(1.0, presence, ease, now);
+                    entry.opacity.go(gone, presence, ease, now);
+                    entry.size.go(height, presence, ease, now);
                 }
-                Some(_) => {
+                Some(_) if motion.fade => {
                     // `translateY(40%)` with `transition: transform 500ms,
                     // opacity 200ms`.
                     let slow = Duration::from_millis(500);
@@ -427,27 +520,33 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
                     entry.y.go(0.4 * front_height, slow, ease, now);
                     entry.scale.go(1.0, slow, ease, now);
                     entry.opacity.go(0.0, fast, ease, now);
-                    entry.size.go(front_height, TRANSITION, ease, now);
+                    entry.size.go(front_height, motion.duration, ease, now);
+                }
+                Some(_) => {
+                    // Slides away from its place in the stack.
+                    let y = lift * peek * index as f32 + away;
+
+                    entry.y.go(y, presence, ease, now);
                 }
                 None if expanded || front => {
                     let y = if expanded { lift * entry.offset } else { 0.0 };
 
-                    entry.y.go(y, TRANSITION, ease, now);
-                    entry.scale.go(1.0, TRANSITION, ease, now);
-                    entry.opacity.go(shown, TRANSITION, ease, now);
-                    entry.content.go(1.0, TRANSITION, ease, now);
-                    entry.size.go(height, TRANSITION, ease, now);
+                    entry.y.go(y, duration, ease, now);
+                    entry.scale.go(1.0, duration, ease, now);
+                    entry.opacity.go(shown, duration, ease, now);
+                    entry.content.go(1.0, duration, ease, now);
+                    entry.size.go(height, duration, ease, now);
                 }
                 None => {
                     let before = index as f32;
 
-                    entry.y.go(lift * self.gap * before, TRANSITION, ease, now);
+                    entry.y.go(lift * peek * before, duration, ease, now);
                     entry
                         .scale
-                        .go(1.0 - SCALE_STEP * before, TRANSITION, ease, now);
-                    entry.opacity.go(shown, TRANSITION, ease, now);
-                    entry.content.go(0.0, TRANSITION, ease, now);
-                    entry.size.go(front_height, TRANSITION, ease, now);
+                        .go(1.0 - motion.shrink * before, duration, ease, now);
+                    entry.opacity.go(shown, duration, ease, now);
+                    entry.content.go(0.0, duration, ease, now);
+                    entry.size.go(front_height, duration, ease, now);
                 }
             }
         }
@@ -508,16 +607,20 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
             entry.swipe.0.value(now),
             entry.y.value(now) + entry.swipe.1.value(now),
         );
-        let transformation = animation::transform(bounds.center(), scale, offset);
+        let origin = match self.motion.origin {
+            Origin::Center => bounds.center(),
+            Origin::Top => Point::new(bounds.center_x(), bounds.y),
+            Origin::Bottom => Point::new(bounds.center_x(), bounds.y + bounds.height),
+        };
+        let transformation = animation::transform(origin, scale, offset);
 
         // `align-items: center`: the content stays centered in the box.
         let content =
             transformation * Transformation::translate(0.0, bounds.center().y - layout.center().y);
 
-        let center = bounds.center() + offset;
         let visible = Rectangle {
-            x: center.x - bounds.width * scale / 2.0,
-            y: center.y - bounds.height * scale / 2.0,
+            x: origin.x + (bounds.x - origin.x) * scale + offset.x,
+            y: origin.y + (bounds.y - origin.y) * scale + offset.y,
             width: bounds.width * scale,
             height: bounds.height * scale,
         };
@@ -706,7 +809,7 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
         match out {
             Some(direction) => {
                 // `swipe-out-*`: `200ms ease-out forwards`.
-                let duration = Duration::from_millis(200);
+                let duration = SWIPE_OUT;
                 let easing = animation::css_ease_out;
 
                 let (transition, distance) = match direction {
@@ -720,8 +823,10 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
                 self.remove(state, drag.id, true, now, shell);
             }
             None => {
-                entry.swipe.0.go(0.0, TRANSITION, animation::ease, now);
-                entry.swipe.1.go(0.0, TRANSITION, animation::ease, now);
+                let motion = self.motion;
+
+                entry.swipe.0.go(0.0, motion.duration, motion.easing, now);
+                entry.swipe.1.go(0.0, motion.duration, motion.easing, now);
                 shell.request_redraw();
             }
         }
@@ -1085,13 +1190,19 @@ where
 
             match (entry.removed, toast.duration) {
                 (Some(removal), _) if !entry.unmounted => {
-                    if now >= removal.at + UNMOUNT {
+                    let unmount = if removal.swiped {
+                        SWIPE_OUT.max(UNMOUNT)
+                    } else {
+                        self.motion.unmount
+                    };
+
+                    if now >= removal.at + unmount {
                         let entry = state.entries.get_mut(&toast.id).unwrap();
                         entry.unmounted = true;
                         shell.publish((self.on_dismiss)(toast.id));
                         shell.invalidate_layout();
                     } else {
-                        schedule(removal.at + UNMOUNT);
+                        schedule(removal.at + unmount);
                     }
                 }
                 (None, Some(duration)) if entry.mounted => {
