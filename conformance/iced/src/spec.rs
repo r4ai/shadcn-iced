@@ -119,6 +119,7 @@ pub fn read_all(directory: &Path) -> Result<Vec<File>, String> {
         if path
             .extension()
             .is_some_and(|extension| extension == "json")
+            && path.file_name().is_some_and(|name| name != "schema.json")
         {
             let content = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
             let file: File = serde_json::from_str(&content)
