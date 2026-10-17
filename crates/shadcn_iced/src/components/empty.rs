@@ -12,12 +12,15 @@
 //!     .into()
 //! # }
 //! ```
+use super::typography::balance;
+
 use shadcn_iced_core::icon::Icon;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
-use iced::widget::{Column, container, text};
-use iced::{Alignment, Background, Length, Padding, Theme, border};
+use iced::widget::canvas::{self, Frame, Path, Stroke};
+use iced::widget::{Column, Stack, container, text};
+use iced::{Alignment, Background, Length, Padding, Point, Rectangle, Size, Theme, border, mouse};
 
 /// An empty state. See the [module documentation](self).
 pub struct Empty<'a, Message> {
@@ -78,8 +81,8 @@ impl<'a, Message: 'a> Empty<'a, Message> {
         self
     }
 
-    /// Draws a border around the empty state (`border border-dashed`,
-    /// drawn solid).
+    /// Draws a dashed border around the empty state
+    /// (`border border-dashed`).
     pub fn bordered(mut self, bordered: bool) -> Self {
         self.bordered = bordered;
         self
@@ -117,23 +120,27 @@ impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
         let header = Column::new()
             .push(media)
             .push(empty.title.map(|title| {
-                // `text-sm font-medium tracking-tight`
-                text(title)
-                    .size(style::text::SM)
-                    // `cn-font-heading`
-                    .font(font::heading(iced::font::Weight::Medium))
-                    .line_height(iced::Pixels(20.0))
-                    .align_x(iced::alignment::Horizontal::Center)
+                // `text-sm font-medium tracking-tight text-balance`
+                balance(
+                    text(title)
+                        .size(style::text::SM)
+                        // `cn-font-heading`
+                        .font(font::heading(iced::font::Weight::Medium))
+                        .line_height(style::text::leading(style::text::SM))
+                        .align_x(iced::alignment::Horizontal::Center),
+                )
             }))
             .push(empty.description.map(|description| {
-                // `text-sm/relaxed text-muted-foreground`
-                text(description)
-                    .size(style::text::SM)
-                    .line_height(1.625)
-                    .align_x(iced::alignment::Horizontal::Center)
-                    .style(|theme: &Theme| text::Style {
-                        color: Some(tokens(theme).palette.muted_foreground),
-                    })
+                // `text-sm/relaxed text-muted-foreground text-balance`
+                balance(
+                    text(description)
+                        .size(style::text::SM)
+                        .line_height(1.625)
+                        .align_x(iced::alignment::Horizontal::Center)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(tokens(theme).palette.muted_foreground),
+                        }),
+                )
             }))
             .spacing(8)
             .max_width(384)
@@ -143,7 +150,7 @@ impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
         let muted = empty.muted;
 
         // `gap-4 p-6`, plus the 1px border.
-        container(
+        let content = container(
             Column::new()
                 .push(header)
                 .push(
@@ -161,14 +168,62 @@ impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
             let t = tokens(theme);
             container::Style {
                 background: muted.then(|| Background::Color(alpha(t.palette.muted, 0.3))),
-                border: if bordered {
-                    style::border(t.palette.border, t.radius_xl())
-                } else {
-                    style::rounded(t.radius_xl())
-                },
+                border: style::rounded(t.radius_xl()),
                 ..container::Style::default()
             }
-        })
-        .into()
+        });
+
+        if bordered {
+            Stack::new()
+                .push(content)
+                .push(
+                    canvas::Canvas::new(DashedBorder)
+                        .width(Length::Fill)
+                        .height(Length::Fill),
+                )
+                .into()
+        } else {
+            content.into()
+        }
+    }
+}
+
+/// A dashed border (`border border-dashed rounded-xl`): dashes of 3px with
+/// gaps of 2px, like browsers draw 1px dashed borders.
+struct DashedBorder;
+
+impl<Message> canvas::Program<Message> for DashedBorder {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &(),
+        renderer: &iced::Renderer,
+        theme: &Theme,
+        bounds: Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> Vec<canvas::Geometry> {
+        let t = tokens(theme);
+        let mut frame = Frame::new(renderer, bounds.size());
+
+        // The middle of the 1px border, inside the bounds.
+        frame.stroke(
+            &Path::rounded_rectangle(
+                Point::new(0.5, 0.5),
+                Size::new(bounds.width - 1.0, bounds.height - 1.0),
+                (t.radius_xl() - 0.5).into(),
+            ),
+            Stroke {
+                line_dash: canvas::LineDash {
+                    segments: &[3.0, 2.0],
+                    offset: 0,
+                },
+                ..Stroke::default()
+                    .with_color(t.palette.border)
+                    .with_width(1.0)
+            },
+        );
+
+        vec![frame.into_geometry()]
     }
 }

@@ -88,39 +88,47 @@ impl<'a, Message: Clone + 'a> From<ButtonGroup<'a, Message>> for Element<'a, Mes
     fn from(group: ButtonGroup<'a, Message>) -> Self {
         let count = group.items.len();
         let vertical = group.orientation == Orientation::Vertical;
-        // Adjacent borders overlap, like `border-l-0`, unless a separator
-        // stands between the (borderless) buttons.
-        let spacing = if group
+
+        // Every item but the first loses its leading border (`border-l-0`):
+        // it overlaps the previous one by a pixel instead, but for a
+        // separator, which follows the full border of the previous item.
+        let items: Vec<(Element<'a, Message>, f32)> = group
             .items
-            .iter()
-            .any(|item| matches!(item, Item::Separator))
-        {
-            0.0
-        } else {
-            -1.0
+            .into_iter()
+            .enumerate()
+            .map(|(index, item)| {
+                let position = style::Position::of(index, count);
+
+                match item {
+                    Item::Button(button) => (button.position(position, vertical).into(), -1.0),
+                    Item::Text(label) => (segment(label, position, vertical), -1.0),
+                    Item::Separator => (separator(vertical), 0.0),
+                }
+            })
+            .collect();
+
+        // `items-stretch`: nested from the end, each item with the space
+        // before the next one.
+        let mut items = items.into_iter().rev();
+        let Some((last, mut gap)) = items.next() else {
+            return Row::new().into();
         };
 
-        let items = group.items.into_iter().enumerate().map(|(index, item)| {
-            let position = style::Position::of(index, count);
+        items.fold(last, |next, (item, spacing)| {
+            let pair: Element<'a, Message> = match group.orientation {
+                Orientation::Horizontal => Row::with_children([item, next])
+                    .spacing(gap)
+                    .height(Length::Shrink)
+                    .into(),
+                Orientation::Vertical => Column::with_children([item, next])
+                    .spacing(gap)
+                    .width(Length::Shrink)
+                    .into(),
+            };
 
-            match item {
-                Item::Button(button) => Element::from(button.position(position, vertical)),
-                Item::Text(label) => segment(label, position, vertical),
-                Item::Separator => separator(vertical),
-            }
-        });
-
-        // `items-stretch`
-        match group.orientation {
-            Orientation::Horizontal => Row::with_children(items)
-                .spacing(spacing)
-                .height(Length::Shrink)
-                .into(),
-            Orientation::Vertical => Column::with_children(items)
-                .spacing(spacing)
-                .width(Length::Shrink)
-                .into(),
-        }
+            gap = spacing;
+            pair
+        })
     }
 }
 
@@ -135,8 +143,9 @@ fn segment<'a, Message: 'a>(
     position: style::Position,
     vertical: bool,
 ) -> Element<'a, Message> {
+    // `px-2.5`, plus the border: iced draws it inside of the padding.
     container(text(label).size(style::text::SM).font(font::medium()))
-        .padding([0, 10])
+        .padding([0, 11])
         .center_y(Length::Fixed(32.0))
         .style(move |theme: &Theme| {
             let t = tokens(theme);

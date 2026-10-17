@@ -3,14 +3,23 @@
 //! [`Split`] is the headless building block behind resizable panel groups.
 //! It remembers the position of the divider by itself, unless you control it
 //! with [`Split::ratio`] and [`Split::on_resize`].
+//!
+//! The divider is focusable, like the `separator` of an ARIA window
+//! splitter: once focused (with <kbd>Tab</kbd> or a click), the arrow keys
+//! of its axis move it by 5% and <kbd>Home</kbd>/<kbd>End</kbd> move it to
+//! its limits.
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::widget::{Operation, Tree, Widget, operation, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
+use iced::keyboard::{self, key};
 use iced::{
     Background, Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector, border,
     mouse, touch,
 };
+
+/// How much the arrow keys move the divider, as a ratio of the total size.
+const KEYBOARD_STEP: f32 = 0.05;
 
 /// The direction in which the panes are laid out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -33,6 +42,9 @@ pub struct Style {
     pub grip: Color,
     /// The border of the grip.
     pub grip_border: Color,
+    /// The ring drawn around the divider while it is focused with the
+    /// keyboard (`focus-visible:ring-1`), if any.
+    pub focus_ring: Option<Color>,
 }
 
 /// Two panes separated by a draggable divider.
@@ -131,6 +143,28 @@ where
 struct State {
     ratio: f32,
     dragging: bool,
+    /// The distance from the center of the divider to the pointer when the
+    /// drag started, kept while dragging.
+    grab: f32,
+    focused: bool,
+    /// Whether the focus came from the keyboard (`:focus-visible`).
+    focus_visible: bool,
+}
+
+impl operation::Focusable for State {
+    fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    fn focus(&mut self) {
+        self.focused = true;
+        self.focus_visible = true;
+    }
+
+    fn unfocus(&mut self) {
+        self.focused = false;
+        self.focus_visible = false;
+    }
 }
 
 const HIT: f32 = 8.0;
@@ -145,14 +179,14 @@ impl<Message, Theme, Renderer> Split<'_, Message, Theme, Renderer> {
     fn divider(&self, bounds: Rectangle, ratio: f32) -> Rectangle {
         match self.axis {
             Axis::Horizontal => Rectangle {
-                x: bounds.x + bounds.width * ratio - HIT / 2.0,
+                x: bounds.x + (bounds.width - 1.0) * ratio + 0.5 - HIT / 2.0,
                 y: bounds.y,
                 width: HIT,
                 height: bounds.height,
             },
             Axis::Vertical => Rectangle {
                 x: bounds.x,
-                y: bounds.y + bounds.height * ratio - HIT / 2.0,
+                y: bounds.y + (bounds.height - 1.0) * ratio + 0.5 - HIT / 2.0,
                 width: bounds.width,
                 height: HIT,
             },
@@ -173,6 +207,9 @@ where
         tree::State::new(State {
             ratio: self.default_ratio,
             dragging: false,
+            grab: 0.0,
+            focused: false,
+            focus_visible: false,
         })
     }
 
@@ -198,8 +235,10 @@ where
         let size = limits.resolve(self.width, self.height, Size::ZERO);
 
         let (first, second, offset) = match self.axis {
+            // The ratio is the share of the first pane in the space left by
+            // the 1px divider, like the percentages of react-resizable-panels.
             Axis::Horizontal => {
-                let first = (size.width * ratio).round();
+                let first = (size.width - 1.0) * ratio;
                 (
                     Size::new(first, size.height),
                     Size::new(size.width - first - 1.0, size.height),
@@ -207,7 +246,7 @@ where
                 )
             }
             Axis::Vertical => {
-                let first = (size.height * ratio).round();
+                let first = (size.height - 1.0) * ratio;
                 (
                     Size::new(size.width, first),
                     Size::new(size.width, size.height - first - 1.0),
@@ -246,11 +285,16 @@ where
         let first = children.next().unwrap();
         let second = children.next().unwrap();
 
+        let ratio = self.current(tree.state.downcast_ref::<State>());
+        let divider = self.divider(layout.bounds(), ratio);
+
         operation.container(None, layout.bounds());
         operation.traverse(&mut |operation| {
             self.first
                 .as_widget_mut()
                 .operate(&mut tree.children[0], first, renderer, operation);
+            // The divider comes between the panes in the focus order.
+            operation.focusable(None, divider, tree.state.downcast_mut::<State>());
             self.second
                 .as_widget_mut()
                 .operate(&mut tree.children[1], second, renderer, operation);
@@ -281,8 +325,60 @@ where
                     if cursor.is_over(divider) =>
                 {
                     state.dragging = true;
+                    state.grab = cursor.position().map_or(0.0, |position| {
+                        let center = divider.center();
+
+                        match self.axis {
+                            Axis::Horizontal => position.x - center.x,
+                            Axis::Vertical => position.y - center.y,
+                        }
+                    });
+                    state.focused = true;
+                    state.focus_visible = false;
                     shell.capture_event();
+                    shell.request_redraw();
                     return;
+                }
+                Event::Mouse(mouse::Event::ButtonPressed(_))
+                | Event::Touch(touch::Event::FingerPressed { .. })
+                    if state.focused =>
+                {
+                    state.focused = false;
+                    state.focus_visible = false;
+                    shell.request_redraw();
+                }
+                Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) if state.focused => {
+                    let current = self.ratio.unwrap_or(state.ratio);
+                    let next = match (key.as_ref(), self.axis) {
+                        (keyboard::Key::Named(key::Named::ArrowRight), Axis::Horizontal)
+                        | (keyboard::Key::Named(key::Named::ArrowDown), Axis::Vertical) => {
+                            Some(current + KEYBOARD_STEP)
+                        }
+                        (keyboard::Key::Named(key::Named::ArrowLeft), Axis::Horizontal)
+                        | (keyboard::Key::Named(key::Named::ArrowUp), Axis::Vertical) => {
+                            Some(current - KEYBOARD_STEP)
+                        }
+                        (keyboard::Key::Named(key::Named::Home), _) => Some(self.min_ratio),
+                        (keyboard::Key::Named(key::Named::End), _) => Some(self.max_ratio),
+                        _ => None,
+                    };
+
+                    if let Some(next) = next {
+                        let next = next.clamp(self.min_ratio, self.max_ratio);
+
+                        if self.ratio.is_none() {
+                            state.ratio = next;
+                            shell.invalidate_layout();
+                        }
+
+                        if let Some(on_resize) = &self.on_resize {
+                            shell.publish(on_resize(next));
+                        }
+
+                        shell.request_redraw();
+                        shell.capture_event();
+                        return;
+                    }
                 }
                 Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
                 | Event::Touch(touch::Event::FingerLifted { .. })
@@ -298,8 +394,12 @@ where
                 {
                     if let Some(position) = cursor.position() {
                         let next = match self.axis {
-                            Axis::Horizontal => (position.x - bounds.x) / bounds.width,
-                            Axis::Vertical => (position.y - bounds.y) / bounds.height,
+                            Axis::Horizontal => {
+                                (position.x - state.grab - bounds.x - 0.5) / (bounds.width - 1.0)
+                            }
+                            Axis::Vertical => {
+                                (position.y - state.grab - bounds.y - 0.5) / (bounds.height - 1.0)
+                            }
                         }
                         .clamp(self.min_ratio, self.max_ratio);
 
@@ -393,6 +493,19 @@ where
                 height: 1.0,
             },
         };
+
+        if state.focused
+            && state.focus_visible
+            && let Some(ring) = appearance.focus_ring
+        {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: line.expand(1.0),
+                    ..renderer::Quad::default()
+                },
+                Background::Color(ring),
+            );
+        }
 
         renderer.fill_quad(
             renderer::Quad {

@@ -1,0 +1,64 @@
+{
+  "$schema": "./schema.json",
+  "component": "input-group",
+  "scenarios": [
+    {
+      "id": "icon",
+      "viewport": [768, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [100, 32]
+          }
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": {
+            "at": [100, 32]
+          }
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "type": "hello"
+        },
+        {
+          "snapshot": "typed"
+        }
+      ]
+    },
+    {
+      "id": "text",
+      "viewport": [768, 64]
+    },
+    {
+      "id": "button",
+      "viewport": [768, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": "Search"
+        },
+        {
+          "snapshot": "hover"
+        }
+      ]
+    },
+    {
+      "id": "kbd",
+      "viewport": [768, 64]
+    },
+    {
+      "id": "states",
+      "viewport": [768, 136]
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "./schema.json",
+  "component": "alert-dialog",
+  "scenarios": [
+    {
+      "id": "default",
+      "description": "Opens with a click, closes with Escape and with the Cancel button.",
+      "viewport": [640, 400],
+      "steps": [
+        { "snapshot": "closed" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "click": "Show Dialog" },
+        {
+          "expect": {
+            "visible": ["Are you absolutely sure?", "Cancel", "Continue"]
+          }
+        },
+        { "snapshot": "open" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "click": "Show Dialog" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "click": "Cancel" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "snapshot": "closed-after-cancel" }
+      ]
+    },
+    {
+      "id": "outside-click",
+      "description": "Unlike a dialog, clicking the backdrop does not close it.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Show Dialog" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "click": { "at": [20, 380] } },
+        { "expect": { "visible": ["Are you absolutely sure?", "Continue"] } },
+        { "snapshot": "still-open" },
+        { "click": "Cancel" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } }
+      ]
+    },
+    {
+      "id": "small-media",
+      "description": "The sm size with a media icon, closed by its action.",
+      "viewport": [640, 400],
+      "steps": [
+        { "snapshot": "closed" },
+        { "click": "Show Small Dialog" },
+        {
+          "expect": {
+            "visible": ["Allow accessory to connect?", "Don't allow", "Allow"]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "Allow" },
+        { "snapshot": "action-hover" },
+        { "click": "Allow" },
+        { "expect": { "hidden": ["Allow accessory to connect?"] } }
+      ]
+    },
+    {
+      "id": "narrow",
+      "description": "A viewport below the sm breakpoint, where the default size is max-w-xs.",
+      "viewport": [480, 360],
+      "steps": [
+        { "click": "Show Dialog" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "snapshot": "open" }
+      ]
+    }
+  ]
+}

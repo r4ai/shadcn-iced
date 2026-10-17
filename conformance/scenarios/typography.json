@@ -1,0 +1,9 @@
+{
+  "$schema": "./schema.json",
+  "component": "typography",
+  "scenarios": [
+    { "id": "headings", "viewport": [560, 330] },
+    { "id": "text", "viewport": [480, 330] },
+    { "id": "blockquote-list", "viewport": [480, 220] }
+  ]
+}

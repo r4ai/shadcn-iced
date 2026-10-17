@@ -77,20 +77,25 @@ fn link_style(theme: &Theme, status: Status) -> Style {
 
 impl<'a, Message: Clone + 'a> From<Breadcrumb<'a, Message>> for Element<'a, Message> {
     fn from(breadcrumb: Breadcrumb<'a, Message>) -> Self {
-        // `text-muted-foreground gap-1.5 text-sm`
+        // `flex items-center gap-1.5 text-sm text-muted-foreground`
         let mut row = Row::new().spacing(6).align_y(Alignment::Center);
         let count = breadcrumb.items.len();
 
         for (index, item) in breadcrumb.items.into_iter().enumerate() {
             let element: Element<'a, Message> = match item {
                 // `hover:text-foreground transition-colors`
-                Item::Link(label, on_press) => Pressable::new(text(label).size(style::text::SM))
-                    .on_press_maybe(on_press)
-                    .style(link_style)
-                    .into(),
+                Item::Link(label, on_press) => Pressable::new(
+                    text(label)
+                        .size(style::text::SM)
+                        .line_height(style::text::leading(style::text::SM)),
+                )
+                .on_press_maybe(on_press)
+                .style(link_style)
+                .into(),
                 // `text-foreground font-normal`
                 Item::Page(label) => text(label)
                     .size(style::text::SM)
+                    .line_height(style::text::leading(style::text::SM))
                     .style(|theme: &Theme| text::Style {
                         color: Some(tokens(theme).palette.foreground),
                     })
@@ -110,7 +115,8 @@ impl<'a, Message: Clone + 'a> From<Breadcrumb<'a, Message>> for Element<'a, Mess
             }
         }
 
-        row.into()
+        // `flex-wrap`
+        row.wrap().vertical_spacing(6).into()
     }
 }
 

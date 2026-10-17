@@ -1,7 +1,9 @@
 //! Accessible resizable panel groups and layouts with keyboard support.
 //!
 //! Port of <https://ui.shadcn.com/docs/components/resizable>. Nest
-//! [`resizable`] calls for more than two panels.
+//! [`resizable`] calls for more than two panels. A focused handle moves
+//! with the arrow keys of its axis, by 5%, and with <kbd>Home</kbd> and
+//! <kbd>End</kbd>.
 //!
 //! ```no_run
 //! # use shadcn_iced::resizable::resizable;
@@ -93,7 +95,8 @@ impl<'a, Message: 'a> Resizable<'a, Message> {
     }
 }
 
-/// The style of the resize handle: `bg-border`, unchanged on hover.
+/// The style of the resize handle: `bg-border`, unchanged on hover, with
+/// a `focus-visible:ring-1 focus-visible:ring-ring`.
 pub fn style(theme: &Theme) -> Style {
     let p = tokens(theme).palette;
 
@@ -102,6 +105,7 @@ pub fn style(theme: &Theme) -> Style {
         divider_active: p.border,
         grip: p.border,
         grip_border: p.border,
+        focus_ring: Some(p.ring),
     }
 }
 

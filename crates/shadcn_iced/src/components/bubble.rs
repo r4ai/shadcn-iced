@@ -175,9 +175,10 @@ impl<'a, Message: Clone + 'a> Bubble<'a, Message> {
 impl<'a, Message: Clone + 'a> From<Bubble<'a, Message>> for Element<'a, Message> {
     fn from(bubble: Bubble<'a, Message>) -> Self {
         let variant = bubble.variant;
-        // `px-3 py-2` inside a 1px border; ghost bubbles have neither.
+        // `px-3 py-2` inside a 1px transparent border; ghost bubbles only
+        // keep the border (`p-0`).
         let padding = if variant == Variant::Ghost {
-            Padding::ZERO
+            Padding::new(1.0)
         } else {
             Padding::from([9, 13])
         };
@@ -397,11 +398,23 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Frame<'_, Message> {
         let mut children = self.children.iter_mut().zip(&mut tree.children);
 
         let (content, state) = children.next().expect("bubble content");
-        let content = content.as_widget_mut().layout(
+        let mut node = content.as_widget_mut().layout(
             state,
             renderer,
-            &layout::Limits::new(Size::ZERO, Size::new(available, max.height)),
+            &layout::Limits::new(Size::ZERO, Size::new(f32::INFINITY, max.height)),
         );
+
+        // `w-fit max-w-[80%]`: content wider than the maximum wraps, and the
+        // bubble then takes the whole maximum width, like CSS.
+        if node.size().width > available {
+            node = content.as_widget_mut().layout(
+                state,
+                renderer,
+                &layout::Limits::new(Size::new(available, 0.0), Size::new(available, max.height)),
+            );
+        }
+
+        let content = node;
         let size = content.size();
         let width = if max.width.is_finite() {
             max.width

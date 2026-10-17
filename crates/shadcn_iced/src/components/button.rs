@@ -15,7 +15,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::Icon;
-use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::{Pressable, underline};
 use shadcn_iced_core::theme::{alpha, mix, tokens};
 use shadcn_iced_core::{Element, font, style};
 
@@ -153,6 +153,8 @@ pub struct Button<'a, Message> {
     size: Size,
     disabled: bool,
     width: Option<Length>,
+    text_size: Option<f32>,
+    padding_x: Option<f32>,
     position: style::Position,
     vertical: bool,
     rounded: bool,
@@ -179,6 +181,8 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
             size: Size::Default,
             disabled: false,
             width: None,
+            text_size: None,
+            padding_x: None,
             position: style::Position::Alone,
             vertical: false,
             rounded: false,
@@ -246,6 +250,20 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
         self
     }
 
+    /// Overrides the font size of the label set by the [`Size`], e.g.
+    /// `text-sm` for the `xs` buttons of an input group.
+    pub fn text_size(mut self, size: f32) -> Self {
+        self.text_size = Some(size);
+        self
+    }
+
+    /// Overrides the horizontal padding set by the [`Size`], inside of the
+    /// border, e.g. `px-1.5`.
+    pub fn padding_x(mut self, padding: f32) -> Self {
+        self.padding_x = Some(padding);
+        self
+    }
+
     /// Sets the width. Buttons shrink to fit their content by default.
     pub fn width(mut self, width: impl Into<Length>) -> Self {
         self.width = Some(width.into());
@@ -258,11 +276,15 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         let size = button.size;
         let height = size.height();
         let icon_size = size.icon_size();
-        let padding = size.padding(button.leading.is_some(), button.trailing.is_some());
+        let text_size = button.text_size.unwrap_or(size.text_size());
+        let padding = match button.padding_x {
+            Some(padding) => Padding::from([0.0, 1.0 + padding]),
+            None => size.padding(button.leading.is_some(), button.trailing.is_some()),
+        };
 
         let label = match button.content {
             Content::Label(label) => text(label)
-                .size(size.text_size())
+                .size(text_size)
                 .font(font::medium())
                 .wrapping(text::Wrapping::None)
                 .into(),
@@ -278,11 +300,28 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             .align_y(Alignment::Center)
             .height(Length::Fill);
 
+        // In a group, the buttons after the first one lose their leading
+        // border (`border-l-0` / `border-t-0`) and overlap the previous one
+        // by a pixel instead. Their fixed sizes (`h-8`, `size-8`) include the
+        // missing border: they grow by a pixel to keep it.
+        let joined = matches!(
+            button.position,
+            style::Position::Middle | style::Position::Last
+        );
+        let grow = |vertical: bool| {
+            if joined && button.vertical == vertical {
+                1.0
+            } else {
+                0.0
+            }
+        };
+
         let width = button.width.unwrap_or(if size.is_icon() {
-            Length::Fixed(height)
+            Length::Fixed(height + grow(false))
         } else {
             Length::Shrink
         });
+        let height = height + grow(true);
 
         let content: Element<'a, Message> = if size.is_icon() || width != Length::Shrink {
             iced::widget::container(content)
@@ -291,6 +330,20 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
                 .into()
         } else {
             content.into()
+        };
+
+        // `hover:underline underline-offset-4`
+        let content = if button.variant == Variant::Link && !button.disabled {
+            underline(content)
+                .text_size(text_size)
+                .hover_area(Padding {
+                    left: padding.left,
+                    right: padding.right,
+                    ..Padding::ZERO
+                })
+                .into()
+        } else {
+            content
         };
 
         let variant = button.variant;
@@ -305,6 +358,8 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             .height(height)
             .padding(padding)
             .press_offset(1.0)
+            // `border border-transparent bg-clip-padding`
+            .clip_background(true)
             .style(move |theme, status| {
                 let mut style = self::style(theme, status, variant);
                 let radius = if rounded {
@@ -347,7 +402,7 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
                 p.primary
             })),
             text_color: p.primary_foreground,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
         Variant::Destructive => Style {
@@ -360,7 +415,7 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
                 },
             ))),
             text_color: p.destructive,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
         Variant::Outline => Style {
@@ -382,29 +437,57 @@ pub fn style(theme: &Theme, status: Status, variant: Variant) -> Style {
                 p.secondary
             })),
             text_color: p.secondary_foreground,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
         Variant::Ghost => Style {
             background: hovered
                 .then(|| Background::Color(if dark { alpha(p.muted, 0.5) } else { p.muted })),
             text_color: p.foreground,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
         Variant::Link => Style {
             background: None,
             text_color: p.primary,
-            border: style::rounded(radius),
+            border: transparent_border(radius),
             ..Style::default()
         },
     };
 
     if status == Status::Disabled {
-        style = disabled(style);
+        style = disabled_over(style, p.background);
     }
 
     style
+}
+
+/// `border border-transparent`: invisible, but it insets the background
+/// (`bg-clip-padding`).
+fn transparent_border(radius: f32) -> iced::Border {
+    iced::Border {
+        width: 1.0,
+        ..style::border(iced::Color::TRANSPARENT, radius)
+    }
+}
+
+/// Applies `opacity-50` to a style, for a button drawn over `background`.
+///
+/// CSS applies the opacity to the button as a whole, so its label blends
+/// with the page rather than with its own translucent background: the label
+/// stays opaque, mixed with `background` instead.
+pub fn disabled_over(style: Style, background: iced::Color) -> Style {
+    let opacity = style::DISABLED_OPACITY;
+    let text = style.text_color;
+
+    Style {
+        text_color: if text.a >= 1.0 {
+            mix(background, text, opacity)
+        } else {
+            alpha(text, opacity)
+        },
+        ..disabled(style)
+    }
 }
 
 /// Applies `opacity-50` to a style.

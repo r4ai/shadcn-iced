@@ -28,6 +28,7 @@ use iced::widget::button::Status;
 use iced::widget::{Column, Row, container, space, text};
 use iced::{Alignment, Background, Border, Length, Padding, Theme, border};
 
+use std::borrow::Cow;
 use std::rc::Rc;
 
 /// A choice of a [`Question`] (`QuestionnaireChoice`).
@@ -285,7 +286,7 @@ impl State {
 /// A questionnaire. See the [module documentation](self).
 pub struct Questionnaire<'a, Message> {
     questions: &'a [Question],
-    state: &'a State,
+    state: Cow<'a, State>,
     on_event: Box<dyn Fn(Event) -> Message + 'a>,
     progress: bool,
     shortcuts: bool,
@@ -293,15 +294,16 @@ pub struct Questionnaire<'a, Message> {
     next: String,
 }
 
-/// Creates a [`Questionnaire`] showing the current question of `state`.
+/// Creates a [`Questionnaire`] showing the current question of `state`,
+/// borrowed or owned.
 pub fn questionnaire<'a, Message: Clone + 'a>(
     questions: &'a [Question],
-    state: &'a State,
+    state: impl Into<Cow<'a, State>>,
     on_event: impl Fn(Event) -> Message + 'a,
 ) -> Questionnaire<'a, Message> {
     Questionnaire {
         questions,
-        state,
+        state: state.into(),
         on_event: Box::new(on_event),
         progress: true,
         shortcuts: false,
@@ -335,6 +337,34 @@ impl<'a, Message: Clone + 'a> Questionnaire<'a, Message> {
         self.next = label.into();
         self
     }
+}
+
+impl<'a> From<&'a State> for Cow<'a, State> {
+    fn from(state: &'a State) -> Self {
+        Cow::Borrowed(state)
+    }
+}
+
+impl From<State> for Cow<'_, State> {
+    fn from(state: State) -> Self {
+        Cow::Owned(state)
+    }
+}
+
+/// The style of a choice of an invalid question
+/// (`data-invalid:border-destructive`).
+pub fn invalid_choice_style(
+    theme: &Theme,
+    status: Status,
+    checked: bool,
+) -> iced::widget::button::Style {
+    let mut style = choice_style(theme, status, checked);
+
+    if !checked {
+        style.border.color = tokens(theme).palette.destructive;
+    }
+
+    style
 }
 
 /// The style of a choice.
@@ -444,7 +474,7 @@ fn shortcut<'a, Message: 'a>(index: usize) -> Element<'a, Message> {
 
 impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, Message> {
     fn from(questionnaire: Questionnaire<'a, Message>) -> Self {
-        let state = questionnaire.state;
+        let state = questionnaire.state.as_ref();
         let total = questionnaire.questions.len();
         let index = state.current.min(total.saturating_sub(1));
         let on_event: Rc<dyn Fn(Event) -> Message + 'a> = Rc::from(questionnaire.on_event);
@@ -481,6 +511,7 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
             .push(question.description.clone().map(|description| {
                 text(description)
                     .size(style::text::SM)
+                    .line_height(style::text::leading(style::text::SM))
                     .style(|theme: &Theme| text::Style {
                         color: Some(tokens(theme).palette.muted_foreground),
                     })
@@ -498,7 +529,6 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
                 .push(
                     text(item.label.clone())
                         .size(style::text::SM)
-                        .font(font::medium())
                         .line_height(1.375),
                 )
                 .push(item.description.clone().map(|description| {
@@ -515,14 +545,15 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
 
             let content =
                 Row::new()
-                    // `min-h-11`: the indicator column is at least 20px tall.
+                    // `min-h-11`: the indicator column is at least 22px tall,
+                    // within `py-2.5` and the border.
                     .push(
                         Column::new()
                             .push(
                                 container(indicator(checked, multiple))
                                     .padding(Padding::ZERO.top(nudge)),
                             )
-                            .push(space().height((20.0 - 16.0 - nudge).max(0.0))),
+                            .push(space().height((44.0 - 2.0 * 11.0 - 16.0 - nudge).max(0.0))),
                     )
                     .push(label)
                     .push(questionnaire.shortcuts.then(|| {
@@ -532,12 +563,20 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
                     .spacing(10)
                     .align_y(Alignment::Start);
 
+            let invalid = state.invalid;
+
             // `px-3 py-2.5`, inside the border
             Pressable::new(container(content).center_y(Length::Shrink))
                 .on_press(on_event(Event::Toggle(choice)))
                 .width(Length::Fill)
                 .padding([11, 13])
-                .style(move |theme, status| choice_style(theme, status, checked))
+                .style(move |theme, status| {
+                    if invalid {
+                        invalid_choice_style(theme, status, checked)
+                    } else {
+                        choice_style(theme, status, checked)
+                    }
+                })
                 .into()
         });
 
@@ -558,15 +597,19 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
 
         // `mt-2 text-sm text-destructive`
         let error = state.invalid.then(|| {
-            text(if question.required {
-                "Choose an answer to continue."
-            } else {
-                "Choose an answer or skip this question."
-            })
-            .size(style::text::SM)
-            .style(|theme: &Theme| text::Style {
-                color: Some(tokens(theme).palette.destructive),
-            })
+            container(
+                text(if question.required {
+                    "Choose an answer to continue."
+                } else {
+                    "Choose an answer or skip this question."
+                })
+                .size(style::text::SM)
+                .line_height(style::text::leading(style::text::SM))
+                .style(|theme: &Theme| text::Style {
+                    color: Some(tokens(theme).palette.destructive),
+                }),
+            )
+            .padding(Padding::ZERO.top(8))
         });
 
         let item = Column::new()

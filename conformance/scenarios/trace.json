@@ -1,0 +1,23 @@
+{
+  "$schema": "./schema.json",
+  "component": "trace",
+  "scenarios": [
+    { "id": "lines", "viewport": [416, 150] },
+    {
+      "id": "collapsible",
+      "viewport": [416, 240],
+      "steps": [
+        { "snapshot": "closed" },
+        { "expect": { "hidden": ["Exit code 0, no output."] } },
+        { "hover": "Ran pnpm --version" },
+        { "snapshot": "hover" },
+        { "click": "Ran pnpm --version" },
+        { "expect": { "visible": ["Exit code 0, no output."] } },
+        { "snapshot": "open" },
+        { "click": "Ran pnpm --version" },
+        { "expect": { "hidden": ["Exit code 0, no output."] } },
+        { "snapshot": "closed-again" }
+      ]
+    }
+  ]
+}

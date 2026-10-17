@@ -1,0 +1,43 @@
+{
+  "$schema": "./schema.json",
+  "component": "date-picker",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [320, 360],
+      "steps": [
+        { "snapshot": "closed" },
+        { "expect": { "visible": ["Pick a date"], "hidden": ["June 2025"] } },
+        { "hover": "Pick a date" },
+        { "snapshot": "hover-trigger" },
+        { "click": "Pick a date" },
+        { "expect": { "visible": ["June 2025"] } },
+        { "snapshot": "open" },
+        { "click": "20" },
+        {
+          "expect": {
+            "visible": ["June 20th, 2025"],
+            "hidden": ["Pick a date"]
+          }
+        },
+        { "snapshot": "selected" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["June 2025"] } },
+        { "snapshot": "closed-with-date" }
+      ]
+    },
+    {
+      "id": "navigate",
+      "viewport": [320, 360],
+      "steps": [
+        { "click": "Pick a date" },
+        { "click": { "at": [206, 74] } },
+        { "expect": { "visible": ["July 2025"], "hidden": ["June 2025"] } },
+        { "snapshot": "july" },
+        { "click": "10" },
+        { "expect": { "visible": ["July 10th, 2025"] } },
+        { "snapshot": "july-10-selected" }
+      ]
+    }
+  ]
+}

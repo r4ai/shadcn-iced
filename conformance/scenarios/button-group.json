@@ -1,0 +1,30 @@
+{
+  "$schema": "./schema.json",
+  "component": "button-group",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [420, 64],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": "Report" },
+        { "snapshot": "hover-middle" },
+        { "hover": "Snooze" },
+        { "snapshot": "hover-first" }
+      ]
+    },
+    { "id": "orientation", "viewport": [96, 96] },
+    { "id": "size", "viewport": [300, 220] },
+    {
+      "id": "separator",
+      "viewport": [200, 64],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": "Paste" },
+        { "snapshot": "hover" }
+      ]
+    },
+    { "id": "split", "viewport": [200, 64] },
+    { "id": "text", "viewport": [260, 64] }
+  ]
+}

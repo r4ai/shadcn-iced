@@ -1,0 +1,21 @@
+{
+  "$schema": "./schema.json",
+  "component": "bubble",
+  "scenarios": [
+    { "id": "variants", "viewport": [416, 410] },
+    { "id": "group-and-reactions", "viewport": [416, 330] },
+    {
+      "id": "button",
+      "viewport": [416, 160],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": "I forgot my password" },
+        { "snapshot": "hover" },
+        { "expect": { "visible": ["Nothing picked"], "hidden": ["Picked"] } },
+        { "click": "I forgot my password" },
+        { "expect": { "visible": ["Picked"], "hidden": ["Nothing picked"] } },
+        { "snapshot": "clicked" }
+      ]
+    }
+  ]
+}

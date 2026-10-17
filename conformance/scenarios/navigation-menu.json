@@ -1,0 +1,89 @@
+{
+  "$schema": "./schema.json",
+  "component": "navigation-menu",
+  "scenarios": [
+    {
+      "id": "closed",
+      "viewport": [560, 80],
+      "steps": [
+        { "snapshot": "closed" },
+        { "hover": "Docs" },
+        { "snapshot": "link-hover" },
+        { "hover": "Getting started" },
+        { "wait": 300 },
+        { "expect": { "visible": ["Introduction"] } },
+        { "snapshot": "trigger-open" }
+      ]
+    },
+    {
+      "id": "getting-started",
+      "viewport": [560, 280],
+      "steps": [
+        { "hover": "Getting started" },
+        { "wait": 300 },
+        {
+          "expect": {
+            "visible": [
+              "Introduction",
+              "Re-usable components built with Tailwind CSS.",
+              "Installation",
+              "Typography"
+            ]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "Installation" },
+        { "snapshot": "link-hover" },
+        { "hover": { "at": [500, 250] } },
+        { "wait": 300 },
+        { "expect": { "hidden": ["Introduction"] } },
+        { "snapshot": "closed-after-leave" }
+      ]
+    },
+    {
+      "id": "components",
+      "viewport": [800, 400],
+      "steps": [
+        { "hover": "Components" },
+        { "wait": 300 },
+        {
+          "expect": {
+            "visible": [
+              "Alert Dialog",
+              "Hover Card",
+              "Progress",
+              "Scroll-area",
+              "Tabs",
+              "Tooltip"
+            ]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "Tabs" },
+        { "snapshot": "link-hover" }
+      ]
+    },
+    {
+      "id": "switch",
+      "viewport": [560, 280],
+      "steps": [
+        { "hover": "Getting started" },
+        { "wait": 300 },
+        { "expect": { "visible": ["Introduction"] } },
+        { "hover": "With Icon" },
+        { "hover": { "at": [326, 34] } },
+        { "hover": { "at": [330, 36] } },
+        { "wait": 300 },
+        {
+          "expect": {
+            "visible": ["Backlog", "To Do", "Done"],
+            "hidden": ["Introduction"]
+          }
+        },
+        { "snapshot": "with-icon-open" },
+        { "hover": "To Do" },
+        { "snapshot": "icon-link-hover" }
+      ]
+    }
+  ]
+}

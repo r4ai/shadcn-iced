@@ -1,0 +1,32 @@
+{
+  "$schema": "./schema.json",
+  "component": "scroll-area",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [260, 330],
+      "steps": [
+        { "snapshot": "idle" },
+        { "expect": { "visible": ["Tags", "v1.2.0-beta.50"] } },
+        { "hover": { "at": [100, 150] } },
+        { "snapshot": "hover" },
+        { "drag": { "from": { "at": [203, 30] }, "to": { "at": [203, 150] } } },
+        { "snapshot": "scrolled" }
+      ]
+    },
+    {
+      "id": "horizontal",
+      "viewport": [420, 290],
+      "steps": [
+        { "snapshot": "idle" },
+        { "expect": { "visible": ["Ornella Binni", "Tom Byrom"] } },
+        { "hover": { "at": [200, 100] } },
+        { "snapshot": "hover" },
+        {
+          "drag": { "from": { "at": [100, 268] }, "to": { "at": [220, 268] } }
+        },
+        { "snapshot": "scrolled" }
+      ]
+    }
+  ]
+}

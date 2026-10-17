@@ -17,10 +17,10 @@
 //!     .into()
 //! # }
 //! ```
-use super::button::{Button, Variant, button};
+use super::button::{Variant, button};
 
 use shadcn_iced_core::icon::Icon;
-use shadcn_iced_core::primitive::Layer;
+use shadcn_iced_core::primitive::{Breakpoint, Layer};
 use shadcn_iced_core::{Element, tokens};
 
 use iced::widget::{Column, Row, container, space};
@@ -45,7 +45,7 @@ pub struct AlertDialog<'a, Message> {
     description: Option<String>,
     media: Option<Icon>,
     cancel: Option<(String, Message)>,
-    action: Option<Button<'a, Message>>,
+    action: Option<(String, Message, Variant)>,
     size: Size,
 }
 
@@ -94,17 +94,13 @@ impl<'a, Message: Clone + 'a> AlertDialog<'a, Message> {
 
     /// Sets the action button.
     pub fn action(mut self, label: impl Into<String>, message: Message) -> Self {
-        self.action = Some(button(label).on_press(message));
+        self.action = Some((label.into(), message, Variant::Default));
         self
     }
 
     /// Sets a destructive action button.
     pub fn destructive_action(mut self, label: impl Into<String>, message: Message) -> Self {
-        self.action = Some(
-            button(label)
-                .variant(Variant::Destructive)
-                .on_press(message),
-        );
+        self.action = Some((label.into(), message, Variant::Destructive));
         self
     }
 
@@ -119,89 +115,165 @@ impl<'a, Message: Clone + 'a> From<AlertDialog<'a, Message>> for Element<'a, Mes
     fn from(alert: AlertDialog<'a, Message>) -> Self {
         let small = alert.size == Size::Sm;
         let on_cancel = alert.cancel.as_ref().map(|(_, message)| message.clone());
+        let sm = Breakpoint::sm();
 
-        // `bg-muted size-10 rounded-md *:[svg]:size-6`
-        let media = alert.media.map(|icon| {
-            container(icon.sized(24)).center(40).style(|theme: &Theme| {
-                let t = tokens(theme);
-                container::Style {
-                    background: Some(Background::Color(t.palette.muted)),
-                    text_color: Some(t.palette.foreground),
-                    border: border::rounded(t.radius_md()),
-                    ..container::Style::default()
-                }
-            })
-        });
-
-        // `gap-1.5`, centered in the small size.
-        let text = Column::new()
-            .push(alert.title.map(super::dialog::title_text))
-            .push(
-                alert
-                    .description
-                    .map(|description| super::dialog::description_text(description, small)),
-            )
-            .spacing(6)
-            .align_x(if small {
-                Alignment::Center
-            } else {
-                Alignment::Start
-            })
-            .width(Length::Fill);
-
-        let header: Element<'a, Message> = match media {
-            // `mb-2` under the media, then `gap-1.5`.
-            Some(media) if small => Column::new()
-                .push(media)
-                .push(text)
-                .spacing(14)
-                .align_x(Alignment::Center)
-                .width(Length::Fill)
-                .into(),
-            // `row-span-2 gap-x-4`
-            Some(media) => Row::new()
-                .push(media)
-                .push(text)
-                .spacing(16)
-                .width(Length::Fill)
-                .into(),
-            None => text.into(),
-        };
-
-        let fill = |button: Button<'a, Message>| {
-            if small {
-                button.width(Length::Fill)
-            } else {
-                button
-            }
-        };
-
-        let cancel = alert.cancel.map(|(label, message)| {
-            fill(button(label).variant(Variant::Outline).on_press(message))
-        });
-
-        let buttons = Row::new()
-            .push((!small).then(space::horizontal))
-            .push(cancel)
-            .push(alert.action.map(fill))
-            .spacing(8)
-            .width(Length::Fill);
-
-        let body = container(header).padding(16).width(Length::Fill);
-
-        let panel = super::dialog::surface(
+        // Below `sm`, the default size looks like the small one, but for its
+        // footer.
+        let content = |centered: bool, footer: Footer| {
             Column::new()
-                .push(body)
-                .push(super::dialog::footer_band(buttons))
-                .width(Length::Fill),
-            if small { 320.0 } else { 384.0 },
-        );
+                .push(
+                    container(header(
+                        alert.title.clone(),
+                        alert.description.clone(),
+                        alert.media,
+                        centered,
+                    ))
+                    .padding(16)
+                    .width(Length::Fill),
+                )
+                .push(super::dialog::footer_band(buttons(
+                    alert.cancel.clone(),
+                    alert.action.clone(),
+                    footer,
+                )))
+                .width(Length::Fill)
+        };
+
+        let (content, wide, narrow): (Element<'a, Message>, _, _) = if small {
+            // `max-w-xs`
+            (content(true, Footer::Grid).into(), 320.0, 320.0)
+        } else {
+            // `max-w-xs sm:max-w-sm`
+            (
+                sm.either(content(false, Footer::Row), content(true, Footer::Stack))
+                    .into(),
+                384.0,
+                320.0,
+            )
+        };
+
+        let panel = super::dialog::responsive_surface(content, &sm, wide, narrow);
 
         Layer::new(alert.base, panel, alert.open)
-            .padding(Padding::new(16.0))
+            .padding(Padding::new(super::dialog::LAYER_PADDING))
             .backdrop_with(super::dialog::backdrop)
             .on_dismiss_maybe(on_cancel)
             .dismiss_on_backdrop(false)
             .into()
+    }
+}
+
+/// The header of an alert dialog: the media, the title and the description,
+/// `gap-1.5`, centered (`place-items-center text-center`) or not.
+fn header<'a, Message: 'a>(
+    title: Option<String>,
+    description: Option<String>,
+    media: Option<Icon>,
+    centered: bool,
+) -> Element<'a, Message> {
+    // `bg-muted size-10 rounded-md *:[svg]:size-6`
+    let media = media.map(|icon| {
+        container(icon.sized(24)).center(40).style(|theme: &Theme| {
+            let t = tokens(theme);
+            container::Style {
+                background: Some(Background::Color(t.palette.muted)),
+                text_color: Some(t.palette.foreground),
+                border: border::rounded(t.radius_md()),
+                ..container::Style::default()
+            }
+        })
+    });
+
+    let text = Column::new()
+        .push(title.map(super::dialog::title_text))
+        .push(description.map(|description| super::dialog::description_text(description, centered)))
+        .spacing(6)
+        .align_x(if centered {
+            Alignment::Center
+        } else {
+            Alignment::Start
+        })
+        .width(Length::Fill);
+
+    match media {
+        // `mb-2` under the media, then `gap-1.5`.
+        Some(media) if centered => Column::new()
+            .push(media)
+            .push(text)
+            .spacing(14)
+            .align_x(Alignment::Center)
+            .width(Length::Fill)
+            .into(),
+        // `row-span-2 gap-x-4`
+        Some(media) => Row::new()
+            .push(media)
+            .push(text)
+            .spacing(16)
+            .width(Length::Fill)
+            .into(),
+        None => text.into(),
+    }
+}
+
+/// The layout of the buttons of an alert dialog.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Footer {
+    /// `sm:flex-row sm:justify-end`
+    Row,
+    /// `flex-col-reverse`: the action above the cancel button, both
+    /// filling the footer.
+    Stack,
+    /// `grid grid-cols-2`, in the small size.
+    Grid,
+}
+
+/// The buttons of an alert dialog, `gap-2` apart.
+fn buttons<'a, Message: Clone + 'a>(
+    cancel: Option<(String, Message)>,
+    action: Option<(String, Message, Variant)>,
+    footer: Footer,
+) -> Element<'a, Message> {
+    let fill = footer != Footer::Row;
+
+    let cancel = cancel.map(|(label, message)| {
+        let button = button(label).variant(Variant::Outline).on_press(message);
+
+        if fill {
+            button.width(Length::Fill)
+        } else {
+            button
+        }
+    });
+
+    let action = action.map(|(label, message, variant)| {
+        let button = button(label).variant(variant).on_press(message);
+
+        if fill {
+            button.width(Length::Fill)
+        } else {
+            button
+        }
+    });
+
+    match footer {
+        Footer::Row => Row::new()
+            .push(space::horizontal())
+            .push(cancel)
+            .push(action)
+            .spacing(8)
+            .width(Length::Fill)
+            .into(),
+        Footer::Grid => Row::new()
+            .push(cancel)
+            .push(action)
+            .spacing(8)
+            .width(Length::Fill)
+            .into(),
+        Footer::Stack => Column::new()
+            .push(action)
+            .push(cancel)
+            .spacing(8)
+            .width(Length::Fill)
+            .into(),
     }
 }

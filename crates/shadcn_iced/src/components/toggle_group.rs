@@ -21,6 +21,8 @@ use super::toggle::{self, Position, Size, Variant};
 
 use shadcn_iced_core::Element;
 use shadcn_iced_core::icon::Icon;
+use shadcn_iced_core::primitive::Roving;
+use shadcn_iced_core::primitive::roving::Keys;
 
 use iced::Length;
 use iced::widget::Row;
@@ -139,6 +141,22 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<ToggleGroup<'a, T, 
         let variant = group.variant;
         let vertical = group.orientation == Orientation::Vertical;
 
+        // Roving focus: only one item is in the tab order, the first pressed
+        // one or else the first enabled one.
+        let enabled = |disabled: bool| !disabled && !group.disabled;
+        let tab_stop = group
+            .items
+            .iter()
+            .position(|(value, _, _, disabled)| {
+                enabled(*disabled) && group.selected.contains(value)
+            })
+            .or_else(|| {
+                group
+                    .items
+                    .iter()
+                    .position(|(_, _, _, disabled)| enabled(*disabled))
+            });
+
         let items =
             group
                 .items
@@ -158,6 +176,7 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<ToggleGroup<'a, T, 
                         .variant(group.variant)
                         .size(group.size)
                         .disabled(disabled || group.disabled)
+                        .tab_stop(tab_stop == Some(index))
                         .on_toggle(move |_| message.clone());
 
                     toggle = if vertical {
@@ -193,17 +212,24 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<ToggleGroup<'a, T, 
             group.spacing
         };
 
+        // The arrow keys of the orientation move the focus between items.
         if vertical {
             // `data-vertical:flex-col data-vertical:items-stretch`
-            iced::widget::Column::with_children(items)
-                .spacing(spacing)
-                .width(group.width)
-                .into()
+            Roving::new(
+                iced::widget::Column::with_children(items)
+                    .spacing(spacing)
+                    .width(group.width),
+            )
+            .keys(Keys::Vertical)
+            .into()
         } else {
-            Row::with_children(items)
-                .spacing(spacing)
-                .width(group.width)
-                .into()
+            Roving::new(
+                Row::with_children(items)
+                    .spacing(spacing)
+                    .width(group.width),
+            )
+            .keys(Keys::Horizontal)
+            .into()
         }
     }
 }

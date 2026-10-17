@@ -1,0 +1,101 @@
+{
+  "$schema": "./schema.json",
+  "component": "context-menu",
+  "scenarios": [
+    {
+      "id": "trigger",
+      "viewport": [352, 212],
+      "steps": [
+        { "snapshot": "closed" },
+        { "hover": "Right click here" },
+        { "snapshot": "trigger-hover" }
+      ]
+    },
+    {
+      "id": "open",
+      "viewport": [480, 420],
+      "steps": [
+        { "expect": { "hidden": ["⌘["] } },
+        { "rightClick": { "at": [48, 40] } },
+        {
+          "expect": {
+            "visible": [
+              "⌘[",
+              "⌘]",
+              "⌘R",
+              "More Tools",
+              "Show Bookmarks",
+              "Show Full URLs",
+              "People",
+              "Pedro Duarte",
+              "Colm Tuite"
+            ],
+            "hidden": ["Save Page..."]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": { "text": "Reload", "exact": false } },
+        { "snapshot": "item-hover" },
+        { "hover": { "text": "Forward", "exact": false } },
+        { "snapshot": "disabled-item-hover" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["⌘[", "More Tools"] } },
+        { "snapshot": "closed-after-escape" }
+      ]
+    },
+    {
+      "id": "submenu",
+      "viewport": [480, 420],
+      "steps": [
+        { "rightClick": { "at": [48, 40] } },
+        { "hover": "More Tools" },
+        { "wait": 300 },
+        {
+          "expect": {
+            "visible": [
+              "Save Page...",
+              "Create Shortcut...",
+              "Name Window...",
+              "Developer Tools",
+              "Delete"
+            ]
+          }
+        },
+        { "snapshot": "submenu-open" },
+        { "hover": "Delete" },
+        { "snapshot": "destructive-hover" },
+        { "click": "Developer Tools" },
+        { "expect": { "hidden": ["Save Page...", "⌘["] } },
+        { "snapshot": "closed-after-select" }
+      ]
+    },
+    {
+      "id": "checkboxes",
+      "viewport": [480, 420],
+      "steps": [
+        { "rightClick": { "at": [48, 40] } },
+        { "hover": "Show Full URLs" },
+        { "snapshot": "item-hover" },
+        { "click": "Show Full URLs" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Show Full URLs"] } },
+        { "rightClick": { "at": [48, 40] } },
+        { "expect": { "visible": ["Show Bookmarks", "Show Full URLs"] } },
+        { "snapshot": "reopened-after-toggle" }
+      ]
+    },
+    {
+      "id": "radio-group",
+      "viewport": [480, 420],
+      "steps": [
+        { "rightClick": { "at": [48, 40] } },
+        { "click": "Colm Tuite" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Colm Tuite"] } },
+        { "rightClick": { "at": [48, 40] } },
+        { "expect": { "visible": ["Pedro Duarte", "Colm Tuite"] } },
+        { "snapshot": "reopened-after-select" }
+      ]
+    }
+  ]
+}

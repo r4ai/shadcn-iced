@@ -35,7 +35,8 @@ pub fn textarea<'a, Message: Clone + 'a>(content: &'a Content) -> Textarea<'a, M
             // `min-h-16 px-2.5 py-2 md:text-sm`, plus the 1px border.
             .padding([9, 11])
             .font(font::sans())
-            .min_height(64),
+            // iced applies the minimum height inside the padding.
+            .min_height(64 - 18),
         invalid: false,
         disabled: true,
     }
@@ -53,6 +54,15 @@ impl<'a, Message: Clone + 'a> Textarea<'a, Message> {
     pub fn on_action(mut self, f: impl Fn(Action) -> Message + 'a) -> Self {
         self.raw = self.raw.on_action(f);
         self.disabled = false;
+        self
+    }
+
+    /// Sets the font size, with its Tailwind line height. Textareas are
+    /// `text-base md:text-sm`: they use `text-sm` (14px) by default, the
+    /// size from the `md` breakpoint (768px) on; set `text-base` (16px)
+    /// for windows narrower than that.
+    pub fn text_size(mut self, size: f32) -> Self {
+        self.raw = self.raw.size(size).line_height(style::text::leading(size));
         self
     }
 

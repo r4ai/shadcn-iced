@@ -16,6 +16,7 @@
 //!     .into()
 //! # }
 //! ```
+use shadcn_iced_core::primitive::focus::{self, focus_within};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -259,9 +260,7 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
             );
         }
 
-        // The 1px ring is drawn outside of the box in CSS: inset the
-        // content so that the footer background doesn't cover it.
-        container(
+        let surface = container(
             Column::with_children(sections)
                 .spacing(spacing)
                 .width(inner)
@@ -271,17 +270,34 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
                     ..Padding::ZERO
                 }),
         )
-        .padding(1)
         .width(card.width)
         .clip(true)
-        .style(style)
+        .style(|theme: &Theme| container::Style {
+            border: style::rounded(radius(theme)),
+            ..self::style(theme)
+        });
+
+        // `ring-1 ring-foreground/10`, drawn outside of the card like CSS.
+        focus_within(surface, |theme: &Theme, _| {
+            let t = tokens(theme);
+
+            focus::Style {
+                ring: Some(focus::Ring {
+                    color: alpha(t.palette.foreground, 0.1),
+                    width: 1.0,
+                    radius: t.radius_xl(),
+                }),
+                ..focus::Style::default()
+            }
+        })
+        .width(card.width)
         .into()
     }
 }
 
-/// The inner radius of a card, inside its 1px ring.
+/// The radius of a card (`rounded-xl`).
 fn radius(theme: &Theme) -> f32 {
-    (tokens(theme).radius_xl() - 1.0).max(0.0)
+    tokens(theme).radius_xl()
 }
 
 /// The style of a card footer (`bg-muted/50 rounded-b-xl border-t`).
@@ -301,7 +317,8 @@ fn footer_style(theme: &Theme) -> container::Style {
 }
 
 /// The style of a card (`bg-card text-card-foreground rounded-xl ring-1
-/// ring-foreground/10`).
+/// ring-foreground/10`), with the ring drawn as a 1px border inside of the
+/// bounds. Cards themselves draw their ring outside.
 pub fn style(theme: &Theme) -> container::Style {
     let t = tokens(theme);
 

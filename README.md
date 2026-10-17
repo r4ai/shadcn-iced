@@ -146,6 +146,7 @@ cargo run -p gallery
 - **[Website & Live Previews](https://shadcn-iced.r4ai.dev)** — Interactive component showcase, theme customizer, and example code.
 - **[Architecture](docs/architecture.md)** — Workspace layout, copy-and-paste design, headless primitives, theming internals, and differences from web `shadcn/ui`.
 - **[Development](docs/development.md)** — Building, testing, headless visual snapshots, and developing the documentation website.
+- **[Conformance](conformance/README.md)** — The suite that compares every component with the latest `shadcn/ui`, in snapshots and behavior.
 
 ## License
 

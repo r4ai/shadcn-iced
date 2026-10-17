@@ -123,9 +123,10 @@ fn step<'a, Message: Clone + 'a>(
     .disabled(on_press.is_none())
     .on_press_maybe(on_press)
     .height(size.height())
+    // `px-2.5` and `pl-1.5!` / `pr-1.5!`, plus the transparent 1px border.
     .padding(Padding {
-        left: if previous { 6.0 } else { 10.0 },
-        right: if previous { 10.0 } else { 6.0 },
+        left: if previous { 7.0 } else { 11.0 },
+        right: if previous { 11.0 } else { 7.0 },
         ..Padding::ZERO
     })
     .press_offset(1.0)
@@ -195,7 +196,8 @@ impl<'a, Message: Clone + 'a> From<Pagination<'a, Message>> for Element<'a, Mess
             ));
         }
 
-        row.into()
+        // `mx-auto flex w-full justify-center`
+        container(row).center_x(Length::Fill).into()
     }
 }
 

@@ -1,0 +1,55 @@
+{
+  "$schema": "./schema.json",
+  "component": "popover",
+  "scenarios": [
+    {
+      "id": "default",
+      "description": "Toggles with its trigger; closes with Escape and with a click outside.",
+      "viewport": [360, 200],
+      "steps": [
+        { "snapshot": "closed" },
+        { "expect": { "hidden": ["Dimensions"] } },
+        { "click": "Open Popover" },
+        {
+          "expect": {
+            "visible": ["Dimensions", "Set the dimensions for the layer."]
+          }
+        },
+        { "snapshot": "open" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Dimensions"] } },
+        { "snapshot": "closed-after-escape" },
+        { "click": "Open Popover" },
+        { "expect": { "visible": ["Dimensions"] } },
+        { "click": { "at": [300, 170] } },
+        { "expect": { "hidden": ["Dimensions"] } },
+        { "click": "Open Popover" },
+        { "expect": { "visible": ["Dimensions"] } },
+        { "click": "Open Popover" },
+        { "expect": { "hidden": ["Dimensions"] } }
+      ]
+    },
+    {
+      "id": "align",
+      "description": "Popovers aligned to the start, center and end of their trigger.",
+      "viewport": [360, 120],
+      "steps": [
+        { "click": "Start" },
+        { "expect": { "visible": ["Aligned to start"] } },
+        { "snapshot": "start" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Aligned to start"] } },
+        { "click": "Center" },
+        { "expect": { "visible": ["Aligned to center"] } },
+        { "snapshot": "center" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Aligned to center"] } },
+        { "click": "End" },
+        { "expect": { "visible": ["Aligned to end"] } },
+        { "snapshot": "end" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Aligned to end"] } }
+      ]
+    }
+  ]
+}

@@ -6,11 +6,17 @@
 //!
 //! Since triggers usually look different when open (e.g. a rotated chevron),
 //! it takes one trigger element per state.
+//!
+//! When its trigger contains a focused control (e.g. a focusable
+//! [`Pressable`](super::Pressable) without a message of its own),
+//! <kbd>Enter</kbd> and <kbd>Space</kbd> toggle it too.
+use super::focus::{self, Focus};
 use crate::animation::{self, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
+use iced::keyboard::{self, key::Named};
 
 use iced::time::Instant;
 use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch, window};
@@ -97,11 +103,57 @@ struct State {
     presence: Transition,
     /// The progress of the animation when the layout was last computed.
     laid_out: f32,
+    /// Whether the open trigger was laid out last.
+    laid_out_open: bool,
+    /// The focus of the controls of the trigger that was replaced by the
+    /// trigger of the given state, to hand over to it.
+    focus: Option<(bool, Vec<Focus>)>,
 }
 
-impl<'a, Message, Theme, Renderer> Disclosure<'a, Message, Theme, Renderer> {
+impl<'a, Message, Theme, Renderer> Disclosure<'a, Message, Theme, Renderer>
+where
+    Renderer: iced::advanced::Renderer,
+{
     fn is_open(&self, state: &State) -> bool {
         self.open.unwrap_or(state.open)
+    }
+
+    /// Toggles the disclosure (or asks the application to), handing the
+    /// focus of the current trigger over to the other one.
+    fn toggle(
+        &mut self,
+        tree: &mut Tree,
+        trigger: Layout<'_>,
+        renderer: &Renderer,
+        shell: &mut Shell<'_, Message>,
+        open: bool,
+    ) {
+        let next = !open;
+        let mut states = Vec::new();
+
+        let (element, trigger_tree) = if open {
+            (&mut self.opened, &mut tree.children[1])
+        } else {
+            (&mut self.closed, &mut tree.children[0])
+        };
+
+        focus::for_each_control(element, trigger_tree, trigger, renderer, |_, focus| {
+            states.push(*focus);
+            focus.blur();
+        });
+
+        let state = tree.state.downcast_mut::<State>();
+        state.focus = Some((next, states));
+
+        if self.open.is_none() {
+            state.open = next;
+            shell.invalidate_layout();
+            shell.request_redraw();
+        }
+
+        if let Some(on_toggle) = &self.on_toggle {
+            shell.publish(on_toggle(next));
+        }
     }
 }
 
@@ -122,6 +174,8 @@ where
             pressed: false,
             presence: Transition::new(if open { 1.0 } else { 0.0 }),
             laid_out: if open { 1.0 } else { 0.0 },
+            laid_out_open: open,
+            focus: None,
         })
     }
 
@@ -168,6 +222,7 @@ where
 
             let progress = state.presence.value(now);
             state.laid_out = progress;
+            state.laid_out_open = open;
 
             (open || state.presence.is_animating(now), progress)
         };
@@ -272,6 +327,27 @@ where
         let mut children = layout.children();
         let trigger = children.next().unwrap();
 
+        // Once the other trigger is laid out, it takes over the focus.
+        let state = tree.state.downcast_mut::<State>();
+
+        if state.laid_out_open == open
+            && let Some((_, states)) = state.focus.take_if(|(target, _)| *target == open)
+        {
+            let (element, trigger_tree) = if open {
+                (&mut self.opened, &mut tree.children[1])
+            } else {
+                (&mut self.closed, &mut tree.children[0])
+            };
+
+            focus::for_each_control(element, trigger_tree, trigger, renderer, |index, focus| {
+                if let Some(state) = states.get(index) {
+                    *focus = *state;
+                }
+            });
+
+            shell.request_redraw();
+        }
+
         if open {
             self.opened.as_widget_mut().update(
                 &mut tree.children[1],
@@ -313,7 +389,27 @@ where
             return;
         }
 
-        let state = tree.state.downcast_mut::<State>();
+        // <kbd>Enter</kbd> and <kbd>Space</kbd> toggle a disclosure whose
+        // trigger holds the focus (e.g. a focusable `Pressable`).
+        if let Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(Named::Enter | Named::Space),
+            ..
+        }) = event
+        {
+            let focused = if open {
+                focus::is_focus_within(&mut self.opened, &mut tree.children[1], trigger, renderer)
+            } else {
+                focus::is_focus_within(&mut self.closed, &mut tree.children[0], trigger, renderer)
+            };
+
+            if focused {
+                self.toggle(tree, trigger, renderer, shell, open);
+                shell.capture_event();
+            }
+
+            return;
+        }
+
         let over_trigger = cursor.is_over(trigger.bounds());
 
         match event {
@@ -321,28 +417,17 @@ where
             | Event::Touch(touch::Event::FingerPressed { .. })
                 if over_trigger =>
             {
-                state.pressed = true;
+                tree.state.downcast_mut::<State>().pressed = true;
                 shell.capture_event();
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerLifted { .. })
-                if state.pressed =>
+                if tree.state.downcast_ref::<State>().pressed =>
             {
-                state.pressed = false;
+                tree.state.downcast_mut::<State>().pressed = false;
 
                 if over_trigger {
-                    let next = !open;
-
-                    if self.open.is_none() {
-                        state.open = next;
-                        shell.invalidate_layout();
-                        shell.request_redraw();
-                    }
-
-                    if let Some(on_toggle) = &self.on_toggle {
-                        shell.publish(on_toggle(next));
-                    }
-
+                    self.toggle(tree, trigger, renderer, shell, open);
                     shell.capture_event();
                 }
             }

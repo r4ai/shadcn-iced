@@ -16,13 +16,13 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::{Align, Anchored, Side, listbox};
+use shadcn_iced_core::primitive::{Align, Anchored, Side, listbox, tracked};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, Tokens, font, style, tokens};
 
 use iced::time::Duration;
 use iced::widget::{Row, container, space, text};
-use iced::{Alignment, Background, Color, Padding, Theme, border};
+use iced::{Alignment, Background, Color, Length, Padding, Theme, border};
 
 /// The tokens menu surfaces read their colors from.
 ///
@@ -137,6 +137,7 @@ enum Entry<'a, Message> {
 pub struct Menu<'a, Message> {
     entries: Vec<Entry<'a, Message>>,
     min_width: Option<f32>,
+    width: Option<f32>,
     kind: Kind,
     sub: bool,
 }
@@ -146,6 +147,7 @@ pub fn menu<'a, Message: Clone + 'a>() -> Menu<'a, Message> {
     Menu {
         entries: Vec::new(),
         min_width: None,
+        width: None,
         kind: Kind::Dropdown,
         sub: false,
     }
@@ -287,6 +289,23 @@ impl<'a, Message: Clone + 'a> Menu<'a, Message> {
         self
     }
 
+    /// Sets the width of the menu (e.g. `className="w-40"`); longer items
+    /// wrap. By default, dropdown and menubar menus are as wide as their
+    /// trigger but at least their minimum width (`w-(--anchor-width)`),
+    /// and the others fit their items.
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    /// The minimum width of a menu that is as wide as its trigger
+    /// (`w-(--anchor-width)`), or `None` when its width is set.
+    pub fn anchor_min_width(&self) -> Option<f32> {
+        self.width
+            .is_none()
+            .then(|| self.min_width.unwrap_or_else(|| self.default_min_width()))
+    }
+
     /// Sets the flavor of the menu. [`dropdown_menu`](super::dropdown_menu),
     /// [`context_menu`](super::context_menu) and [`menubar`](super::menubar)
     /// set it for you.
@@ -341,7 +360,6 @@ fn label_text<'a>(label: String, disabled: bool, destructive: bool) -> text::Tex
     text(label)
         .size(style::text::SM)
         .line_height(iced::Pixels(20.0))
-        .wrapping(text::Wrapping::None)
         .style(move |theme: &Theme| text::Style {
             color: item_color(theme, disabled, destructive),
         })
@@ -367,6 +385,26 @@ fn indicator<'a, Message: 'a>(checked: bool, disabled: bool) -> Element<'a, Mess
     .width(16)
     .center_y(20)
     .into()
+}
+
+/// A shortcut hint (`ml-auto text-xs tracking-widest`), colored by
+/// [`shortcut_color`].
+pub fn shortcut<'a, Message: 'a>(shortcut: impl Into<String>) -> Element<'a, Message> {
+    // `tracking-widest` is `0.1em`.
+    tracked(shortcut, style::text::XS, iced::Pixels(16.0), None, 1.2).into()
+}
+
+/// The color of a shortcut hint (`text-muted-foreground
+/// group-focus:text-accent-foreground`).
+pub fn shortcut_color(theme: &Theme, highlighted: bool, disabled: bool) -> Color {
+    if highlighted && !disabled {
+        highlight(theme).text_color
+    } else {
+        alpha(
+            menu_tokens(theme).palette.muted_foreground,
+            opacity(disabled),
+        )
+    }
 }
 
 /// `px-1.5 py-1`
@@ -511,6 +549,7 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
     fn from(menu: Menu<'a, Message>) -> Self {
         let kind = menu.kind;
         let min_width = menu.min_width.unwrap_or_else(|| menu.default_min_width());
+        let width = menu.width;
         let mut list = listbox::Listbox::new(highlight);
 
         for entry in menu.entries {
@@ -525,19 +564,8 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                         .spacing(GAP)
                         .align_y(Alignment::Center);
 
-                    let shortcut = item.shortcut.map(|shortcut| {
-                        text(shortcut)
-                            .size(style::text::XS)
-                            .line_height(iced::Pixels(16.0))
-                            .wrapping(text::Wrapping::None)
-                            .style(move |theme: &Theme| text::Style {
-                                color: Some(alpha(
-                                    menu_tokens(theme).palette.muted_foreground,
-                                    opacity(disabled),
-                                )),
-                            })
-                            .into()
-                    });
+                    let has_shortcut = item.shortcut.is_some();
+                    let shortcut = item.shortcut.map(shortcut);
 
                     let padding = if item.inset {
                         ITEM_PADDING.left(INSET)
@@ -545,7 +573,13 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                         ITEM_PADDING
                     };
 
-                    let row = listbox::row(row, shortcut).spacing(16.0).padding(padding);
+                    let mut row = listbox::row(row, shortcut).spacing(16.0).padding(padding);
+
+                    if has_shortcut {
+                        row = row.trailing_color(move |theme, highlighted| {
+                            shortcut_color(theme, highlighted, disabled)
+                        });
+                    }
 
                     if destructive {
                         list.styled_item(row, item.on_select, destructive_highlight)
@@ -648,6 +682,8 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                         .offset(offset)
                         .align_offset(align_offset)
                         .close_on_select(true)
+                        // `ring-1` around the panel.
+                        .outset(1.0)
                         // `data-open:bg-accent`
                         .open_highlight(|theme| {
                             let style = highlight(theme);
@@ -665,10 +701,15 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
             (true, _) => sub_panel,
         };
 
-        // `p-1` inside a 1px ring.
-        container(list.padding(4).min_width(min_width - 10.0))
-            .padding(1)
-            .style(style)
-            .into()
+        // `p-1` inside a 1px ring, outside of the width.
+        let list = list.padding(4).min_width(min_width - 8.0);
+
+        match width {
+            Some(width) => container(list.width(Length::Fill)).width(width + 2.0),
+            None => container(list),
+        }
+        .padding(1)
+        .style(style)
+        .into()
     }
 }

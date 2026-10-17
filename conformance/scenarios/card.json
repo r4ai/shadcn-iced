@@ -1,0 +1,28 @@
+{
+  "$schema": "./schema.json",
+  "component": "card",
+  "scenarios": [
+    {
+      "id": "login",
+      "viewport": [416, 460],
+      "steps": [
+        {
+          "expect": {
+            "visible": [
+              "Login to your account",
+              "Sign Up",
+              "Login",
+              "Login with Google"
+            ]
+          }
+        },
+        { "snapshot": "idle" },
+        { "hover": "Sign Up" },
+        { "snapshot": "hover-link" },
+        { "hover": "Login with Google" },
+        { "snapshot": "hover-outline" }
+      ]
+    },
+    { "id": "small", "viewport": [416, 210] }
+  ]
+}

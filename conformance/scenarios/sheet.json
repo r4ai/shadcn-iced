@@ -1,0 +1,87 @@
+{
+  "$schema": "./schema.json",
+  "component": "sheet",
+  "scenarios": [
+    {
+      "id": "default",
+      "description": "Opens from the right with a click and closes with Escape.",
+      "viewport": [640, 400],
+      "steps": [
+        { "snapshot": "closed" },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "click": "Open" },
+        { "expect": { "visible": ["Edit profile", "Save changes", "Close"] } },
+        { "snapshot": "open" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "snapshot": "closed-after-escape" }
+      ]
+    },
+    {
+      "id": "close-button",
+      "description": "Closes with the X button in the top-right corner.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "hover": { "at": [614, 26] } },
+        { "snapshot": "close-button-hover" },
+        { "click": { "at": [614, 26] } },
+        { "expect": { "hidden": ["Edit profile"] } }
+      ]
+    },
+    {
+      "id": "footer",
+      "description": "Closes with the Close button of the footer.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "hover": "Save changes" },
+        { "snapshot": "save-hover" },
+        { "click": "Close" },
+        { "expect": { "hidden": ["Edit profile"] } }
+      ]
+    },
+    {
+      "id": "outside-click",
+      "description": "Closes when the backdrop is clicked.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "click": { "at": [20, 380] } },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "snapshot": "closed" }
+      ]
+    },
+    {
+      "id": "sides",
+      "description": "A sheet on each side of the window.",
+      "viewport": [640, 400],
+      "steps": [
+        { "snapshot": "closed" },
+        { "click": "top" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "snapshot": "top" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "click": "right" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "snapshot": "right" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "click": "bottom" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "snapshot": "bottom" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Edit profile"] } },
+        { "click": "left" },
+        { "expect": { "visible": ["Edit profile"] } },
+        { "snapshot": "left" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Edit profile"] } }
+      ]
+    }
+  ]
+}

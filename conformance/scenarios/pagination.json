@@ -1,0 +1,42 @@
+{
+  "$schema": "./schema.json",
+  "component": "pagination",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [680, 72],
+      "steps": [
+        { "snapshot": "page-2" },
+        {
+          "expect": { "visible": ["Previous", "Next", "10"], "hidden": ["4"] }
+        },
+        { "hover": "3" },
+        { "snapshot": "hover-page" },
+        { "hover": "Next" },
+        { "snapshot": "hover-next" },
+        { "click": "3" },
+        { "expect": { "visible": ["2", "3", "4", "10"] } },
+        { "snapshot": "page-3" },
+        { "click": "Next" },
+        { "expect": { "visible": ["3", "4", "5"], "hidden": ["2"] } },
+        { "snapshot": "page-4" },
+        { "click": "Previous" },
+        { "click": "Previous" },
+        {
+          "expect": { "visible": ["1", "2", "3", "10"], "hidden": ["4", "5"] }
+        },
+        { "snapshot": "back-to-page-2" }
+      ]
+    },
+    {
+      "id": "simple",
+      "viewport": [320, 72],
+      "steps": [
+        { "snapshot": "page-3" },
+        { "click": "5" },
+        { "expect": { "visible": ["1", "2", "3", "4", "5"] } },
+        { "snapshot": "page-5" }
+      ]
+    }
+  ]
+}
