@@ -23,6 +23,6 @@
     },
     { "id": "outline", "viewport": [480, 250] },
     { "id": "background", "viewport": [480, 260] },
-    { "id": "avatar", "viewport": [480, 260] }
+    { "id": "avatar", "viewport": [480, 270] }
   ]
 }
