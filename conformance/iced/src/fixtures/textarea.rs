@@ -1,9 +1,7 @@
-//! The store cannot hold a `Content` nor apply `Action`s, so the textareas
-//! of these fixtures show a fixed content and ignore edits.
 use super::Fixture;
-use crate::store::Msg;
+use crate::store::{Msg, Store, edit};
 
-use shadcn_iced::textarea::{Content, textarea};
+use shadcn_iced::textarea::textarea;
 use shadcn_iced::tokens;
 
 use iced::widget::{column, text};
@@ -13,13 +11,18 @@ const PLACEHOLDER: &str = "Type your message here.";
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
-        "default" => Fixture::new(|_| narrow(editable("", false))),
+        "default" => {
+            Fixture::new(|store| narrow(editable(store, "message", false))).init(|store| {
+                store.set_editor("message", "");
+            })
+        }
         "typing" => Fixture::new(|store| {
-            narrow({
-                let value = store.str("message");
+            let value = store.editor("message").text();
+            let value = value.trim_end();
 
+            narrow(
                 column![
-                    editable("", false),
+                    editable(store, "message", false),
                     text(if value.is_empty() {
                         "Nothing typed".to_owned()
                     } else {
@@ -31,39 +34,44 @@ pub fn get(id: &str) -> Option<Fixture> {
                     }),
                 ]
                 .spacing(12)
-                .into()
-            })
+                .into(),
+            )
+        })
+        .init(|store| {
+            store.set_editor("message", "");
         }),
-        "states" => Fixture::new(|_| {
-            narrow({
+        "states" => Fixture::new(|store| {
+            narrow(
                 column![
-                    editable("Hello, world!", false),
-                    textarea::<Msg>(content("")).placeholder(PLACEHOLDER),
-                    editable("This message is invalid.", true),
-                    editable("First line\nSecond line\nThird line\nFourth line", false),
+                    editable(store, "value", false),
+                    textarea::<Msg>(store.editor("disabled")).placeholder(PLACEHOLDER),
+                    editable(store, "invalid", true),
+                    editable(store, "lines", false),
                 ]
                 .spacing(12)
-                .into()
-            })
+                .into(),
+            )
+        })
+        .init(|store| {
+            store
+                .set_editor("value", "Hello, world!")
+                .set_editor("disabled", "")
+                .set_editor("invalid", "This message is invalid.")
+                .set_editor("lines", "First line\nSecond line\nThird line\nFourth line");
         }),
         _ => return None,
     })
 }
 
-/// Leaks the content: fixtures are views of a short-lived process.
-fn content(value: &str) -> &'static Content {
-    Box::leak(Box::new(Content::with_text(value)))
-}
-
-fn editable(value: &str, invalid: bool) -> Element<'static, Msg> {
-    textarea(content(value))
+fn editable<'a>(store: &'a Store, key: &'static str, invalid: bool) -> Element<'a, Msg> {
+    textarea(store.editor(key))
         .placeholder(PLACEHOLDER)
-        .on_action(|_| Msg::Noop)
+        .on_action(edit(key))
         .invalid(invalid)
         .into()
 }
 
 /// The page of the fixture is 768px wide (the `md` breakpoint), in a `w-80`.
-fn narrow(content: iced::Element<'_, Msg>) -> iced::Element<'_, Msg> {
+fn narrow(content: Element<'_, Msg>) -> Element<'_, Msg> {
     iced::widget::container(content).width(320).into()
 }

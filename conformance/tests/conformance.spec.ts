@@ -53,6 +53,25 @@ interface IcedOutcome {
   snapshots: string[]
 }
 
+/**
+ * Takes screenshots until two consecutive ones are identical: some
+ * animations are driven by JavaScript (e.g. Embla carousels), which CSS
+ * cannot disable.
+ */
+async function stableScreenshot(page: Page) {
+  const take = () => page.screenshot({ animations: "disabled", caret: "hide" })
+  let previous = await take()
+
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await page.waitForTimeout(50)
+    const next = await take()
+    if (next.equals(previous)) return next
+    previous = next
+  }
+
+  throw new Error("the page never stops changing")
+}
+
 async function locate(page: Page, locator: Locator) {
   if (typeof locator === "object" && "at" in locator) {
     return { x: locator.at[0], y: locator.at[1] }
@@ -142,11 +161,7 @@ for (const file of readScenarios()) {
                 mkdirSync(dirname(referencePath), { recursive: true })
                 // Fonts of overlays load when they are first shown.
                 await page.evaluate(() => document.fonts.ready)
-                await page.screenshot({
-                  path: referencePath,
-                  animations: "disabled",
-                  caret: "hide",
-                })
+                writeFileSync(referencePath, await stableScreenshot(page))
 
                 const key = snapshotKey(
                   file.component,

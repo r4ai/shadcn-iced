@@ -109,9 +109,7 @@ impl Harness {
                 context.messages,
             );
 
-            statuses
-                .iter()
-                .any(|status| *status == iced::event::Status::Captured)
+            statuses.contains(&iced::event::Status::Captured)
         });
 
         self.redraw();
@@ -119,7 +117,7 @@ impl Harness {
     }
 
     fn redraw(&mut self) {
-        let _ = self.with_interface(|interface, context| {
+        self.with_interface(|interface, context| {
             let _ = interface.update(
                 &[Event::Window(
                     window::Event::RedrawRequested(Instant::now()),
