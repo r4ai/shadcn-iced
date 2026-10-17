@@ -35,15 +35,25 @@ pub fn dropdown_menu<'a, Message: Clone + 'a>(
     trigger: impl Into<Element<'a, Message>>,
     menu: Menu<'a, Message>,
 ) -> Anchored<'a, Message> {
-    Anchored::new(trigger, menu.kind(Kind::Dropdown))
+    let menu = menu.kind(Kind::Dropdown);
+    let anchor_width = menu.anchor_min_width();
+
+    let anchored = Anchored::new(trigger, menu)
         .side(Side::Bottom)
         .align(Align::Start)
         .offset(4.0)
+        .outset(1.0)
         .close_on_select(true)
         .modal(true)
         // `focus-visible:border-ring focus-visible:ring-3` of a button.
         .focus_ring(|theme| {
             let t = tokens(theme);
             style::focus_visible(&t, t.radius_lg())
-        })
+        });
+
+    // `w-(--anchor-width) min-w-32`
+    match anchor_width {
+        Some(min) => anchored.anchor_width(min),
+        None => anchored,
+    }
 }

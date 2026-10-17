@@ -89,7 +89,7 @@ fn example(s: &Store) -> Element<'_, Msg> {
                 .separator()
                 .item(noop("Hide Sidebar").inset())
                 // `w-44`
-                .min_width(176.0),
+                .width(176.0),
         )
         .menu(
             "Profiles",

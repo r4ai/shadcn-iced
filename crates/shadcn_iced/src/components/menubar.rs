@@ -79,12 +79,16 @@ impl<'a, Message: Clone + 'a> From<Menubar<'a, Message>> for Element<'a, Message
             .padding([2, 6])
             .style(trigger_style);
 
+            let menu = menu.kind(Kind::Menubar);
+            let anchor_width = menu.anchor_min_width();
+
             // `align="start" alignOffset={-4} sideOffset={8}`
-            Anchored::new(trigger, menu.kind(Kind::Menubar))
+            let anchored = Anchored::new(trigger, menu)
                 .side(Side::Bottom)
                 .align(Align::Start)
                 .offset(8.0)
                 .align_offset(-4.0)
+                .outset(1.0)
                 .close_on_select(true)
                 .modal(true)
                 // `aria-expanded:bg-muted`
@@ -94,7 +98,13 @@ impl<'a, Message: Clone + 'a> From<Menubar<'a, Message>> for Element<'a, Message
                         Background::Color(t.palette.muted),
                         border::rounded(t.radius_sm()),
                     )
-                })
+                });
+
+            // `w-(--anchor-width) min-w-36`
+            match anchor_width {
+                Some(min) => anchored.anchor_width(min),
+                None => anchored,
+            }
         });
 
         // `flex h-8 gap-0.5 rounded-lg border p-[3px]`: a block spanning the

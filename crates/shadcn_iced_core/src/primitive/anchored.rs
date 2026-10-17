@@ -101,7 +101,9 @@ pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
     offset: f32,
     align_offset: f32,
     collision_padding: f32,
+    outset: f32,
     match_anchor_width: bool,
+    anchor_width: Option<f32>,
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<Box<dyn Fn(bool) -> Message + 'a>>,
@@ -129,6 +131,8 @@ where
             offset: 4.0,
             align_offset: 0.0,
             collision_padding: 8.0,
+            outset: 0.0,
+            anchor_width: None,
             match_anchor_width: false,
             close_on_select: false,
             modal: false,
@@ -228,6 +232,21 @@ where
     /// the window.
     pub fn collision_padding(mut self, padding: f32) -> Self {
         self.collision_padding = padding;
+        self
+    }
+
+    /// Sets the width of a ring drawn around the content, outside of the
+    /// element it surrounds (`ring-1`): the content is placed, sized and
+    /// kept inside the window as if it did not have it.
+    pub fn outset(mut self, outset: f32) -> Self {
+        self.outset = outset;
+        self
+    }
+
+    /// Makes the content exactly as wide as the anchor, but at least `min`
+    /// wide (`w-(--anchor-width) min-w-32`), whatever its own width.
+    pub fn anchor_width(mut self, min: f32) -> Self {
+        self.anchor_width = Some(min);
         self
     }
 
@@ -773,6 +792,8 @@ where
                 offset: self.offset,
                 align_offset: self.align_offset,
                 collision_padding: self.collision_padding,
+                outset: self.outset,
+                anchor_width: self.anchor_width,
                 match_anchor_width: self.match_anchor_width,
                 close_on_select: self.close_on_select,
                 modal: self.modal,
@@ -830,7 +851,9 @@ struct Floating<'a, 'b, Message, Theme, Renderer> {
     offset: f32,
     align_offset: f32,
     collision_padding: f32,
+    outset: f32,
     match_anchor_width: bool,
+    anchor_width: Option<f32>,
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<&'b (dyn Fn(bool) -> Message + 'a)>,
@@ -965,15 +988,23 @@ where
 {
     fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
         let padding = self.collision_padding;
+        let outset = self.outset;
         let max = Size::new(
-            (bounds.width - padding * 2.0).max(0.0),
-            (bounds.height - padding * 2.0).max(0.0),
+            (bounds.width - padding * 2.0 + outset * 2.0).max(0.0),
+            (bounds.height - padding * 2.0 + outset * 2.0).max(0.0),
         );
 
-        let min_width = if self.match_anchor_width && self.point.is_none() {
-            self.anchor_bounds.width.min(max.width)
-        } else {
-            0.0
+        let (min_width, max) = match self.anchor_width {
+            Some(min) if self.point.is_none() => {
+                let width = (self.anchor_bounds.width.max(min) + outset * 2.0).min(max.width);
+
+                (width, Size::new(width, max.height))
+            }
+            _ if self.match_anchor_width && self.point.is_none() => (
+                (self.anchor_bounds.width + outset * 2.0).min(max.width),
+                max,
+            ),
+            _ => (0.0, max),
         };
 
         let node = self.content.as_widget_mut().layout(
@@ -987,9 +1018,13 @@ where
             None => self.anchor_bounds,
         };
 
+        let size = node.size();
         let (position, side) = position(
             anchor,
-            node.size(),
+            Size::new(
+                (size.width - outset * 2.0).max(0.0),
+                (size.height - outset * 2.0).max(0.0),
+            ),
             bounds,
             self.side,
             self.align,
@@ -1000,7 +1035,7 @@ where
 
         self.resolved_side = side;
 
-        node.move_to(position)
+        node.move_to(position - Vector::new(outset, outset))
     }
 
     fn draw(
