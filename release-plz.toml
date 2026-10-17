@@ -1,0 +1,41 @@
+# The releases of the crates (`.github/workflows/release.yml`,
+# https://release-plz.dev/docs/config).
+#
+# The three crates share the version of the workspace: one release pull
+# request bumps them together, one changelog (`CHANGELOG.md`) and one tag
+# (`v<version>`) describe the release. The other packages of the workspace
+# (`examples/`, `conformance/iced`) are not published (`publish = false`).
+
+[workspace]
+# Release only when the release pull request is merged.
+release_always = false
+# Run cargo-semver-checks on the public API: a breaking change bumps the
+# minor version of `0.x`.
+semver_check = true
+pr_labels = ["release"]
+# The tag and the GitHub release belong to `shadcn-iced` only.
+git_tag_enable = false
+git_release_enable = false
+changelog_update = false
+
+[changelog]
+protect_breaking_commits = true
+
+[[package]]
+name = "shadcn-iced"
+version_group = "shadcn_iced"
+changelog_update = true
+changelog_path = "CHANGELOG.md"
+changelog_include = ["shadcn_iced_core", "cargo-shadcn-iced"]
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+git_release_enable = true
+git_release_name = "v{{ version }}"
+
+[[package]]
+name = "shadcn_iced_core"
+version_group = "shadcn_iced"
+
+[[package]]
+name = "cargo-shadcn-iced"
+version_group = "shadcn_iced"

@@ -643,7 +643,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "serde_json",
- "shadcn_iced",
+ "shadcn-iced",
  "unicode-script",
 ]
 
@@ -843,7 +843,7 @@ name = "dashboard"
 version = "0.0.0"
 dependencies = [
  "iced",
- "shadcn_iced",
+ "shadcn-iced",
 ]
 
 [[package]]
@@ -1284,7 +1284,7 @@ dependencies = [
  "iced",
  "iced_test",
  "settings",
- "shadcn_iced",
+ "shadcn-iced",
 ]
 
 [[package]]
@@ -1294,7 +1294,7 @@ dependencies = [
  "console_error_panic_hook",
  "gallery",
  "iced",
- "shadcn_iced",
+ "shadcn-iced",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -1515,7 +1515,7 @@ name = "hello"
 version = "0.0.0"
 dependencies = [
  "iced",
- "shadcn_iced",
+ "shadcn-iced",
 ]
 
 [[package]]
@@ -3502,7 +3502,7 @@ name = "settings"
 version = "0.0.0"
 dependencies = [
  "iced",
- "shadcn_iced",
+ "shadcn-iced",
 ]
 
 [[package]]
@@ -3517,7 +3517,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "shadcn_iced"
+name = "shadcn-iced"
 version = "0.1.0"
 dependencies = [
  "iced",

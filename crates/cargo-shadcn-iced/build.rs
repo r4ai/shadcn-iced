@@ -1,10 +1,19 @@
 //! Embeds the component sources of `shadcn_iced` into the CLI.
+//!
+//! In the workspace, they come from `shadcn_iced` itself. The published crate
+//! cannot reach its sibling, so `scripts/prepare-publish.sh` copies them into
+//! `components/` before `cargo publish`.
 use std::path::PathBuf;
 use std::{env, fs};
 
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let components = manifest.join("../shadcn_iced/src/components");
+    let workspace = manifest.join("../shadcn_iced/src/components");
+    let components = if workspace.is_dir() {
+        workspace
+    } else {
+        manifest.join("components")
+    };
 
     println!("cargo:rerun-if-changed={}", components.display());
 

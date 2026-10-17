@@ -70,7 +70,7 @@ test("the copy button copies the code and shows a check for a moment", async ({ 
   await button.click();
 
   await expect(button).toHaveAttribute("data-copied", "true");
-  expect(await lastCopied(page)).toContain('shadcn_iced = { git = "');
+  expect(await lastCopied(page)).toContain('shadcn-iced = { git = "');
   await expect(button).toHaveAttribute("data-copied", "false", { timeout: 3000 });
 });
 

@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 iced.workspace = true
-shadcn_iced = { path = "../../crates/shadcn_iced" }
+shadcn-iced = { path = "../../crates/shadcn_iced" }
 dashboard = { path = "../dashboard" }
 settings = { path = "../settings" }
 

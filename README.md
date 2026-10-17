@@ -28,7 +28,7 @@ Add `shadcn_iced` to your `Cargo.toml`:
 ```toml
 [dependencies]
 iced = "0.14"
-shadcn_iced = { git = "https://github.com/r4ai/shadcn-iced.git" }
+shadcn-iced = { git = "https://github.com/r4ai/shadcn-iced.git" }
 ```
 
 ### Option 2: Copy and Own (CLI)
