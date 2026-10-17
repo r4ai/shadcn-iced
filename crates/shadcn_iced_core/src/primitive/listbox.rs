@@ -49,6 +49,7 @@ pub struct Listbox<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> 
     min_width: f32,
     keyboard: bool,
     highlight_first: bool,
+    initial: Option<usize>,
     clear_on_leave: bool,
     style: Box<dyn Fn(&Theme) -> Style + 'a>,
 }
@@ -67,6 +68,7 @@ where
             min_width: 0.0,
             keyboard: true,
             highlight_first: false,
+            initial: None,
             clear_on_leave: true,
             style: Box::new(style),
         }
@@ -168,6 +170,13 @@ where
         self
     }
 
+    /// Highlights the child at `index` (e.g. the selected option of a
+    /// select) until the user moves the highlight.
+    pub fn highlighted(mut self, index: Option<usize>) -> Self {
+        self.initial = index;
+        self
+    }
+
     /// Sets whether the highlight is cleared when the cursor leaves the
     /// list. Defaults to `true`.
     pub fn clear_on_leave(mut self, clear: bool) -> Self {
@@ -196,8 +205,18 @@ impl<Message, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
                 .is_some_and(|child| child.selectable)
         });
 
-        if active.is_none() && self.highlight_first && !state.touched {
-            return self.children.iter().position(|child| child.selectable);
+        if active.is_none() && !state.touched {
+            if let Some(index) = self.initial.filter(|index| {
+                self.children
+                    .get(*index)
+                    .is_some_and(|child| child.selectable)
+            }) {
+                return Some(index);
+            }
+
+            if self.highlight_first {
+                return self.children.iter().position(|child| child.selectable);
+            }
         }
 
         active

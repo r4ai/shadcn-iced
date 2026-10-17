@@ -104,6 +104,7 @@ pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
     outset: f32,
     match_anchor_width: bool,
     anchor_width: Option<f32>,
+    fallback_offset: Option<f32>,
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<Box<dyn Fn(bool) -> Message + 'a>>,
@@ -133,6 +134,7 @@ where
             collision_padding: 8.0,
             outset: 0.0,
             anchor_width: None,
+            fallback_offset: None,
             match_anchor_width: false,
             close_on_select: false,
             modal: false,
@@ -247,6 +249,15 @@ where
     /// wide (`w-(--anchor-width) min-w-32`), whatever its own width.
     pub fn anchor_width(mut self, min: f32) -> Self {
         self.anchor_width = Some(min);
+        self
+    }
+
+    /// Sets the offset used instead of [`Anchored::offset`] when the
+    /// content placed with it would not fit in the window, e.g. a select
+    /// list overlapping its trigger (`alignItemWithTrigger`) that falls
+    /// back to opening below it.
+    pub fn fallback_offset(mut self, offset: f32) -> Self {
+        self.fallback_offset = Some(offset);
         self
     }
 
@@ -794,6 +805,7 @@ where
                 collision_padding: self.collision_padding,
                 outset: self.outset,
                 anchor_width: self.anchor_width,
+                fallback_offset: self.fallback_offset,
                 match_anchor_width: self.match_anchor_width,
                 close_on_select: self.close_on_select,
                 modal: self.modal,
@@ -854,6 +866,7 @@ struct Floating<'a, 'b, Message, Theme, Renderer> {
     outset: f32,
     match_anchor_width: bool,
     anchor_width: Option<f32>,
+    fallback_offset: Option<f32>,
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<&'b (dyn Fn(bool) -> Message + 'a)>,
@@ -905,6 +918,35 @@ where
     }
 }
 
+/// Places content of the given size next to the anchor, without keeping it
+/// inside the window.
+fn place(
+    anchor: Rectangle,
+    size: Size,
+    side: Side,
+    align: Align,
+    offset: f32,
+    align_offset: f32,
+) -> Point {
+    let cross_x = || match align {
+        Align::Start => anchor.x + align_offset,
+        Align::Center => anchor.center_x() - size.width / 2.0,
+        Align::End => anchor.x + anchor.width - size.width - align_offset,
+    };
+    let cross_y = || match align {
+        Align::Start => anchor.y + align_offset,
+        Align::Center => anchor.center_y() - size.height / 2.0,
+        Align::End => anchor.y + anchor.height - size.height - align_offset,
+    };
+
+    match side {
+        Side::Bottom => Point::new(cross_x(), anchor.y + anchor.height + offset),
+        Side::Top => Point::new(cross_x(), anchor.y - size.height - offset),
+        Side::Right => Point::new(anchor.x + anchor.width + offset, cross_y()),
+        Side::Left => Point::new(anchor.x - size.width - offset, cross_y()),
+    }
+}
+
 /// Computes the position of floating content of the given size.
 ///
 /// Exposed for components that want to position things themselves.
@@ -918,25 +960,7 @@ pub fn position(
     align_offset: f32,
     padding: f32,
 ) -> (Point, Side) {
-    let place = |side: Side| {
-        let cross_x = || match align {
-            Align::Start => anchor.x + align_offset,
-            Align::Center => anchor.center_x() - size.width / 2.0,
-            Align::End => anchor.x + anchor.width - size.width - align_offset,
-        };
-        let cross_y = || match align {
-            Align::Start => anchor.y + align_offset,
-            Align::Center => anchor.center_y() - size.height / 2.0,
-            Align::End => anchor.y + anchor.height - size.height - align_offset,
-        };
-
-        match side {
-            Side::Bottom => Point::new(cross_x(), anchor.y + anchor.height + offset),
-            Side::Top => Point::new(cross_x(), anchor.y - size.height - offset),
-            Side::Right => Point::new(anchor.x + anchor.width + offset, cross_y()),
-            Side::Left => Point::new(anchor.x - size.width - offset, cross_y()),
-        }
-    };
+    let place = |side: Side| place(anchor, size, side, align, offset, align_offset);
 
     let overflow = |side: Side, point: Point| match side {
         Side::Bottom => point.y + size.height - (viewport.height - padding),
@@ -1019,16 +1043,38 @@ where
         };
 
         let size = node.size();
+        let size = Size::new(
+            (size.width - outset * 2.0).max(0.0),
+            (size.height - outset * 2.0).max(0.0),
+        );
+
+        let offset = match self.fallback_offset {
+            Some(fallback) => {
+                let point = place(
+                    anchor,
+                    size,
+                    self.side,
+                    self.align,
+                    self.offset,
+                    self.align_offset,
+                );
+                let fits = point.x >= padding
+                    && point.y >= padding
+                    && point.x + size.width <= bounds.width - padding
+                    && point.y + size.height <= bounds.height - padding;
+
+                if fits { self.offset } else { fallback }
+            }
+            None => self.offset,
+        };
+
         let (position, side) = position(
             anchor,
-            Size::new(
-                (size.width - outset * 2.0).max(0.0),
-                (size.height - outset * 2.0).max(0.0),
-            ),
+            size,
             bounds,
             self.side,
             self.align,
-            self.offset,
+            offset,
             self.align_offset,
             padding,
         );
