@@ -270,12 +270,21 @@ impl Harness {
             let backwards = modifiers.shift();
 
             self.with_interface(|interface, context| {
-                if backwards {
-                    let mut operation = operation::focusable::focus_previous::<()>();
-                    interface.operate(context.renderer, &mut operation);
+                let mut operation: Box<dyn Operation<()>> = if backwards {
+                    Box::new(operation::focusable::focus_previous::<()>())
                 } else {
-                    let mut operation = operation::focusable::focus_next::<()>();
-                    interface.operate(context.renderer, &mut operation);
+                    Box::new(operation::focusable::focus_next::<()>())
+                };
+
+                // Like the iced runtime, run the operations they chain
+                // (`focus_next` counts the focusable widgets first).
+                loop {
+                    interface.operate(context.renderer, operation.as_mut());
+
+                    match operation.finish() {
+                        Outcome::Chain(next) => operation = next,
+                        _ => break,
+                    }
                 }
             });
             self.redraw();
