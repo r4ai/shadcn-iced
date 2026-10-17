@@ -10,7 +10,7 @@ Use **65+ components**—from forms, overlays, and data tables to charts and AI 
 
 ## Showcase
 
-![dashboard-01 recreated with shadcn-iced, light](docs/screenshots/dashboard-light.png)
+![dashboard-01 recreated with shadcn-iced, dark](docs/screenshots/dashboard-dark.png)
 
 | | |
 | :---: | :---: |
