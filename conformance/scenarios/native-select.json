@@ -1,0 +1,31 @@
+{
+  "$schema": "./schema.json",
+  "component": "native-select",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [200, 64],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": { "at": [60, 32] } },
+        { "snapshot": "hover" },
+        { "press": "Tab" },
+        { "snapshot": "focused" }
+      ]
+    },
+    { "id": "selected", "viewport": [200, 64] },
+    { "id": "sizes", "viewport": [200, 96] },
+    {
+      "id": "keyboard",
+      "viewport": [200, 64],
+      "steps": [
+        { "press": "Tab" },
+        { "press": "ArrowDown" },
+        { "snapshot": "todo" },
+        { "press": "ArrowDown" },
+        { "snapshot": "in-progress" }
+      ]
+    },
+    { "id": "states", "viewport": [200, 96] }
+  ]
+}

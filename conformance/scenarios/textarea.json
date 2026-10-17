@@ -1,0 +1,63 @@
+{
+  "$schema": "./schema.json",
+  "component": "textarea",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [768, 112],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [100, 48]
+          }
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": {
+            "at": [100, 48]
+          }
+        },
+        {
+          "snapshot": "focused"
+        }
+      ]
+    },
+    {
+      "id": "typing",
+      "viewport": [768, 128],
+      "steps": [
+        {
+          "expect": {
+            "visible": ["Nothing typed"]
+          }
+        },
+        {
+          "click": {
+            "at": [100, 48]
+          }
+        },
+        {
+          "type": "Hello"
+        },
+        {
+          "expect": {
+            "visible": ["You typed: Hello"],
+            "hidden": ["Nothing typed"]
+          }
+        },
+        {
+          "snapshot": "typed"
+        }
+      ]
+    },
+    {
+      "id": "states",
+      "viewport": [768, 360]
+    }
+  ]
+}

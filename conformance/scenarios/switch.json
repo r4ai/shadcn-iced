@@ -1,0 +1,94 @@
+{
+  "$schema": "./schema.json",
+  "component": "switch",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [200, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": "Airplane Mode"
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": "Airplane Mode"
+        },
+        {
+          "snapshot": "checked"
+        }
+      ]
+    },
+    {
+      "id": "sizes",
+      "viewport": [160, 88]
+    },
+    {
+      "id": "states",
+      "viewport": [240, 160]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [240, 96],
+      "steps": [
+        {
+          "expect": {
+            "visible": ["Airplane mode is off"],
+            "hidden": ["Airplane mode is on"]
+          }
+        },
+        {
+          "click": {
+            "at": [32, 25]
+          }
+        },
+        {
+          "expect": {
+            "visible": ["Airplane mode is on"],
+            "hidden": ["Airplane mode is off"]
+          }
+        },
+        {
+          "snapshot": "checked-focused"
+        },
+        {
+          "press": "Space"
+        },
+        {
+          "expect": {
+            "visible": ["Airplane mode is off"],
+            "hidden": ["Airplane mode is on"]
+          }
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "Space"
+        },
+        {
+          "expect": {
+            "visible": ["Airplane mode is on"],
+            "hidden": ["Airplane mode is off"]
+          }
+        },
+        {
+          "click": "Airplane Mode"
+        },
+        {
+          "expect": {
+            "visible": ["Airplane mode is off"],
+            "hidden": ["Airplane mode is on"]
+          }
+        },
+        {
+          "snapshot": "unchecked"
+        }
+      ]
+    }
+  ]
+}

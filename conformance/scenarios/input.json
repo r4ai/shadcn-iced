@@ -1,0 +1,93 @@
+{
+  "$schema": "./schema.json",
+  "component": "input",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [768, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [100, 32]
+          }
+        },
+        {
+          "snapshot": "hover"
+        },
+        {
+          "click": {
+            "at": [100, 32]
+          }
+        },
+        {
+          "snapshot": "focused"
+        }
+      ]
+    },
+    {
+      "id": "typing",
+      "viewport": [768, 96],
+      "steps": [
+        {
+          "expect": {
+            "visible": ["Nothing typed"]
+          }
+        },
+        {
+          "click": {
+            "at": [100, 32]
+          }
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "type": "hello"
+        },
+        {
+          "expect": {
+            "visible": ["You typed: hello"],
+            "hidden": ["Nothing typed"]
+          }
+        },
+        {
+          "snapshot": "typed"
+        },
+        {
+          "press": "Backspace"
+        },
+        {
+          "press": "Backspace"
+        },
+        {
+          "expect": {
+            "visible": ["You typed: hel"],
+            "hidden": ["You typed: hello"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "states",
+      "viewport": [768, 192]
+    },
+    {
+      "id": "with-button",
+      "viewport": [768, 64],
+      "steps": [
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": "Subscribe"
+        },
+        {
+          "snapshot": "hover"
+        }
+      ]
+    }
+  ]
+}
