@@ -1,0 +1,20 @@
+# Supply-chain hardening of the dependencies of the conformance suite, like
+# the site (https://pnpm.io/supply-chain-security).
+
+# Only install versions published at least 7 days ago (in minutes), so a
+# compromised release is usually caught and pulled before it reaches us; the
+# same cooldown as Dependabot (`.github/dependabot.yml`). This also applies
+# to the weekly update of shadcn/ui (`pnpm shadcn:update`).
+minimumReleaseAge: 10080
+
+# Fail when a package loses the provenance or trusted publisher it had in
+# earlier versions, a sign that its publishing was taken over.
+trustPolicy: no-downgrade
+
+# Transitive dependencies may only come from the registry, not from git
+# repositories or tarball URLs.
+blockExoticSubdeps: true
+
+# Install scripts are not run, and a new package with one fails the install
+# until it is reviewed and listed here.
+strictDepBuilds: true

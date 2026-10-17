@@ -31,3 +31,16 @@ updates:
     groups:
       site:
         update-types: [minor, patch]
+
+  # The reference of the conformance suite. Updates of `shadcn` itself come
+  # from the weekly Conformance workflow (`pnpm shadcn:update`); a new
+  # Playwright (Chromium) may move scores: re-record the baseline if so.
+  - package-ecosystem: npm
+    directory: /conformance
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      conformance:
+        update-types: [minor, patch]
