@@ -11,6 +11,7 @@
 //! its expectations, to `DIR/runs/<component>--<scenario>--<theme>.json`. The Playwright runner compares them
 //! with shadcn/ui.
 mod fixtures;
+mod fonts;
 mod harness;
 mod spec;
 mod store;
@@ -57,12 +58,7 @@ fn main() {
     // Deterministic snapshots: the shadcn/ui runner disables animations too.
     shadcn_iced::animation::set_enabled(false);
 
-    for font in shadcn_iced::font::all() {
-        iced_test::renderer::graphics::text::font_system()
-            .write()
-            .expect("font system")
-            .load_font(font);
-    }
+    fonts::load();
 
     let files = spec::read_all(&root.join("scenarios")).unwrap_or_else(|error| {
         eprintln!("{error}");

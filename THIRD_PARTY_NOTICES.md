@@ -37,6 +37,20 @@ distributed under the SIL Open Font License 1.1. See
 Open Font License 1.1. See
 [`GEIST-LICENSE.txt`](crates/shadcn_iced_core/assets/fonts/GEIST-LICENSE.txt).
 
+## Noto Sans Symbols, Noto Sans Symbols 2 and Noto Sans Math
+
+`crates/shadcn_iced_core/assets/fonts/ShadcnIcedSymbols-Regular.ttf` merges
+subsets of Noto Sans Symbols 2, Noto Sans Symbols and Noto Sans Math
+(`scripts/gen_fonts.py`), distributed under the SIL Open Font License 1.1. See
+[`NOTO-LICENSE.txt`](crates/shadcn_iced_core/assets/fonts/NOTO-LICENSE.txt).
+
+## Noto Emoji
+
+`conformance/fonts/NotoEmoji-Regular.ttf` (the regular instance of Noto Emoji,
+used by the conformance suite only) is distributed under the SIL Open Font
+License 1.1. See
+[`NOTO-EMOJI-LICENSE.txt`](conformance/fonts/NOTO-EMOJI-LICENSE.txt).
+
 ## Lucide
 
 `crates/shadcn_iced_core/assets/fonts/lucide.ttf` is distributed under the ISC
