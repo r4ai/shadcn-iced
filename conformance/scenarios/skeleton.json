@@ -1,0 +1,8 @@
+{
+  "$schema": "./schema.json",
+  "component": "skeleton",
+  "scenarios": [
+    { "id": "avatar", "viewport": [320, 72] },
+    { "id": "lines", "viewport": [416, 168] }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "./schema.json",
+  "component": "table",
+  "scenarios": [
+    {
+      "id": "demo",
+      "viewport": [560, 420],
+      "steps": [
+        {
+          "expect": {
+            "visible": [
+              "INV001",
+              "Credit Card",
+              "Total",
+              "$2,500.00",
+              "A list of your recent invoices."
+            ]
+          }
+        },
+        { "snapshot": "idle" },
+        { "hover": "INV003" },
+        { "snapshot": "hover-row" }
+      ]
+    },
+    {
+      "id": "actions",
+      "viewport": [480, 210],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": "USB-C Hub" },
+        { "snapshot": "hover-row" }
+      ]
+    }
+  ]
+}
