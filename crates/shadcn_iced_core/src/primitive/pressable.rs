@@ -45,6 +45,7 @@ pub struct Pressable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer
     clip_background: bool,
     style: Box<dyn Fn(&Theme, Status, bool) -> Style + 'a>,
     ring: Option<Box<dyn Fn(&Theme, Status, bool) -> Option<Ring> + 'a>>,
+    outline: Option<Box<dyn Fn(&Theme, Status, bool) -> Option<Ring> + 'a>>,
     focusable: bool,
     tab_stop: bool,
     enter: bool,
@@ -91,6 +92,7 @@ where
                 ..Style::default()
             }),
             ring: None,
+            outline: None,
             focusable: false,
             tab_stop: true,
             enter: true,
@@ -184,6 +186,14 @@ where
     /// status and whether the keyboard focus is visible.
     pub fn ring(mut self, ring: impl Fn(&Theme, Status, bool) -> Option<Ring> + 'a) -> Self {
         self.ring = Some(Box::new(ring));
+        self
+    }
+
+    /// Sets an outline drawn *outside* of the bounds, over the ring
+    /// (`outline-1`), given the status and whether the keyboard focus is
+    /// visible.
+    pub fn outline(mut self, outline: impl Fn(&Theme, Status, bool) -> Option<Ring> + 'a) -> Self {
+        self.outline = Some(Box::new(outline));
         self
     }
 
@@ -530,10 +540,11 @@ where
             _ => (self.style)(theme, status, focused),
         };
 
-        let ring = self
-            .ring
-            .as_ref()
-            .and_then(|ring| ring(theme, status, focused));
+        let rings = [&self.ring, &self.outline]
+            .into_iter()
+            .flatten()
+            .filter_map(|ring| ring(theme, status, focused))
+            .collect::<Vec<_>>();
 
         let viewport = if self.clip {
             bounds.intersection(viewport).unwrap_or(*viewport)
@@ -542,7 +553,7 @@ where
         };
 
         let draw = |renderer: &mut Renderer| {
-            if let Some(ring) = ring {
+            for ring in &rings {
                 renderer.fill_quad(
                     renderer::Quad {
                         bounds: bounds.expand(ring.width),

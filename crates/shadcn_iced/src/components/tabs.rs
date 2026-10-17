@@ -16,6 +16,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::Icon;
+use shadcn_iced_core::primitive::focus::Ring;
 use shadcn_iced_core::primitive::roving::Keys;
 use shadcn_iced_core::primitive::{Pressable, Roving};
 use shadcn_iced_core::theme::alpha;
@@ -199,6 +200,18 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
                         let t = tokens(theme);
 
                         style::ring(&t, t.radius_md())
+                    })
+                })
+                // `focus-visible:outline-1 focus-visible:outline-ring`
+                .outline(|theme, _status, focused| {
+                    focused.then(|| {
+                        let t = tokens(theme);
+
+                        Ring {
+                            color: t.palette.ring,
+                            width: 1.0,
+                            radius: t.radius_md(),
+                        }
                     })
                 });
 
