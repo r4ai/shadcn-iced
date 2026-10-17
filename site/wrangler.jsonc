@@ -1,4 +1,5 @@
-// Cloudflare Workers static assets: the built site, without a Worker script.
+// Cloudflare Workers static assets: the prerendered pages of `dist/client`,
+// without a Worker script (`dist/server` is the build-time renderer).
 // Deployed by the `Site` workflow (`pnpm run deploy`).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -11,7 +12,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "assets": {
-    "directory": "./dist",
+    "directory": "./dist/client",
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
   },
