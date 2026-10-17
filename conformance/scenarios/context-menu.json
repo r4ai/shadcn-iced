@@ -1,0 +1,15 @@
+{
+  "$schema": "./schema.json",
+  "component": "context-menu",
+  "scenarios": [
+    {
+      "id": "trigger",
+      "viewport": [352, 212],
+      "steps": [
+        { "snapshot": "closed" },
+        { "hover": "Right click here" },
+        { "snapshot": "trigger-hover" }
+      ]
+    }
+  ]
+}

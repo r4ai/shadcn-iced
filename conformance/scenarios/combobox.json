@@ -1,0 +1,78 @@
+{
+  "$schema": "./schema.json",
+  "component": "combobox",
+  "scenarios": [
+    {
+      "id": "basic",
+      "viewport": [360, 300],
+      "steps": [
+        { "snapshot": "closed" },
+        { "click": { "at": [256, 32] } },
+        {
+          "expect": {
+            "visible": ["Next.js", "SvelteKit", "Nuxt.js", "Remix", "Astro"]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "Nuxt.js" },
+        { "snapshot": "item-hover" },
+        { "click": "Remix" },
+        { "expect": { "hidden": ["Astro", "SvelteKit"] } },
+        { "snapshot": "selected" }
+      ]
+    },
+    {
+      "id": "filter",
+      "viewport": [360, 300],
+      "steps": [
+        { "click": { "at": [80, 32] } },
+        { "type": "x" },
+        {
+          "expect": {
+            "visible": ["Next.js", "Nuxt.js", "Remix"],
+            "hidden": ["SvelteKit", "Astro"]
+          }
+        },
+        { "snapshot": "filtered" },
+        { "press": "ArrowDown" },
+        { "snapshot": "first-highlighted" },
+        { "press": "ArrowDown" },
+        { "snapshot": "second-highlighted" },
+        { "press": "Enter" },
+        { "expect": { "hidden": ["Remix", "SvelteKit"] } },
+        { "snapshot": "selected-by-keyboard" }
+      ]
+    },
+    {
+      "id": "empty",
+      "viewport": [360, 300],
+      "steps": [
+        { "click": { "at": [80, 32] } },
+        { "type": "zzz" },
+        {
+          "expect": {
+            "visible": ["No items found."],
+            "hidden": ["Next.js", "Astro"]
+          }
+        },
+        { "snapshot": "empty" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [360, 300],
+      "steps": [
+        { "click": { "at": [80, 32] } },
+        { "press": "ArrowDown" },
+        { "snapshot": "first-key" },
+        { "press": "ArrowDown" },
+        { "snapshot": "second-key" },
+        { "press": "ArrowUp" },
+        { "snapshot": "back-key" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Next.js", "Astro"] } },
+        { "snapshot": "closed-after-escape" }
+      ]
+    }
+  ]
+}

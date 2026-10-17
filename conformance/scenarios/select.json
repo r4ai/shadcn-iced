@@ -1,0 +1,96 @@
+{
+  "$schema": "./schema.json",
+  "component": "select",
+  "scenarios": [
+    {
+      "id": "basic",
+      "viewport": [320, 300],
+      "steps": [
+        { "snapshot": "closed" },
+        { "hover": "Select a fruit" },
+        { "snapshot": "trigger-hover" },
+        { "click": "Select a fruit" },
+        {
+          "expect": {
+            "visible": [
+              "Fruits",
+              "Apple",
+              "Banana",
+              "Blueberry",
+              "Grapes",
+              "Pineapple"
+            ]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "Blueberry" },
+        { "snapshot": "item-hover" },
+        { "click": "Banana" },
+        { "expect": { "visible": ["Banana"], "hidden": ["Apple", "Fruits"] } },
+        { "snapshot": "selected" }
+      ]
+    },
+    {
+      "id": "reopen",
+      "viewport": [320, 300],
+      "steps": [
+        { "click": "Select a fruit" },
+        { "click": "Grapes" },
+        { "expect": { "hidden": ["Apple"] } },
+        { "click": "Grapes" },
+        { "expect": { "visible": ["Fruits", "Apple", "Pineapple"] } },
+        { "snapshot": "reopened-with-selection" },
+        { "press": "Escape" },
+        { "expect": { "visible": ["Grapes"], "hidden": ["Apple", "Fruits"] } },
+        { "snapshot": "closed-with-selection" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [320, 300],
+      "steps": [
+        { "click": "Select a fruit" },
+        { "snapshot": "open" },
+        { "press": "ArrowDown" },
+        { "snapshot": "first-key" },
+        { "press": "ArrowDown" },
+        { "snapshot": "second-key" },
+        { "press": "ArrowUp" },
+        { "snapshot": "back-key" },
+        { "press": "Enter" },
+        { "expect": { "hidden": ["Fruits", "Pineapple"] } },
+        { "snapshot": "closed-after-enter" }
+      ]
+    },
+    {
+      "id": "below-trigger",
+      "viewport": [320, 300],
+      "steps": [
+        { "click": "Select a fruit" },
+        {
+          "expect": {
+            "visible": ["Apple", "Banana", "Blueberry", "Grapes", "Pineapple"]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": "Pineapple" },
+        { "snapshot": "disabled-item-hover" },
+        { "click": "Pineapple" },
+        { "expect": { "visible": ["Apple"] } },
+        { "snapshot": "still-open-after-disabled-click" },
+        { "click": "Grapes" },
+        { "expect": { "hidden": ["Apple"] } },
+        { "snapshot": "selected" }
+      ]
+    },
+    {
+      "id": "trigger-states",
+      "viewport": [240, 190],
+      "steps": [
+        { "snapshot": "closed" },
+        { "hover": "Small" },
+        { "snapshot": "hover-small" }
+      ]
+    }
+  ]
+}
