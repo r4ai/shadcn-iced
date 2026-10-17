@@ -20,7 +20,7 @@ Browse all components with interactive WebAssembly previews at **[shadcn-iced.r4
 - **66 Components**: Covers the `shadcn/ui` registry in its default **Base UI + Nova** (`base-nova`) style, ranging from basic inputs and buttons to charts, calendars, data tables, and command palettes.
 - **Two Adoption Modes**: Depend on the `shadcn_iced` crate as a library, or vendor self-contained component modules into `src/ui/` using `cargo shadcn-iced`.
 - **Token-Based Theming**: Generated from `shadcn/ui`'s OKLCH tokens across light and dark modes, with 7 base palettes (`neutral`, `stone`, `zinc`, `mauve`, `olive`, `mist`, `taupe`), 17 accent colors, chart palettes, radius presets, and menu styles. Standard `iced::Theme` values are also supported.
-- **Bundled Fonts and Icons**: Includes Geist, Geist Mono, Inter, and all 2,179 [Lucide](https://lucide.dev) icons out of the box, with configurable body and heading fonts.
+- **Bundled Fonts and Icons**: Includes Geist, Geist Mono, Inter, the keyboard symbols of shortcuts (⌘ ⌥ ⌃ ⏎ ...), and all 2,179 [Lucide](https://lucide.dev) icons out of the box, with configurable body and heading fonts.
 - **Headless Primitives and Animations**: Built on reusable primitives for anchored floating overlays (with collision handling and flipping), modal layers, keyboard-navigable listboxes, disclosures, and resizable split panes, paired with smooth native transitions.
 
 ## Getting Started
