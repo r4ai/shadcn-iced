@@ -14,14 +14,17 @@ flowchart TD
         Core["shadcn_iced_core (Tokens, Themes, Fonts, Primitives)"]
         Lib["shadcn_iced (66 Styled Components)"]
         CLI["cargo-shadcn-iced (CLI Source Copier)"]
+        Apps["examples/dashboard, examples/settings (Example Apps)"]
         Gallery["examples/gallery (Desktop Showcase & Snapshot CLI)"]
         Web["examples/gallery-web (WASM Multi-Canvas Previews)"]
-        Conf["conformance (Pixel-Diff Suite vs. React shadcn/ui)"]
+        Conf["conformance/iced (Scenario Runner vs. React shadcn/ui)"]
     end
 
     Core --> Lib
-    Core --> Gallery
+    Lib --> Apps
     Lib --> Gallery
+    Apps --> Gallery
+    Lib --> Web
     Gallery --> Web
     Lib -. "embeds components/*.rs" .-> CLI
     Lib --> Conf
@@ -63,10 +66,12 @@ flowchart LR
 | `crates/shadcn_iced` | `shadcn_iced` | All 66 styled components (`src/components/*.rs`),<br/>re-exports of `shadcn_iced_core`, and `shadcn_iced::prelude`. |
 | `crates/cargo-shadcn-iced` | `cargo-shadcn-iced` | CLI binary (`cargo shadcn-iced`) that embeds `components/*.rs`<br/>and copies selected components with transitive siblings. |
 | `examples/hello` | `hello` | Minimal single-file app (`cargo run -p hello`)<br/>demonstrating the `README.md` quick start. |
-| `examples/gallery` | `gallery` | Desktop showcase of 65 component pages and 4 chart pages,<br/>plus `snapshot` (PNG renderer) and `extract_docs` (site JSON). |
+| `examples/dashboard` | `dashboard` | The `dashboard-01` block of `shadcn/ui` (sidebar, metrics, chart,<br/>data table) as a library (state, `update`, `view`) and a `main.rs`. |
+| `examples/settings` | `settings` | An app's settings (profile, account, appearance, notifications,<br/>display), structured like `dashboard`. |
+| `examples/gallery` | `gallery` | Desktop showcase of 65 component pages, plus 4 chart pages and<br/>the 2 example apps for the website, `snapshot` (PNG renderer),<br/>and `site_data` (site JSON). |
 | `examples/gallery-web` | `gallery-web` | WebAssembly entrypoint (`wasm32-unknown-unknown`) driving<br/>all website component previews in a single `iced::daemon`. |
-| `conformance/` | `conformance` | Visual regression harness comparing `shadcn-iced` snapshots<br/>against an official Next.js + React `shadcn/ui` app. |
-| `site/` | Astro + Starlight | Documentation website (`https://shadcn-iced.r4ai.dev`)<br/>consuming `extract_docs` JSON and the `gallery-web` WASM bundle. |
+| `conformance/` | `conformance` (`conformance/iced`)<br/>+ Vite + React app | Runs the same scenarios against `shadcn-iced` (headless)<br/>and the latest `shadcn/ui` (Playwright), and compares them. |
+| `site/` | TanStack Start + Solid + Vite | Documentation website (`https://shadcn-iced.r4ai.dev`)<br/>consuming `site_data` JSON and the `gallery-web` WASM bundle. |
 | `scripts/` | Developer Scripts | Maintenance utilities (`check-copy.sh`, `gen_themes.py`,<br/>`gen_icons.py`, `gen_fonts.py`, `grid.py`, `montage.py`). |
 
 ---
@@ -128,7 +133,7 @@ flowchart LR
 Every component in `crates/shadcn_iced/src/components/<name>.rs` exposes a builder function that converts into `iced::Element<'a, Message>`:
 
 ```rust
-pub fn button<'a, Message>(content: impl Into<Element<'a, Message>>) -> Button<'a, Message>
+pub fn button<'a, Message: Clone + 'a>(label: impl Into<String>) -> Button<'a, Message>
 ```
 
 ### Where Widget State Lives
@@ -137,12 +142,12 @@ pub fn button<'a, Message>(content: impl Into<Element<'a, Message>>) -> Button<'
 | :--- | :--- | :--- |
 | **Visual & Transient** | Widget tree (`tree.state`) | Hover/press states, focus rings, animations, and open/close state of<br/>`DropdownMenu`, `ContextMenu`, `Menubar`, `Popover`, `HoverCard`,<br/>`Tooltip`, `Select`, `Combobox`, `Collapsible`, and `Accordion`. |
 | **Controlled Values** | Caller model (`&str`, `bool`, `Option<T>`) | `input`, `textarea`, `checkbox`, `switch`, `slider`,<br/>`radio_group`, `tabs`, `calendar`, `date_picker`, `pagination`. |
-| **Shared Collections** | Caller model (`Vec<Toast>`, `State`) | `sonner::Toast`, `toast::Toast`, `questionnaire::State`,<br/>`resizable::Split`, and `sidebar` open state. |
+| **Shared Collections** | Caller model (`Vec<Toast>`, `State`) | `sonner::Toast`, `toast::Toast`, `questionnaire::State`,<br/>and `sidebar` open state. |
 
 ### Self-Contained Portability Contract
 
 - Component files under `crates/shadcn_iced/src/components/` never import from `crate::*`
-- Shared utilities come from `use shadcn_iced_core::*;`
+- Shared utilities come from `shadcn_iced_core` paths (e.g. `use shadcn_iced_core::primitive::Pressable;`)
 - Sibling components are imported via `use super::<sibling>::*;`
 - `scripts/check-copy.sh` verifies this in CI by running `cargo shadcn-iced add --all` in an isolated crate
 
@@ -150,7 +155,7 @@ pub fn button<'a, Message>(content: impl Into<Element<'a, Message>>) -> Button<'
 
 ## Headless Primitives (`shadcn_iced_core::primitive`)
 
-`shadcn_iced_core::primitive` implements **17 headless primitives** on top of `iced::advanced::Widget` and `iced::advanced::Overlay`.
+`shadcn_iced_core::primitive` implements **17 headless primitives**: 16 widgets on top of `iced::advanced::Widget` and `iced::advanced::Overlay`, plus `plot`, the plain geometry (functions and types) behind charts.
 
 ```mermaid
 flowchart TD
@@ -164,23 +169,23 @@ flowchart TD
 
 | Primitive | Responsibility | Used By |
 | :--- | :--- | :--- |
-| `anchored` | Floating overlay positioning, viewport collision flipping,<br/>submenu safe-triangle hover tracking, and outside-click dismissal. | `DropdownMenu`, `ContextMenu`, `Menubar`,<br/>`Popover`, `HoverCard`, `Tooltip`, `Select`,<br/>`Combobox`, `DatePicker`, `NavigationMenu` |
+| `anchored` | Floating content next to an anchor: positioning on a side with an alignment,<br/>flipping and shifting to stay inside the window, opening (controlled, click,<br/>hover, right click, combobox), dismissal (`Escape`, outside click), and menubar groups. | `ContextMenu`, `DropdownMenu`, `HoverCard`,<br/>`Menubar`, `NavigationMenu`, `Popover`,<br/>`Tooltip`, `Select`, `Combobox`, `DatePicker` |
 | `animated_width` | Smoothly interpolates container width between two target lengths. | `Sidebar` |
-| `breakpoint` | Responsive container (`SM = 640px`, `MD = 768px`) that switches<br/>layouts based on available width (`measure`, `either`). | Responsive shells, `Sidebar`, `NativeSelect` |
+| `breakpoint` | Responsive variants (`SM = 640px`, `MD = 768px`) for the content of overlays,<br/>laid out with the window size (`measure`, `either`). | `Dialog`, `AlertDialog` |
 | `disclosure` | Animated height reveal/collapse container that clips content<br/>during transitions and hides it when closed. | `Accordion`, `Collapsible`, `Trace` |
-| `focus` | Tracks direct (`Focus`) or descendant (`FocusWithin`) focus,<br/>drawing `shadcn/ui`'s 3px outset focus ring (`Ring`). | `Button`, `Checkbox`, `Switch`, `Input`,<br/>`Textarea`, `InputGroup`, `Slider`, `Toggle` |
+| `focus` | Tracks direct (`Focus`) or descendant (`FocusWithin`) focus and draws<br/>the focus ring (`Ring`, outside the bounds like CSS `ring-[3px]`). | `Input`, `Textarea`, `InputGroup`, `Checkbox`,<br/>`RadioGroup`, `Slider`, `Tabs`, `NativeSelect`,<br/>`Combobox`, `Card`, `Avatar` |
 | `labelled` | HTML `<label>` behavior that focuses and activates<br/>the first interactive child control when clicked. | `Field`, `Label`, `Checkbox`,<br/>`RadioGroup`, `Switch` |
-| `layer` | Full-viewport modal stack and dimmed backdrop (`bg-black/50`)<br/>handling pointer trapping, `Escape`, and entry animation. | `AlertDialog`, `Dialog`, `Sheet`,<br/>`Drawer`, `CommandDialog` |
-| `listbox` | Keyboard-navigable option list (`ArrowUp`, `ArrowDown`,<br/>`Home`, `End`, `Enter`, typeahead) with auto-scroll. | `Select`, `Combobox`, `Command` |
-| `plot` | 2D chart engine computing scales, nice ticks, stacked series,<br/>splines, bars, pie/donut arcs, legends, and hover tooltips. | `Chart` (`Area`, `Bar`, `Line`, `Pie`) |
-| `pressable` | Low-level interactive wrapper exposing hover, press, focus,<br/>right-click, and cursor states without button chrome. | `Badge`, `Card`, `Table` rows,<br/>`Breadcrumb`, `TraceLine`, `Item` |
-| `roving` | WAI-ARIA roving tabindex (`Arrow` keys, `Home`, `End`)<br/>focus navigation across sibling controls. | `RadioGroup`, `ToggleGroup`, `Tabs`,<br/>`Accordion`, `ButtonGroup` |
-| `split` | Draggable two-pane split container with mouse/keyboard<br/>handle dragging and min/max size constraints. | `Resizable` |
+| `layer` | Content on top of the whole window (centered, against an edge, or in a corner),<br/>with an optional backdrop (`bg-black/10` by default) that blocks the rest of the interface. | `AlertDialog`, `Dialog`, `Sheet`,<br/>`Drawer`, `Sonner`, `Toast` |
+| `listbox` | Vertical list with a highlighted item that follows the mouse and<br/>the keys (`ArrowUp`, `ArrowDown`, `Home`, `End`); `Enter` or a click selects it. | `Select`, `Combobox`, `Command`, menus |
+| `plot` | Chart geometry (not a widget): category and linear scales, nice ticks,<br/>stacked baselines, natural curves, pie arcs, and pointer hit-testing. | `Chart` (`Area`, `Bar`, `Line`, `Pie`) |
+| `pressable` | Clickable surface exposing hover, press, and focus status without button chrome;<br/>reacts to hover without `on_press` and can take the keyboard focus. | `Button`, `Toggle`, `Checkbox`, `Switch`,<br/>`Accordion`, `Tabs`, `Select`, `Calendar`,<br/>`Pagination`, `Sidebar`, `Badge`, `Breadcrumb`,<br/>`Item`, `Trace`, and others |
+| `roving` | Roving focus: arrow keys, `Home`, and `End` move the focus<br/>between the items of a group, which is a single `Tab` stop. | `RadioGroup`, `ToggleGroup`, `Tabs` |
+| `split` | Two panes separated by a divider that can be dragged or moved with the keys,<br/>self-managed unless controlled with `ratio` and `on_resize`. | `Resizable` |
 | `toaster` | Animated corner stack manager handling hover-to-expand,<br/>dismiss gestures, auto-dismiss timers, and stack transforms. | `Sonner`, `Toast` |
 | `track` | Horizontal/vertical sliding viewport with drag gestures<br/>and smooth index snapping. | `Carousel` |
-| `tracked` | Character-by-character text layout implementing CSS<br/>`letter-spacing` while supporting widget text lookup. | `Card` titles, `AlertTitle`,<br/>`Kbd`, `Table` headers |
-| `underline` | Draws a baseline-offset text underline (`underline-offset-4`)<br/>on hover or persistently. | `Button` (`Variant::Link`),<br/>`Breadcrumb`, `HoverCard` triggers |
-| `wheel` | Intercepts mouse wheel events for smooth pixel scrolling<br/>and maps `Shift + Wheel` to horizontal scrolling. | `ScrollArea`, `Table`, `CodeBlock` |
+| `tracked` | Character-by-character text layout implementing CSS<br/>`letter-spacing` while supporting widget text lookup. | Shortcuts in `Command` and menus |
+| `underline` | Underlines text while hovered (`hover:underline`). | `Button` (`Variant::Link`) |
+| `wheel` | Browser-like wheel scrolling: smooth, with `Shift + Wheel` scrolling horizontally.<br/>Wraps a whole application view. | Application views (`gallery`, `gallery-web`) |
 
 ---
 
@@ -190,10 +195,10 @@ flowchart TD
 
 | Feature | Default | Bundled Asset | Size | Purpose |
 | :--- | :---: | :--- | :---: | :--- |
-| `lucide` | Yes | `fonts/lucide.ttf` | ~900 KB | 2,179 [Lucide](https://lucide.dev) icons exposed in `shadcn_iced::lucide::*`. |
-| `geist` | Yes | `Geist-*.ttf`,<br/>`GeistMono-*.ttf` | ~380 KB | Default sans-serif (`Geist`) and monospace (`Geist Mono`)<br/>typefaces (`Regular`, `Medium`, `SemiBold`, `Bold`). |
-| `inter` | Yes | `Inter-*.ttf` | ~1.3 MB | Alternative sans-serif typeface (`Inter`), selectable<br/>at runtime via `font::set_sans(FontFamily::Inter)`. |
-| `symbols` | Yes | `ShadcnIcedSymbols-Regular.ttf` | ~55 KB | Subset of Noto Sans Symbols / Math covering<br/>keyboard shortcut glyphs (`⌘ ⌥ ⌃ ⇧ ⏎ ⌫ ⎋ ⇥ ␣`) and arrows. |
+| `lucide` | Yes | `fonts/lucide.ttf` | ~900 KB | 2,179 [Lucide](https://lucide.dev) icons exposed in `shadcn_iced::icon::lucide`<br/>(also `shadcn_iced::prelude::lucide`). |
+| `geist` | Yes | `Geist-*.ttf`,<br/>`GeistMono-*.ttf` | ~810 KB | Default sans-serif (`Geist`: `Regular`, `Medium`, `SemiBold`, `Bold`)<br/>and monospace (`Geist Mono`: `Regular`, `Medium`) typefaces. |
+| `inter` | Yes | `Inter-*.ttf` | ~710 KB | Alternative sans-serif typeface (`Inter`), selectable<br/>at runtime via `font::set_sans(font::INTER)`. |
+| `symbols` | Yes | `ShadcnIcedSymbols-Regular.ttf` | ~55 KB | Subset of Noto Sans Symbols, Symbols 2, and Math covering<br/>keyboard shortcut glyphs (`⌘ ⌥ ⌃ ⇧ ⏎ ⌫ ⎋ ⇥ ␣`) and arrows. |
 
 - Call `.shadcn_iced()` on `iced::application` or `iced::daemon` to register all enabled fonts and set the default font
 - Alternatively, register fonts manually via `shadcn_iced::font::all()` and `shadcn_iced::font::sans()`
@@ -202,16 +207,17 @@ flowchart TD
 
 ## Animation System
 
-`crates/shadcn_iced_core/src/animation.rs` drives frame-based transitions with `iced::time::Instant`:
+`crates/shadcn_iced_core/src/animation.rs` ports the `tw-animate-css` utilities used by `shadcn/ui`. Animated widgets keep a `Transition` in their state and redraw until it settles, timed with `iced::time::Instant`:
 
-- **`SPRING` (`200ms`)**
-  - Critically damped spring curve for switches, accordions, drawers, sheets, and sidebar width
-- **`CUBIC_OUT` (`150ms`)**
-  - `cubic-bezier(0.22, 1, 0.36, 1)` curve for popover, menu, and dialog scale/fade transitions
-- **`FAST_OUT` (`100ms`)**
-  - Fast fade/slide curve for tooltips and immediate feedback
+- **Durations**
+  - `FAST` (`150ms`), `NORMAL` (`200ms`), `SLOW` (`300ms`), and `SLOWER` (`500ms`)
+- **Easings**
+  - `linear`, `ease`, `ease_in`, `ease_out`, `css_ease_out`, `ease_in_out`, and `cubic_bezier(x1, y1, x2, y2, t)` for custom curves
+- **Effects**
+  - Transforms (`zoom-in-95`, `slide-in-from-top-2`, sheets sliding in) through `iced::Transformation`
+  - Opacity (`fade-in-0`) by drawing a subtree with a faded copy of the theme (`Fade`, `theme::faded`)
 - **`shadcn_iced::animation::set_enabled(false)`**
-  - Snaps all animations immediately to their target value for deterministic snapshots
+  - Snaps all animations immediately to their target value for deterministic snapshots or reduced motion
 
 ---
 
@@ -221,17 +227,22 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-    participant Page as Astro Doc Page
+    participant Page as Site Doc Page
     participant WASM as gallery-web Daemon
     participant Canvas as iced Canvas Window
 
     Page->>WASM: mount(target, page, example)
     WASM->>Canvas: window::open(target)
     Canvas-->>WASM: window::Id
-    WASM->>WASM: gallery::view_example(page, example)
+    WASM->>WASM: gallery::view_example(gallery, page, example)
     WASM-->>Page: shadcnIcedPreviewResized(target, height)
+    WASM-->>Page: shadcnIcedPreviewWheel(captured)
     Page->>WASM: setTheme(dark, base, accent, radius)
     WASM->>WASM: Update theme across all windows
+    Page->>WASM: themeCode(dark, base, accent, radius)
+    WASM-->>Page: Rust code of the theme
+    Page->>WASM: unmount(target)
+    WASM->>Canvas: window::close
 ```
 
 ---
@@ -241,7 +252,7 @@ sequenceDiagram
 - **Font Hinting & Anti-Aliasing**
   - Browser text rendering differs slightly in glyph weight and kerning from `cosmic-text` + `tiny-skia` / `wgpu`
 - **Backdrop Blur**
-  - Translucent menus (`MenuColor::DefaultTranslucent` / `InvertedTranslucent`) use higher surface alpha instead of CSS `backdrop-filter: blur(...)`
+  - Translucent menus (`MenuColor::DefaultTranslucent` / `InvertedTranslucent`) use the same translucent surface (`bg-popover/70`) without the CSS `backdrop-filter: blur(...)`, which iced cannot do
 - **CSS Box Shadows**
   - Multi-layer CSS shadows (`shadow-xs`, `shadow-md`, `shadow-lg`) map to single-layer `iced::Shadow`
 - **DOM Portals vs. `iced::advanced::Overlay`**
