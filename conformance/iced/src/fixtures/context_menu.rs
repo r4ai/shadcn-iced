@@ -9,10 +9,11 @@ use iced::widget::{container, text};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
-        "trigger" => Fixture::new(example).init(|s| {
-            s.set("bookmarks", true);
-            s.set("person", "pedro");
-        }),
+        "trigger" | "open" | "submenu" | "checkboxes" | "radio-group" => Fixture::new(example)
+            .init(|s| {
+                s.set("bookmarks", true);
+                s.set("person", "pedro");
+            }),
         _ => return None,
     })
 }
@@ -56,7 +57,7 @@ fn example(s: &Store) -> Element<'_, Msg> {
                 .separator()
                 .item(item("Delete").destructive().on_select(Msg::Noop))
                 // `w-44`
-                .min_width(176.0),
+                .width(176.0),
         )
         .separator()
         .checkbox(
@@ -70,7 +71,7 @@ fn example(s: &Store) -> Element<'_, Msg> {
 
     let menu = person(menu, "pedro", "Pedro Duarte");
     // `w-48`
-    let menu = person(menu, "colm", "Colm Tuite").min_width(192.0);
+    let menu = person(menu, "colm", "Colm Tuite").width(192.0);
 
     context_menu(area, menu).into()
 }

@@ -8,9 +8,13 @@
 //!   and shifting it so it stays inside the window,
 //! - opening it, either controlled by your application ([`Anchored::open`])
 //!   or self-managed: on click ([`Anchored::new`]'s default), on hover
-//!   ([`Anchored::hover`]) or on right click ([`Anchored::context_menu`]),
+//!   ([`Anchored::hover`]), on right click ([`Anchored::context_menu`]) or
+//!   like the popup of a combobox ([`Anchored::combobox`]),
 //! - dismissing it on <kbd>Escape</kbd>, on a click outside, and (for menus)
-//!   once an item has been activated.
+//!   once an item has been activated, with a click or <kbd>Enter</kbd>,
+//! - switching between the menus of a [`Group`] (a menubar) when another
+//!   trigger is hovered, or with <kbd>←</kbd> and <kbd>→</kbd>.
+use super::focus;
 use crate::animation::{self, Appearance, Fade, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -20,8 +24,8 @@ use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
 use iced::time::{Duration, Instant};
 use iced::{
-    Background, Border, Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch,
-    window,
+    Background, Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector, border,
+    mouse, touch, window,
 };
 
 use std::sync::atomic::{self, AtomicU64};
@@ -84,6 +88,7 @@ enum Trigger<Message> {
         close_delay: Duration,
     },
     ContextMenu,
+    Input,
 }
 
 /// Floating content anchored to another element.
@@ -96,11 +101,15 @@ pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
     offset: f32,
     align_offset: f32,
     collision_padding: f32,
+    outset: f32,
     match_anchor_width: bool,
+    anchor_width: Option<f32>,
+    fallback_offset: Option<f32>,
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<Box<dyn Fn(bool) -> Message + 'a>>,
     open_highlight: Option<Box<dyn Fn(&Theme) -> (Background, Border) + 'a>>,
+    focus_ring: Option<Box<dyn Fn(&Theme) -> focus::Style + 'a>>,
     animate: bool,
 }
 
@@ -123,11 +132,15 @@ where
             offset: 4.0,
             align_offset: 0.0,
             collision_padding: 8.0,
+            outset: 0.0,
+            anchor_width: None,
+            fallback_offset: None,
             match_anchor_width: false,
             close_on_select: false,
             modal: false,
             on_open_change: None,
             open_highlight: None,
+            focus_ring: None,
             animate: true,
         }
     }
@@ -183,6 +196,16 @@ where
         self
     }
 
+    /// Opens the content like the popup of a combobox: when a [`Toggle`]
+    /// inside the anchor is pressed, or when the focused anchor receives
+    /// text or <kbd>↓</kbd> / <kbd>↑</kbd> (which also highlight the first
+    /// or last item). Pressing the rest of the anchor (the input) neither
+    /// opens nor closes it.
+    pub fn combobox(mut self) -> Self {
+        self.trigger = Trigger::Input;
+        self
+    }
+
     /// Sets the side of the anchor the content is placed on.
     pub fn side(mut self, side: Side) -> Self {
         self.side = side;
@@ -211,6 +234,30 @@ where
     /// the window.
     pub fn collision_padding(mut self, padding: f32) -> Self {
         self.collision_padding = padding;
+        self
+    }
+
+    /// Sets the width of a ring drawn around the content, outside of the
+    /// element it surrounds (`ring-1`): the content is placed, sized and
+    /// kept inside the window as if it did not have it.
+    pub fn outset(mut self, outset: f32) -> Self {
+        self.outset = outset;
+        self
+    }
+
+    /// Makes the content exactly as wide as the anchor, but at least `min`
+    /// wide (`w-(--anchor-width) min-w-32`), whatever its own width.
+    pub fn anchor_width(mut self, min: f32) -> Self {
+        self.anchor_width = Some(min);
+        self
+    }
+
+    /// Sets the offset used instead of [`Anchored::offset`] when the
+    /// content placed with it would not fit in the window, e.g. a select
+    /// list overlapping its trigger (`alignItemWithTrigger`) that falls
+    /// back to opening below it.
+    pub fn fallback_offset(mut self, offset: f32) -> Self {
+        self.fallback_offset = Some(offset);
         self
     }
 
@@ -246,6 +293,16 @@ where
         self
     }
 
+    /// Draws a focus ring around the anchor once the content has been
+    /// dismissed with the keyboard (<kbd>Escape</kbd>, or <kbd>Enter</kbd>
+    /// on an item), like the `focus-visible` style of a trigger the focus
+    /// returns to. It lasts until the next press. Only the `ring` and
+    /// `border` of the style are drawn, the border over the anchor.
+    pub fn focus_ring(mut self, f: impl Fn(&Theme) -> focus::Style + 'a) -> Self {
+        self.focus_ring = Some(Box::new(f));
+        self
+    }
+
     /// Sets a closure producing a message whenever a self-managed
     /// [`Anchored`] opens or closes.
     pub fn on_open_change(mut self, f: impl Fn(bool) -> Message + 'a) -> Self {
@@ -272,13 +329,22 @@ struct State {
     hover: Hover,
     anchor_hovered: bool,
     content_hovered: bool,
+    /// Whether hover content was dismissed (<kbd>Escape</kbd>) and stays
+    /// closed until the pointer leaves.
+    suppressed: bool,
+    /// Whether the content was dismissed with the keyboard, which leaves
+    /// the anchor `focus-visible`.
+    focus_visible: bool,
+    /// The key event that opened the content, replayed into it once it is
+    /// shown (<kbd>↓</kbd> highlights the first item).
+    replay: Option<Event>,
 }
 
 impl State {
     fn is_open<Message>(&self, trigger: &Trigger<Message>) -> bool {
         match trigger {
             Trigger::Controlled { open, .. } => *open,
-            Trigger::Click | Trigger::ContextMenu => self.open,
+            Trigger::Click | Trigger::ContextMenu | Trigger::Input => self.open,
             Trigger::Hover { .. } => {
                 matches!(self.hover, Hover::Open | Hover::Closing(_))
             }
@@ -292,7 +358,12 @@ impl State {
         shell: &mut Shell<'_, Message>,
     ) {
         let now = Instant::now();
-        let hovered = self.anchor_hovered || self.content_hovered;
+        let mut hovered = self.anchor_hovered || self.content_hovered;
+
+        if self.suppressed {
+            self.suppressed = hovered;
+            hovered = false;
+        }
 
         let next = match self.hover {
             Hover::Idle if hovered => {
@@ -421,6 +492,18 @@ where
         let state = tree.state.downcast_mut::<State>();
         let bounds = layout.bounds();
 
+        if let Event::Mouse(mouse::Event::ButtonPressed(_))
+        | Event::Touch(touch::Event::FingerPressed { .. })
+        | Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(key::Named::Tab),
+            ..
+        }) = event
+            && state.focus_visible
+        {
+            state.focus_visible = false;
+            shell.request_redraw();
+        }
+
         match &self.trigger {
             Trigger::Controlled { .. } => {}
             Trigger::Click => {
@@ -466,6 +549,89 @@ where
                     state.tick(*open_delay, *close_delay, shell);
                 }
             }
+            Trigger::Input => {
+                let toggle = match event {
+                    Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+                    | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                        cursor.position_over(bounds).is_some_and(|position| {
+                            let mut toggles = FindToggles(Vec::new());
+
+                            self.anchor.as_widget_mut().operate(
+                                &mut tree.children[0],
+                                layout,
+                                renderer,
+                                &mut toggles,
+                            );
+
+                            toggles.0.iter().any(|toggle| toggle.contains(position))
+                        })
+                    }
+                    Event::Keyboard(keyboard::Event::KeyPressed {
+                        key,
+                        text,
+                        modifiers,
+                        ..
+                    }) if !state.open => {
+                        let arrow = matches!(
+                            key,
+                            keyboard::Key::Named(key::Named::ArrowDown | key::Named::ArrowUp)
+                        );
+                        let typed = !modifiers.command()
+                            && (text
+                                .as_ref()
+                                .is_some_and(|text| !text.chars().any(char::is_control))
+                                || matches!(
+                                    key,
+                                    keyboard::Key::Named(
+                                        key::Named::Backspace | key::Named::Delete
+                                    )
+                                ));
+
+                        let opens = (arrow || typed) && {
+                            let mut focused = FindFocused(false);
+
+                            self.anchor.as_widget_mut().operate(
+                                &mut tree.children[0],
+                                layout,
+                                renderer,
+                                &mut focused,
+                            );
+
+                            focused.0
+                        };
+
+                        if opens && arrow {
+                            state.replay = Some(event.clone());
+                            shell.capture_event();
+                        }
+
+                        opens
+                    }
+                    _ => false,
+                };
+
+                if toggle {
+                    // Like a click on the trigger of a Base UI combobox, which
+                    // focuses its input.
+                    if !state.open {
+                        self.anchor.as_widget_mut().operate(
+                            &mut tree.children[0],
+                            layout,
+                            renderer,
+                            &mut FocusFirst(false),
+                        );
+                    }
+
+                    state.open = !state.open;
+                    state.epoch = select_epoch();
+                    shell.invalidate_layout();
+                    shell.request_redraw();
+
+                    if let Some(f) = &self.on_open_change {
+                        shell.publish(f(state.open));
+                    }
+                }
+            }
         }
     }
 
@@ -479,8 +645,31 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
+        let state = tree.state.downcast_ref::<State>();
+        let focus_ring = self
+            .focus_ring
+            .as_ref()
+            .filter(|_| state.focus_visible && !state.is_open(&self.trigger))
+            .map(|f| f(theme));
+
+        // `focus-visible:ring-3`
+        if let Some(ring) = focus_ring.and_then(|style| style.ring) {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: layout.bounds().expand(ring.width),
+                    border: Border {
+                        color: ring.color,
+                        width: ring.width,
+                        radius: border::radius(ring.radius + ring.width),
+                    },
+                    ..renderer::Quad::default()
+                },
+                Background::Color(Color::TRANSPARENT),
+            );
+        }
+
         if let Some(highlight) = &self.open_highlight
-            && tree.state.downcast_ref::<State>().is_open(&self.trigger)
+            && state.is_open(&self.trigger)
         {
             let (background, border) = highlight(theme);
 
@@ -503,6 +692,22 @@ where
             cursor,
             viewport,
         );
+
+        // `focus-visible:border-ring`
+        if let Some(style) = focus_ring
+            && style.border.width > 0.0
+        {
+            renderer.with_layer(*viewport, |renderer| {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: layout.bounds(),
+                        border: style.border,
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(Color::TRANSPARENT),
+                );
+            });
+        }
     }
 
     fn mouse_interaction(
@@ -529,6 +734,25 @@ where
         renderer: &Renderer,
         viewport: &Rectangle,
         translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        self.overlay_in(tree, layout, renderer, viewport, translation, None)
+    }
+}
+
+impl<'a, Message, Theme, Renderer> Anchored<'a, Message, Theme, Renderer>
+where
+    Message: Clone + 'a,
+    Theme: Fade + 'a,
+    Renderer: iced::advanced::Renderer + 'a,
+{
+    fn overlay_in<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+        group: Option<GroupLink<'b>>,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
         let Tree {
             state, children, ..
@@ -579,12 +803,16 @@ where
                 offset: self.offset,
                 align_offset: self.align_offset,
                 collision_padding: self.collision_padding,
+                outset: self.outset,
+                anchor_width: self.anchor_width,
+                fallback_offset: self.fallback_offset,
                 match_anchor_width: self.match_anchor_width,
                 close_on_select: self.close_on_select,
                 modal: self.modal,
                 on_open_change: self.on_open_change.as_deref(),
                 closing: !open,
                 resolved_side: self.side,
+                group: group.filter(|_| open),
             })))
         } else {
             None
@@ -635,12 +863,26 @@ struct Floating<'a, 'b, Message, Theme, Renderer> {
     offset: f32,
     align_offset: f32,
     collision_padding: f32,
+    outset: f32,
     match_anchor_width: bool,
+    anchor_width: Option<f32>,
+    fallback_offset: Option<f32>,
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<&'b (dyn Fn(bool) -> Message + 'a)>,
     closing: bool,
     resolved_side: Side,
+    group: Option<GroupLink<'b>>,
+}
+
+/// What the open content of a [`Group`] knows about its siblings.
+struct GroupLink<'b> {
+    /// The index of the [`Anchored`] in its group.
+    index: usize,
+    /// The bounds of the anchors of the group.
+    anchors: Vec<Rectangle>,
+    /// Where to ask the group to open another [`Anchored`].
+    request: &'b mut Option<usize>,
 }
 
 impl<Message, Theme, Renderer> Floating<'_, '_, Message, Theme, Renderer>
@@ -654,7 +896,7 @@ where
                     shell.publish(message.clone());
                 }
             }
-            Trigger::Click | Trigger::ContextMenu => {
+            Trigger::Click | Trigger::ContextMenu | Trigger::Input => {
                 if self.state.open {
                     self.state.open = false;
                     shell.invalidate_layout();
@@ -667,10 +909,41 @@ where
             }
             Trigger::Hover { .. } => {
                 self.state.hover = Hover::Idle;
+                // Until the pointer leaves, or it would reopen right away.
+                self.state.suppressed = true;
                 shell.invalidate_layout();
                 shell.request_redraw();
             }
         }
+    }
+}
+
+/// Places content of the given size next to the anchor, without keeping it
+/// inside the window.
+fn place(
+    anchor: Rectangle,
+    size: Size,
+    side: Side,
+    align: Align,
+    offset: f32,
+    align_offset: f32,
+) -> Point {
+    let cross_x = || match align {
+        Align::Start => anchor.x + align_offset,
+        Align::Center => anchor.center_x() - size.width / 2.0,
+        Align::End => anchor.x + anchor.width - size.width - align_offset,
+    };
+    let cross_y = || match align {
+        Align::Start => anchor.y + align_offset,
+        Align::Center => anchor.center_y() - size.height / 2.0,
+        Align::End => anchor.y + anchor.height - size.height - align_offset,
+    };
+
+    match side {
+        Side::Bottom => Point::new(cross_x(), anchor.y + anchor.height + offset),
+        Side::Top => Point::new(cross_x(), anchor.y - size.height - offset),
+        Side::Right => Point::new(anchor.x + anchor.width + offset, cross_y()),
+        Side::Left => Point::new(anchor.x - size.width - offset, cross_y()),
     }
 }
 
@@ -687,25 +960,7 @@ pub fn position(
     align_offset: f32,
     padding: f32,
 ) -> (Point, Side) {
-    let place = |side: Side| {
-        let cross_x = || match align {
-            Align::Start => anchor.x + align_offset,
-            Align::Center => anchor.center_x() - size.width / 2.0,
-            Align::End => anchor.x + anchor.width - size.width - align_offset,
-        };
-        let cross_y = || match align {
-            Align::Start => anchor.y + align_offset,
-            Align::Center => anchor.center_y() - size.height / 2.0,
-            Align::End => anchor.y + anchor.height - size.height - align_offset,
-        };
-
-        match side {
-            Side::Bottom => Point::new(cross_x(), anchor.y + anchor.height + offset),
-            Side::Top => Point::new(cross_x(), anchor.y - size.height - offset),
-            Side::Right => Point::new(anchor.x + anchor.width + offset, cross_y()),
-            Side::Left => Point::new(anchor.x - size.width - offset, cross_y()),
-        }
-    };
+    let place = |side: Side| place(anchor, size, side, align, offset, align_offset);
 
     let overflow = |side: Side, point: Point| match side {
         Side::Bottom => point.y + size.height - (viewport.height - padding),
@@ -757,15 +1012,23 @@ where
 {
     fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
         let padding = self.collision_padding;
+        let outset = self.outset;
         let max = Size::new(
-            (bounds.width - padding * 2.0).max(0.0),
-            (bounds.height - padding * 2.0).max(0.0),
+            (bounds.width - padding * 2.0 + outset * 2.0).max(0.0),
+            (bounds.height - padding * 2.0 + outset * 2.0).max(0.0),
         );
 
-        let min_width = if self.match_anchor_width && self.point.is_none() {
-            self.anchor_bounds.width.min(max.width)
-        } else {
-            0.0
+        let (min_width, max) = match self.anchor_width {
+            Some(min) if self.point.is_none() => {
+                let width = (self.anchor_bounds.width.max(min) + outset * 2.0).min(max.width);
+
+                (width, Size::new(width, max.height))
+            }
+            _ if self.match_anchor_width && self.point.is_none() => (
+                (self.anchor_bounds.width + outset * 2.0).min(max.width),
+                max,
+            ),
+            _ => (0.0, max),
         };
 
         let node = self.content.as_widget_mut().layout(
@@ -779,20 +1042,46 @@ where
             None => self.anchor_bounds,
         };
 
+        let size = node.size();
+        let size = Size::new(
+            (size.width - outset * 2.0).max(0.0),
+            (size.height - outset * 2.0).max(0.0),
+        );
+
+        let offset = match self.fallback_offset {
+            Some(fallback) => {
+                let point = place(
+                    anchor,
+                    size,
+                    self.side,
+                    self.align,
+                    self.offset,
+                    self.align_offset,
+                );
+                let fits = point.x >= padding
+                    && point.y >= padding
+                    && point.x + size.width <= bounds.width - padding
+                    && point.y + size.height <= bounds.height - padding;
+
+                if fits { self.offset } else { fallback }
+            }
+            None => self.offset,
+        };
+
         let (position, side) = position(
             anchor,
-            node.size(),
+            size,
             bounds,
             self.side,
             self.align,
-            self.offset,
+            offset,
             self.align_offset,
             padding,
         );
 
         self.resolved_side = side;
 
-        node.move_to(position)
+        node.move_to(position - Vector::new(outset, outset))
     }
 
     fn draw(
@@ -874,11 +1163,74 @@ where
             return;
         }
 
+        // The key that opened the content (`ArrowDown` in a combobox) acts
+        // on it too.
+        if let Some(replay) = self.state.replay.take() {
+            let mut messages = Vec::new();
+            let mut inner = Shell::new(&mut messages);
+
+            self.content.as_widget_mut().update(
+                self.tree, &replay, layout, cursor, renderer, clipboard, &mut inner, &bounds,
+            );
+
+            // Not merged: the replayed event must not capture this one.
+            let invalid = inner.is_layout_invalid();
+
+            for message in messages {
+                shell.publish(message);
+            }
+
+            if invalid {
+                shell.invalidate_layout();
+            }
+
+            shell.request_redraw();
+        }
+
+        // Another trigger of the group is hovered: open its menu instead.
+        if let Some(group) = &mut self.group
+            && let Event::Mouse(mouse::Event::CursorMoved { .. }) = event
+            && let Some(position) = cursor.position()
+            && !bounds.contains(position)
+            && let Some(other) = group
+                .anchors
+                .iter()
+                .position(|anchor| anchor.contains(position))
+            && other != group.index
+        {
+            *group.request = Some(other);
+            self.dismiss(shell);
+            shell.capture_event();
+            return;
+        }
+
         self.content.as_widget_mut().update(
             self.tree, event, layout, cursor, renderer, clipboard, shell, &bounds,
         );
 
         let captured_by_content = !was_captured && shell.is_event_captured();
+
+        // `ArrowLeft` and `ArrowRight` move to the previous and next menus of
+        // the group.
+        if let Some(group) = &mut self.group
+            && !captured_by_content
+            && let Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(named @ (key::Named::ArrowLeft | key::Named::ArrowRight)),
+                ..
+            }) = event
+            && group.anchors.len() > 1
+        {
+            let count = group.anchors.len();
+
+            *group.request = Some(if *named == key::Named::ArrowRight {
+                (group.index + 1) % count
+            } else {
+                (group.index + count - 1) % count
+            });
+            self.dismiss(shell);
+            shell.capture_event();
+            return;
+        }
 
         if let Trigger::Hover {
             open_delay,
@@ -896,6 +1248,7 @@ where
                 ..
             }) => {
                 self.dismiss(shell);
+                self.state.focus_visible = true;
                 shell.capture_event();
             }
             Event::Mouse(mouse::Event::ButtonPressed(_))
@@ -904,7 +1257,12 @@ where
             {
                 let over_anchor = self.point.is_none() && cursor.is_over(self.anchor_bounds);
 
-                if matches!(self.trigger, Trigger::Hover { .. }) {
+                if matches!(self.trigger, Trigger::Input) {
+                    // The anchor handles its own presses (its toggle).
+                    if !over_anchor {
+                        self.dismiss(shell);
+                    }
+                } else if matches!(self.trigger, Trigger::Hover { .. }) {
                     if !over_anchor {
                         self.dismiss(shell);
                     }
@@ -923,6 +1281,16 @@ where
                 let _ = SELECT_EPOCH.fetch_add(1, atomic::Ordering::Relaxed);
                 self.state.epoch = select_epoch();
                 self.dismiss(shell);
+            }
+            // An item activated with the keyboard.
+            Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(key::Named::Enter),
+                ..
+            }) if captured_by_content && self.close_on_select => {
+                let _ = SELECT_EPOCH.fetch_add(1, atomic::Ordering::Relaxed);
+                self.state.epoch = select_epoch();
+                self.dismiss(shell);
+                self.state.focus_visible = true;
             }
             Event::Mouse(_) | Event::Touch(_) if self.modal => {
                 shell.capture_event();
@@ -964,6 +1332,487 @@ where
         self.content
             .as_widget_mut()
             .overlay(self.tree, layout, renderer, &bounds, Vector::ZERO)
+    }
+}
+
+/// A row of [`Anchored`] menus that behave as one, like a menubar: while
+/// one of them is open, hovering another trigger opens its menu instead,
+/// and <kbd>←</kbd> / <kbd>→</kbd> move to the previous or next menu.
+///
+/// Menus opened this way do not call their [`Anchored::on_open_change`].
+pub struct Group<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
+    children: Vec<Anchored<'a, Message, Theme, Renderer>>,
+    spacing: f32,
+}
+
+/// Creates a [`Group`] of [`Anchored`] menus.
+pub fn group<'a, Message, Theme, Renderer>(
+    children: impl IntoIterator<Item = Anchored<'a, Message, Theme, Renderer>>,
+) -> Group<'a, Message, Theme, Renderer> {
+    Group {
+        children: children.into_iter().collect(),
+        spacing: 0.0,
+    }
+}
+
+impl<Message, Theme, Renderer> Group<'_, Message, Theme, Renderer> {
+    /// Sets the horizontal space between the anchors.
+    pub fn spacing(mut self, spacing: f32) -> Self {
+        self.spacing = spacing;
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+struct GroupState {
+    /// The menu to open, asked for by the open one.
+    request: Option<usize>,
+}
+
+impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
+    for Group<'a, Message, Theme, Renderer>
+where
+    Message: Clone + 'a,
+    Theme: Fade + 'a,
+    Renderer: iced::advanced::Renderer + 'a,
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<GroupState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(GroupState::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        self.children
+            .iter()
+            .map(|child| Tree::new(child as &dyn Widget<Message, Theme, Renderer>))
+            .collect()
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(
+            &self
+                .children
+                .iter()
+                .map(|child| child as &dyn Widget<Message, Theme, Renderer>)
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    fn size(&self) -> Size<Length> {
+        Size::new(Length::Shrink, Length::Shrink)
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let loose = layout::Limits::new(Size::ZERO, limits.max());
+        let mut nodes: Vec<layout::Node> = self
+            .children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .map(|(child, tree)| child.layout(tree, renderer, &loose))
+            .collect();
+
+        let height = nodes
+            .iter()
+            .map(|node| node.size().height)
+            .fold(0.0, f32::max);
+        let mut x = 0.0;
+
+        for node in &mut nodes {
+            let size = node.size();
+            node.move_to_mut(Point::new(x, (height - size.height) / 2.0));
+            x += size.width + self.spacing;
+        }
+
+        let width = if nodes.is_empty() {
+            0.0
+        } else {
+            x - self.spacing
+        };
+
+        layout::Node::with_children(
+            limits.resolve(Length::Shrink, Length::Shrink, Size::new(width, height)),
+            nodes,
+        )
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        operation.container(None, layout.bounds());
+        operation.traverse(&mut |operation| {
+            for ((child, tree), layout) in self
+                .children
+                .iter_mut()
+                .zip(&mut tree.children)
+                .zip(layout.children())
+            {
+                child.operate(tree, layout, renderer, operation);
+            }
+        });
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        for ((child, tree), layout) in self
+            .children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+        {
+            child.update(
+                tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+            );
+        }
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        for ((child, tree), layout) in self
+            .children
+            .iter()
+            .zip(&tree.children)
+            .zip(layout.children())
+        {
+            child.draw(tree, renderer, theme, style, layout, cursor, viewport);
+        }
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        self.children
+            .iter()
+            .zip(&tree.children)
+            .zip(layout.children())
+            .map(|((child, tree), layout)| {
+                child.mouse_interaction(tree, layout, cursor, viewport, renderer)
+            })
+            .max()
+            .unwrap_or_default()
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        let Tree {
+            state, children, ..
+        } = tree;
+        let group = state.downcast_mut::<GroupState>();
+
+        // Opens the menu the previously open one asked for.
+        if let Some(index) = group.request.take()
+            && let Some(tree) = children.get_mut(index)
+        {
+            let state = tree.state.downcast_mut::<State>();
+            state.open = true;
+            state.epoch = select_epoch();
+        }
+
+        let anchors: Vec<Rectangle> = layout
+            .children()
+            .map(|layout| layout.bounds() + translation)
+            .collect();
+        let mut request = Some(&mut group.request);
+
+        let overlays: Vec<_> = self
+            .children
+            .iter_mut()
+            .zip(children.iter_mut())
+            .zip(layout.children())
+            .enumerate()
+            .filter_map(|(index, ((child, tree), layout))| {
+                let link = if tree.state.downcast_ref::<State>().is_open(&child.trigger) {
+                    request.take().map(|request| GroupLink {
+                        index,
+                        anchors: anchors.clone(),
+                        request,
+                    })
+                } else {
+                    None
+                };
+
+                child.overlay_in(tree, layout, renderer, viewport, translation, link)
+            })
+            .collect();
+
+        (!overlays.is_empty()).then(|| overlay::Group::with_children(overlays).overlay())
+    }
+}
+
+impl<'a, Message, Theme, Renderer> From<Group<'a, Message, Theme, Renderer>>
+    for Element<'a, Message, Theme, Renderer>
+where
+    Message: Clone + 'a,
+    Theme: Fade + 'a,
+    Renderer: iced::advanced::Renderer + 'a,
+{
+    fn from(group: Group<'a, Message, Theme, Renderer>) -> Self {
+        Element::new(group)
+    }
+}
+
+/// The part of the anchor of a [`combobox`](Anchored::combobox) that opens
+/// and closes the content when pressed, e.g. a chevron button.
+pub struct Toggle<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
+    content: Element<'a, Message, Theme, Renderer>,
+}
+
+/// Creates a [`Toggle`].
+pub fn toggle<'a, Message, Theme, Renderer>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+) -> Toggle<'a, Message, Theme, Renderer> {
+    Toggle {
+        content: content.into(),
+    }
+}
+
+/// The state of a [`Toggle`], which [`Anchored`] looks for.
+#[derive(Debug, Default)]
+struct ToggleMarker;
+
+impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
+    for Toggle<'a, Message, Theme, Renderer>
+where
+    Renderer: iced::advanced::Renderer + 'a,
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<ToggleMarker>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(ToggleMarker)
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn size_hint(&self) -> Size<Length> {
+        self.content.as_widget().size_hint()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        operation.custom(
+            None,
+            layout.bounds(),
+            tree.state.downcast_mut::<ToggleMarker>(),
+        );
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
+    }
+}
+
+impl<'a, Message, Theme, Renderer> From<Toggle<'a, Message, Theme, Renderer>>
+    for Element<'a, Message, Theme, Renderer>
+where
+    Message: 'a,
+    Theme: 'a,
+    Renderer: iced::advanced::Renderer + 'a,
+{
+    fn from(toggle: Toggle<'a, Message, Theme, Renderer>) -> Self {
+        Element::new(toggle)
+    }
+}
+
+/// Collects the bounds of the [`Toggle`]s of a widget tree.
+struct FindToggles(Vec<Rectangle>);
+
+impl Operation for FindToggles {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+
+    fn custom(
+        &mut self,
+        _id: Option<&widget::Id>,
+        bounds: Rectangle,
+        state: &mut dyn std::any::Any,
+    ) {
+        if state.is::<ToggleMarker>() {
+            self.0.push(bounds);
+        }
+    }
+}
+
+/// Focuses the first focusable widget of a widget tree.
+struct FocusFirst(bool);
+
+impl Operation for FocusFirst {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+
+    fn focusable(
+        &mut self,
+        _id: Option<&widget::Id>,
+        _bounds: Rectangle,
+        state: &mut dyn widget::operation::Focusable,
+    ) {
+        if !self.0 {
+            state.focus();
+            self.0 = true;
+        }
+    }
+}
+
+/// Finds out whether a widget tree holds the keyboard focus.
+struct FindFocused(bool);
+
+impl Operation for FindFocused {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+
+    fn focusable(
+        &mut self,
+        _id: Option<&widget::Id>,
+        _bounds: Rectangle,
+        state: &mut dyn widget::operation::Focusable,
+    ) {
+        self.0 |= state.is_focused();
     }
 }
 

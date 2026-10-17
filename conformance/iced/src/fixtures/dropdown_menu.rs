@@ -65,7 +65,7 @@ fn basic(_: &Store) -> Element<'_, Msg> {
             .separator()
             .item(noop("Log out").shortcut("⇧⌘Q"))
             // `w-40`
-            .min_width(160.0),
+            .width(160.0),
     )
     .into()
 }
@@ -81,7 +81,7 @@ fn checkboxes(s: &Store) -> Element<'_, Msg> {
         .checkbox_maybe("Activity Bar", false, None)
         .checkbox("Panel", s.bool("panel"), Msg::Toggle("panel"))
         // `w-40`
-        .min_width(160.0);
+        .width(160.0);
 
     dropdown_menu(button("Checkboxes").variant(Variant::Outline), menu).into()
 }
@@ -103,7 +103,7 @@ fn radio_group(s: &Store) -> Element<'_, Msg> {
     // `w-32`
     dropdown_menu(
         button("Radio Group").variant(Variant::Outline),
-        menu.min_width(128.0),
+        menu.width(128.0),
     )
     .into()
 }

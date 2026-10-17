@@ -87,7 +87,8 @@ fn link_style(theme: &Theme, status: Status) -> Style {
 
 /// A link of the content of a navigation menu: a title and a short
 /// description (`ListItem` in the shadcn/ui example: `flex-col gap-1
-/// text-sm`, the title `leading-none font-medium`).
+/// text-sm`, the title `leading-none font-medium`, the description
+/// `line-clamp-2`).
 pub fn link<'a, Message: Clone + 'a>(
     title: impl Into<String>,
     description: impl Into<String>,
@@ -102,12 +103,17 @@ pub fn link<'a, Message: Clone + 'a>(
                     .line_height(1.0),
             )
             .push(
-                text(description.into())
-                    .size(style::text::SM)
-                    .line_height(iced::Pixels(20.0))
-                    .style(|theme: &Theme| text::Style {
-                        color: Some(tokens(theme).palette.muted_foreground),
-                    }),
+                // `line-clamp-2`, without the ellipsis iced cannot draw.
+                container(
+                    text(description.into())
+                        .size(style::text::SM)
+                        .line_height(iced::Pixels(20.0))
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(tokens(theme).palette.muted_foreground),
+                        }),
+                )
+                .max_height(40)
+                .clip(true),
             )
             .spacing(4),
     )
@@ -178,7 +184,7 @@ impl<'a, Message: Clone + 'a> From<NavigationMenu<'a, Message>> for Element<'a, 
                         )
                         .align_y(Alignment::Center),
                 )
-                .padding([6, 10])
+                .padding([8, 10])
                 .height(36)
                 .style(trigger_style);
 
@@ -190,6 +196,8 @@ impl<'a, Message: Clone + 'a> From<NavigationMenu<'a, Message>> for Element<'a, 
                     .side(Side::Bottom)
                     .align(Align::Start)
                     .offset(8.0)
+                    // `ring-1` around the popup.
+                    .outset(1.0)
                     // `data-popup-open:bg-muted/50`
                     .open_highlight(|theme| {
                         let t = tokens(theme);
@@ -202,7 +210,7 @@ impl<'a, Message: Clone + 'a> From<NavigationMenu<'a, Message>> for Element<'a, 
             }
             Entry::Link(title, on_press) => Pressable::new(label(title))
                 .on_press(on_press)
-                .padding([6, 10])
+                .padding([8, 10])
                 .height(36)
                 .style(trigger_style)
                 .into(),

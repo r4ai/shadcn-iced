@@ -40,8 +40,8 @@ impl<T> Entry<T> {
             Entry::Option(..) => 28.0,
             // `py-1` + `text-xs`
             Entry::Label(_) => 24.0,
-            // `my-1 h-px`
-            Entry::Separator => 9.0,
+            // `my-1 h-px` between two `p-1` groups.
+            Entry::Separator => 17.0,
         }
     }
 }
@@ -186,6 +186,12 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
         let has_value = selected_label.is_some();
         let invalid = select.invalid;
         let size = select.size;
+        // `disabled:opacity-50`
+        let opacity = if select.disabled {
+            style::DISABLED_OPACITY
+        } else {
+            1.0
+        };
 
         // `gap-1.5 py-2 pr-2 pl-2.5 text-sm`
         let trigger = Pressable::new(
@@ -201,14 +207,15 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                             Length::Fill
                         })
                         .style(move |theme: &Theme| text::Style {
-                            color: (!has_value).then(|| tokens(theme).palette.muted_foreground),
+                            color: (!has_value)
+                                .then(|| alpha(tokens(theme).palette.muted_foreground, opacity)),
                         }),
                 )
                 .push(
                     lucide::CHEVRON_DOWN
                         .sized(16)
-                        .style(|theme: &Theme| text::Style {
-                            color: Some(tokens(theme).palette.muted_foreground),
+                        .style(move |theme: &Theme| text::Style {
+                            color: Some(alpha(tokens(theme).palette.muted_foreground, opacity)),
                         }),
                 )
                 .spacing(6)
@@ -217,18 +224,20 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
         )
         .width(select.width)
         .height(size.height())
+        // `pr-2 pl-2.5` inside the 1px border.
         .padding(iced::Padding {
             top: 0.0,
-            right: 8.0,
+            right: 9.0,
             bottom: 0.0,
-            left: 10.0,
+            left: 11.0,
         })
         .disabled(select.disabled)
         .style(move |theme, status| trigger_style(theme, status, invalid, size));
 
         // Where the selected (or first) option sits in the list, to open
         // the list with it on top of the trigger.
-        let mut item_top = 1.0 + 4.0;
+        // (`p-1`, inside the ring.)
+        let mut item_top = 4.0;
         let mut aligned = None;
         let mut first = None;
 
@@ -246,7 +255,12 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
 
         let aligned_top = aligned.or(first).unwrap_or(0.0);
 
-        let mut list = listbox::Listbox::new(menu::highlight);
+        // The selected option is highlighted when the list opens.
+        let selected_index = select.entries.iter().position(|entry| {
+            matches!(entry, Entry::Option(value, ..) if select.selected.as_ref() == Some(value))
+        });
+
+        let mut list = listbox::Listbox::new(menu::highlight).highlighted(selected_index);
 
         for entry in select.entries {
             list = match entry {
@@ -291,14 +305,16 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                     )
                     .padding(menu::ITEM_PADDING),
                 ),
-                Entry::Separator => list.push(menu::separator()),
+                // A separator ends a `SelectGroup` (`p-1`) and starts another.
+                Entry::Separator => list.push(container(menu::separator()).padding([4, 0])),
             };
         }
 
-        // `min-w-36 rounded-lg shadow-md ring-1`, `p-1` groups.
+        // `w-(--anchor-width) min-w-36 rounded-lg shadow-md ring-1`, `p-1`
+        // groups.
         let content = container(
-            scrollable(list.padding(4).min_width(144.0 - 10.0))
-                .width(Length::Shrink)
+            scrollable(list.padding(4).width(Length::Fill))
+                .width(Length::Fill)
                 .direction(scrollable::Direction::Vertical(
                     super::scroll_area::scrollbar(),
                 ))
@@ -310,17 +326,31 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
 
         let anchored = Anchored::new(trigger, content)
             .align(Align::Start)
-            .match_anchor_width(true)
+            .anchor_width(144.0)
+            // `ring-1` around the list.
+            .outset(1.0)
             .close_on_select(true)
-            .modal(true);
+            .modal(true)
+            // `focus-visible:border-ring focus-visible:ring-3`, once
+            // dismissed with the keyboard.
+            .focus_ring(move |theme| {
+                let t = tokens(theme);
+                style::focus_visible(
+                    &t,
+                    match size {
+                        Size::Default => t.radius_lg(),
+                        Size::Sm => t.radius_md().min(10.0),
+                    },
+                )
+            });
 
         if select.align_item_with_trigger {
             // The item centered on the trigger, its text aligned with the
-            // value (`pl-2.5` against the ring, `p-1` and `pl-1.5`).
+            // value, or below the trigger when there is no room for it.
             anchored
                 .side(Side::Bottom)
                 .offset(-(size.height() + 28.0) / 2.0 - aligned_top)
-                .align_offset(-1.0)
+                .fallback_offset(4.0)
                 .animate(false)
                 .into()
         } else {
@@ -349,8 +379,8 @@ fn trigger_style(theme: &Theme, status: Status, invalid: bool, size: Size) -> St
     Style {
         background: Some(Background::Color(match (dark, hovered) {
             (false, _) => Color::TRANSPARENT,
-            (true, false) => alpha(p.input, 0.3),
-            (true, true) => alpha(p.input, 0.5),
+            (true, false) => alpha(p.input, 0.3 * opacity),
+            (true, true) => alpha(p.input, 0.5 * opacity),
         })),
         text_color: alpha(p.foreground, opacity),
         border: Border {

@@ -29,4 +29,8 @@ pub fn hover_card<'a, Message: Clone + 'a>(
     .hover(Duration::from_millis(600), Duration::from_millis(300))
     .side(Side::Bottom)
     .offset(4.0)
+    // `ring-1` around the panel.
+    .outset(1.0)
+    // Base UI keeps popups 5px away from the edges of the window.
+    .collision_padding(5.0)
 }

@@ -17,6 +17,11 @@ use iced::{
     mouse, touch,
 };
 
+std::thread_local! {
+    /// Whether the item being drawn is highlighted, for [`ItemRow::trailing_color`].
+    static HIGHLIGHTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// The look of the highlighted item of a [`Listbox`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Style {
@@ -44,6 +49,7 @@ pub struct Listbox<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> 
     min_width: f32,
     keyboard: bool,
     highlight_first: bool,
+    initial: Option<usize>,
     clear_on_leave: bool,
     style: Box<dyn Fn(&Theme) -> Style + 'a>,
 }
@@ -62,6 +68,7 @@ where
             min_width: 0.0,
             keyboard: true,
             highlight_first: false,
+            initial: None,
             clear_on_leave: true,
             style: Box::new(style),
         }
@@ -163,6 +170,13 @@ where
         self
     }
 
+    /// Highlights the child at `index` (e.g. the selected option of a
+    /// select) until the user moves the highlight.
+    pub fn highlighted(mut self, index: Option<usize>) -> Self {
+        self.initial = index;
+        self
+    }
+
     /// Sets whether the highlight is cleared when the cursor leaves the
     /// list. Defaults to `true`.
     pub fn clear_on_leave(mut self, clear: bool) -> Self {
@@ -191,8 +205,18 @@ impl<Message, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
                 .is_some_and(|child| child.selectable)
         });
 
-        if active.is_none() && self.highlight_first && !state.touched {
-            return self.children.iter().position(|child| child.selectable);
+        if active.is_none() && !state.touched {
+            if let Some(index) = self.initial.filter(|index| {
+                self.children
+                    .get(*index)
+                    .is_some_and(|child| child.selectable)
+            }) {
+                return Some(index);
+            }
+
+            if self.highlight_first {
+                return self.children.iter().position(|child| child.selectable);
+            }
         }
 
         active
@@ -494,6 +518,8 @@ where
                 );
             }
 
+            let was_highlighted = HIGHLIGHTED.replace(is_active);
+
             child.content.as_widget().draw(
                 tree,
                 renderer,
@@ -509,6 +535,8 @@ where
                 cursor,
                 viewport,
             );
+
+            HIGHLIGHTED.set(was_highlighted);
         }
     }
 
@@ -592,6 +620,7 @@ where
 pub struct ItemRow<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
     trailing: Option<Element<'a, Message, Theme, Renderer>>,
+    trailing_color: Option<Box<dyn Fn(&Theme, bool) -> Color + 'a>>,
     spacing: f32,
     padding: Padding,
 }
@@ -604,6 +633,7 @@ pub fn row<'a, Message, Theme, Renderer>(
     ItemRow {
         content: content.into(),
         trailing,
+        trailing_color: None,
         spacing: 16.0,
         padding: Padding::ZERO,
     }
@@ -613,6 +643,16 @@ impl<'a, Message, Theme, Renderer> ItemRow<'a, Message, Theme, Renderer> {
     /// Sets the minimum space between the content and the trailing part.
     pub fn spacing(mut self, spacing: f32) -> Self {
         self.spacing = spacing;
+        self
+    }
+
+    /// Sets the text color of the trailing part, given whether the item is
+    /// highlighted in its [`Listbox`], e.g. a shortcut that is muted
+    /// unless highlighted (`text-muted-foreground
+    /// group-focus:text-accent-foreground`). By default, it inherits the
+    /// color of the item.
+    pub fn trailing_color(mut self, f: impl Fn(&Theme, bool) -> Color + 'a) -> Self {
+        self.trailing_color = Some(Box::new(f));
         self
     }
 
@@ -791,6 +831,13 @@ where
         );
 
         if let (Some(trailing), Some(layout)) = (self.trailing.as_ref(), layouts.next()) {
+            let style = match &self.trailing_color {
+                Some(f) => &renderer::Style {
+                    text_color: f(theme, HIGHLIGHTED.get()),
+                },
+                None => style,
+            };
+
             trailing.as_widget().draw(
                 &tree.children[1],
                 renderer,

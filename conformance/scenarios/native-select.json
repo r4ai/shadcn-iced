@@ -14,7 +14,7 @@
       ]
     },
     { "id": "selected", "viewport": [200, 64] },
-    { "id": "sizes", "viewport": [200, 96] },
+    { "id": "sizes", "viewport": [200, 112] },
     {
       "id": "keyboard",
       "viewport": [200, 64],
@@ -26,6 +26,6 @@
         { "snapshot": "in-progress" }
       ]
     },
-    { "id": "states", "viewport": [200, 96] }
+    { "id": "states", "viewport": [200, 112] }
   ]
 }

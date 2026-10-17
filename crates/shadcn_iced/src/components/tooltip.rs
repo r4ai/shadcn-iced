@@ -201,6 +201,8 @@ impl<'a, Message: Clone + 'a> From<Tooltip<'a, Message>> for Element<'a, Message
             .align(tooltip.align)
             // The arrow is part of the content.
             .offset(tooltip.offset - ARROW_HEIGHT)
+            // Base UI keeps popups 5px away from the edges of the window.
+            .collision_padding(5.0)
             .into()
     }
 }

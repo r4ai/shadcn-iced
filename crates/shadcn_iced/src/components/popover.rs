@@ -27,6 +27,14 @@ pub fn popover<'a, Message: Clone + 'a>(
         .side(Side::Bottom)
         .align(Align::Center)
         .offset(4.0)
+        // `ring-1` around the panel.
+        .outset(1.0)
+        // `focus-visible:border-ring focus-visible:ring-3` of a button,
+        // once dismissed with the keyboard.
+        .focus_ring(|theme| {
+            let t = tokens(theme);
+            style::focus_visible(&t, t.radius_lg())
+        })
 }
 
 /// Creates a popover whose panel has the given width (e.g. `w-80`).
@@ -39,16 +47,29 @@ pub fn popover_with_width<'a, Message: Clone + 'a>(
         .side(Side::Bottom)
         .align(Align::Center)
         .offset(4.0)
+        // `ring-1` around the panel.
+        .outset(1.0)
+        // `focus-visible:border-ring focus-visible:ring-3` of a button,
+        // once dismissed with the keyboard.
+        .focus_ring(|theme| {
+            let t = tokens(theme);
+            style::focus_visible(&t, t.radius_lg())
+        })
 }
 
-/// Wraps content in a popover panel of the given width (`p-2.5 text-sm`).
+/// Wraps content in a popover panel of the given width (`p-2.5 text-sm`),
+/// with its `ring-1` around it: the panel is 2px larger, to be placed with
+/// [`Anchored::outset`].
 pub fn panel<'a, Message: 'a>(
     content: impl Into<Element<'a, Message>>,
     width: Length,
 ) -> Element<'a, Message> {
     container(content)
-        .padding(10)
-        .width(width)
+        .padding(1.0 + 10.0)
+        .width(match width {
+            Length::Fixed(width) => Length::Fixed(width + 2.0),
+            width => width,
+        })
         .style(style)
         .into()
 }
