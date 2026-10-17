@@ -278,11 +278,28 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
             .align_y(Alignment::Center)
             .height(Length::Fill);
 
+        // In a group, the buttons after the first one lose their leading
+        // border (`border-l-0` / `border-t-0`) and overlap the previous one
+        // by a pixel instead. Their fixed sizes (`h-8`, `size-8`) include the
+        // missing border: they grow by a pixel to keep it.
+        let joined = matches!(
+            button.position,
+            style::Position::Middle | style::Position::Last
+        );
+        let grow = |vertical: bool| {
+            if joined && button.vertical == vertical {
+                1.0
+            } else {
+                0.0
+            }
+        };
+
         let width = button.width.unwrap_or(if size.is_icon() {
-            Length::Fixed(height)
+            Length::Fixed(height + grow(false))
         } else {
             Length::Shrink
         });
+        let height = height + grow(true);
 
         let content: Element<'a, Message> = if size.is_icon() || width != Length::Shrink {
             iced::widget::container(content)
