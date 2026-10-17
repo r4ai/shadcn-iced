@@ -1,0 +1,57 @@
+{
+  "$schema": "./schema.json",
+  "component": "hover-card",
+  "scenarios": [
+    {
+      "id": "default",
+      "description": "Opens 600ms after hovering the trigger and closes 300ms after the pointer leaves (the delays of Base UI's preview card).",
+      "viewport": [320, 200],
+      "steps": [
+        { "snapshot": "closed" },
+        { "hover": "@nextjs" },
+        { "expect": { "hidden": ["Joined December 2021"] } },
+        { "wait": 800 },
+        {
+          "expect": {
+            "visible": [
+              "Joined December 2021",
+              "The React Framework – created and maintained by @vercel."
+            ]
+          }
+        },
+        { "snapshot": "open" },
+        { "hover": { "at": [300, 180] } },
+        { "wait": 600 },
+        { "expect": { "hidden": ["Joined December 2021"] } },
+        { "snapshot": "closed-after-leave" }
+      ]
+    },
+    {
+      "id": "escape",
+      "description": "Closes with Escape while the pointer is over the trigger.",
+      "viewport": [320, 200],
+      "steps": [
+        { "hover": "@nextjs" },
+        { "wait": 800 },
+        { "expect": { "visible": ["Joined December 2021"] } },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Joined December 2021"] } },
+        { "snapshot": "closed" }
+      ]
+    },
+    {
+      "id": "stays-open",
+      "description": "Moving the pointer from the trigger into the card keeps it open.",
+      "viewport": [320, 200],
+      "steps": [
+        { "hover": "@nextjs" },
+        { "wait": 800 },
+        { "expect": { "visible": ["Joined December 2021"] } },
+        { "hover": "Joined December 2021" },
+        { "wait": 600 },
+        { "expect": { "visible": ["Joined December 2021"] } },
+        { "snapshot": "hovering-card" }
+      ]
+    }
+  ]
+}
