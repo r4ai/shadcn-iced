@@ -9,12 +9,14 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const site = join(dirname(fileURLToPath(import.meta.url)), "..");
 const root = join(site, "..");
 const out = join(site, "public/wasm");
+const target = resolve(root, process.env.CARGO_TARGET_DIR ?? "target");
 const run = (command, args) => execFileSync(command, args, { cwd: root, stdio: "inherit" });
 
 const lock = readFileSync(join(root, "Cargo.lock"), "utf8");
@@ -27,7 +29,28 @@ if (bindgen && !installed.endsWith(bindgen)) {
   );
 }
 
-run("cargo", ["build", "-p", "gallery-web", "--target", "wasm32-unknown-unknown", "--profile", "wasm"]);
+// Panic locations survive wasm-opt: remap build paths before compiling.
+// Cargo splits RUSTFLAGS on whitespace; encoded flags also preserve paths with spaces.
+const rustflags =
+  process.env.CARGO_ENCODED_RUSTFLAGS !== undefined
+    ? process.env.CARGO_ENCODED_RUSTFLAGS.split("\x1f").filter(Boolean)
+    : (process.env.RUSTFLAGS ?? "").split(/\s+/).filter(Boolean);
+const prefixes = [
+  [homedir(), "/home/build"],
+  [resolve(root, process.env.CARGO_HOME ?? join(homedir(), ".cargo")), "/cargo"],
+  [resolve(root, process.env.RUSTUP_HOME ?? join(homedir(), ".rustup")), "/rustup"],
+  [root, "/workspace"],
+];
+execFileSync("cargo", ["build", "-p", "gallery-web", "--target", "wasm32-unknown-unknown", "--profile", "wasm"], {
+  cwd: root,
+  stdio: "inherit",
+  env: {
+    ...process.env,
+    CARGO_ENCODED_RUSTFLAGS: [...rustflags, ...prefixes.map(([from, to]) => `--remap-path-prefix=${from}=${to}`)].join(
+      "\x1f",
+    ),
+  },
+});
 
 rmSync(out, { recursive: true, force: true });
 run("wasm-bindgen", [
@@ -36,7 +59,7 @@ run("wasm-bindgen", [
   "--no-typescript",
   "--out-dir",
   out,
-  join(root, "target/wasm32-unknown-unknown/wasm/gallery_web.wasm"),
+  join(target, "wasm32-unknown-unknown/wasm/gallery_web.wasm"),
 ]);
 
 const wasm = join(out, "gallery_web_bg.wasm");
@@ -60,6 +83,14 @@ execFileSync(
   ],
   { stdio: "inherit" },
 );
+
+// Reject any build-machine prefixes that escaped remapping.
+const binary = readFileSync(wasm);
+for (const [prefix] of prefixes) {
+  if ([prefix, prefix.replaceAll("\\", "/")].some((path) => binary.includes(Buffer.from(path)))) {
+    throw new Error("The preview WASM still contains a build-machine path.");
+  }
+}
 
 const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 console.log(`gallery_web_bg.wasm: ${mb(before)} → ${mb(statSync(wasm).size)}`);

@@ -2,6 +2,10 @@
 
 UI components for [iced](https://iced.rs), ported from [shadcn/ui](https://ui.shadcn.com).
 
+The initial crates.io release, `shadcn-iced` 0.0.0, contains documentation only,
+with no component implementation or dependencies. Use the Git dependencies below
+to try the components under development in this repository.
+
 `shadcn-iced` can be used as a standard Cargo dependency, or you can copy individual component source files into your project with the CLI and customize them directly:
 
 ```sh

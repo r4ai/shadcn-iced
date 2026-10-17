@@ -183,7 +183,7 @@ impl Gallery {
                             text("shadcn-iced")
                                 .size(style::text::SM)
                                 .font(font::semibold()),
-                            text(format!("{} components", PAGES.len())).size(style::text::XS),
+                            text(format!("{} component pages", PAGES.len())).size(style::text::XS),
                         ],
                     ]
                     .spacing(8)

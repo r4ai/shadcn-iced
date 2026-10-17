@@ -122,7 +122,7 @@ The website in `site/` is built with TanStack Start, Solid, Vite, and Tailwind C
 ### How Site Assets Are Generated
 
 1. **`pnpm data`** (`site/scripts/gen-data.mjs`): Runs `cargo run -p gallery --bin site_data` to locate every `example(...)` call in the gallery, extracts the corresponding Rust source snippets (including referenced imports and helpers) and component source files, and writes `site/src/data/components.json`.
-2. **`pnpm wasm`** (`site/scripts/build-wasm.mjs`): Compiles `examples/gallery-web` for `wasm32-unknown-unknown` using the `wasm` Cargo profile, generates bindings with `wasm-bindgen`, and optimizes the binary with `wasm-opt` into `site/public/wasm/`.
+2. **`pnpm wasm`** (`site/scripts/build-wasm.mjs`): Compiles `examples/gallery-web` for `wasm32-unknown-unknown` using the `wasm` Cargo profile, generates bindings with `wasm-bindgen`, and optimizes the binary with `wasm-opt` into `site/public/wasm/`. Build-machine paths are remapped before compilation, and the final binary is checked for unremapped prefixes before it can be deployed.
 
 ### Local Development Setup
 
