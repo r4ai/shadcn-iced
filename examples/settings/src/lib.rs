@@ -317,16 +317,15 @@ impl Settings {
             submit,
         ]
         .spacing(24)
-        .max_width(640);
+        .width(Fill);
 
-        // The row makes a filling child at least as wide as its share: the
-        // container takes it, and lays out the section within it loosely.
-        let section = container(section).width(Fill);
-
-        column![header, separator(), row![nav, section].spacing(48),]
+        // The nav and a form at most 640 wide (`lg:max-w-2xl`), centered as
+        // one page so that both sides of a wide window stay even.
+        let page = column![header, separator(), row![nav, section].spacing(48)]
             .spacing(24)
-            .padding(40)
-            .into()
+            .max_width(200.0 + 48.0 + 640.0);
+
+        container(page).center_x(Fill).padding(40).into()
     }
 
     fn profile(&self) -> Element<'_, Message> {
