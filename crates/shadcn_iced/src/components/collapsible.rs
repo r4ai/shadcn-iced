@@ -8,14 +8,14 @@
 //! collapsible("@peduarte starred 3 repositories", iced::widget::text("@radix-ui/primitives")).into()
 //! # }
 //! ```
-use super::button::{Size, Variant, icon_button};
+use super::button::{self, Size, Variant};
 
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::Disclosure;
-use shadcn_iced_core::{Element, font, style};
+use shadcn_iced_core::primitive::{Disclosure, Pressable};
+use shadcn_iced_core::{Element, font, style, tokens};
 
-use iced::widget::{Row, text};
-use iced::{Alignment, Length};
+use iced::widget::{Row, container, text};
+use iced::{Alignment, Length, border};
 
 /// Creates a collapsible with a text header (`text-sm font-semibold`) and
 /// a ghost chevron button (`size-8`) in a `px-4 gap-4` row, like the
@@ -34,11 +34,7 @@ pub fn collapsible<'a, Message: Clone + 'a>(
                     .font(font::semibold())
                     .width(Length::Fill),
             )
-            .push(
-                icon_button::<Message>(lucide::CHEVRONS_UP_DOWN)
-                    .variant(Variant::Ghost)
-                    .size(Size::Icon),
-            )
+            .push(trigger::<Message>())
             .spacing(16)
             .padding([0, 16])
             .align_y(Alignment::Center)
@@ -46,6 +42,43 @@ pub fn collapsible<'a, Message: Clone + 'a>(
     };
 
     Disclosure::new(header(title.clone()), header(title), content).spacing(8.0)
+}
+
+/// The ghost chevron button (`Button variant="ghost" size="icon"`) of the
+/// collapsible: it takes the keyboard focus, and the disclosure toggles on
+/// Enter and Space.
+fn trigger<'a, Message: Clone + 'a>() -> Element<'a, Message> {
+    let size = Size::Icon;
+
+    Pressable::new(container(lucide::CHEVRONS_UP_DOWN.sized(size.icon_size())).center(Length::Fill))
+        .focusable(true)
+        .width(size.height())
+        .height(size.height())
+        .press_offset(1.0)
+        // `border border-transparent bg-clip-padding`
+        .clip_background(true)
+        .focus_style(move |theme, status, focused| {
+            let t = tokens(theme);
+            let mut style = button::style(theme, status, Variant::Ghost);
+
+            style.border.radius = border::radius(size.radius(&t));
+
+            // `focus-visible:border-ring`
+            if focused {
+                style.border.color = t.palette.ring;
+            }
+
+            style
+        })
+        // `focus-visible:ring-3 focus-visible:ring-ring/50`
+        .ring(move |theme, _status, focused| {
+            focused.then(|| {
+                let t = tokens(theme);
+
+                style::ring(&t, size.radius(&t))
+            })
+        })
+        .into()
 }
 
 /// Creates a collapsible with custom triggers for the closed and open states.

@@ -17,7 +17,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::Disclosure;
+use shadcn_iced_core::primitive::{Disclosure, Pressable};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -26,7 +26,7 @@ use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell};
 use iced::widget::{Column, Row, container, space, text};
-use iced::{Alignment, Background, Event, Length, Rectangle, Size, Theme, mouse};
+use iced::{Alignment, Background, Color, Event, Length, Rectangle, Size, Theme, mouse};
 
 struct Item<'a, Message> {
     title: String,
@@ -120,7 +120,11 @@ impl<'a, Message: Clone + 'a> Accordion<'a, Message> {
 
 /// `AccordionTrigger`: `rounded-lg py-2.5 text-left text-sm font-medium
 /// hover:underline`, with a muted `size-4` chevron.
-fn trigger<'a, Message: 'a>(title: &str, open: bool, disabled: bool) -> Element<'a, Message> {
+fn trigger<'a, Message: Clone + 'a>(
+    title: &str,
+    open: bool,
+    disabled: bool,
+) -> Element<'a, Message> {
     let opacity = if disabled {
         style::DISABLED_OPACITY
     } else {
@@ -151,16 +155,50 @@ fn trigger<'a, Message: 'a>(title: &str, open: bool, disabled: bool) -> Element<
         )
         .align_y(Alignment::Start);
 
-    // `border border-transparent py-2.5`
-    let row = container(row).padding([11, 1]).width(Length::Fill);
+    // `py-2.5`
+    let row = container(row).padding([10, 0]).width(Length::Fill);
 
-    if disabled {
+    let row: Element<'a, Message> = if disabled {
         row.into()
     } else {
         Element::new(HoverUnderline {
             content: row.into(),
         })
-    }
+    };
+
+    // The trigger takes the keyboard focus; the disclosure toggles on
+    // Enter and Space. `rounded-lg border border-transparent`,
+    // `focus-visible:border-ring focus-visible:ring-3
+    // focus-visible:ring-ring/50`
+    Pressable::new(row)
+        .disabled(disabled)
+        .focusable(true)
+        .width(Length::Fill)
+        .padding(1)
+        .interaction(mouse::Interaction::Pointer)
+        .focus_style(|theme, _status, focused| {
+            let t = tokens(theme);
+
+            iced::widget::button::Style {
+                border: style::border(
+                    if focused {
+                        t.palette.ring
+                    } else {
+                        Color::TRANSPARENT
+                    },
+                    t.radius_lg(),
+                ),
+                ..iced::widget::button::Style::default()
+            }
+        })
+        .ring(|theme, _status, focused| {
+            focused.then(|| {
+                let t = tokens(theme);
+
+                style::ring(&t, t.radius_lg())
+            })
+        })
+        .into()
 }
 
 impl<'a, Message: Clone + 'a> From<Accordion<'a, Message>> for Element<'a, Message> {
