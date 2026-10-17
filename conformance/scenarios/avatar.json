@@ -1,0 +1,9 @@
+{
+  "$schema": "./schema.json",
+  "component": "avatar",
+  "scenarios": [
+    { "id": "sizes", "viewport": [160, 72] },
+    { "id": "badge", "viewport": [160, 64] },
+    { "id": "group", "viewport": [200, 112] }
+  ]
+}

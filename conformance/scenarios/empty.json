@@ -1,0 +1,28 @@
+{
+  "$schema": "./schema.json",
+  "component": "empty",
+  "scenarios": [
+    {
+      "id": "demo",
+      "viewport": [480, 330],
+      "steps": [
+        {
+          "expect": {
+            "visible": [
+              "No Projects Yet",
+              "Create Project",
+              "Import Project",
+              "Learn More"
+            ]
+          }
+        },
+        { "snapshot": "idle" },
+        { "hover": "Learn More" },
+        { "snapshot": "hover-link" }
+      ]
+    },
+    { "id": "outline", "viewport": [480, 230] },
+    { "id": "background", "viewport": [480, 260] },
+    { "id": "avatar", "viewport": [480, 260] }
+  ]
+}

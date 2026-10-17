@@ -1,0 +1,30 @@
+{
+  "$schema": "./schema.json",
+  "component": "item",
+  "scenarios": [
+    {
+      "id": "demo",
+      "viewport": [480, 190],
+      "steps": [
+        {
+          "expect": {
+            "visible": [
+              "Basic Item",
+              "Action",
+              "Your profile has been verified."
+            ]
+          }
+        },
+        { "snapshot": "idle" },
+        { "hover": "Your profile has been verified." },
+        { "snapshot": "hover-link" },
+        { "hover": "Action" },
+        { "snapshot": "hover-action" }
+      ]
+    },
+    { "id": "variants", "viewport": [480, 280] },
+    { "id": "sizes", "viewport": [480, 270] },
+    { "id": "avatar", "viewport": [544, 190] },
+    { "id": "group", "viewport": [416, 380] }
+  ]
+}

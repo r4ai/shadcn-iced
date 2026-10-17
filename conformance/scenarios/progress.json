@@ -1,0 +1,9 @@
+{
+  "$schema": "./schema.json",
+  "component": "progress",
+  "scenarios": [
+    { "id": "demo", "viewport": [320, 40] },
+    { "id": "label", "viewport": [416, 76] },
+    { "id": "values", "viewport": [416, 80] }
+  ]
+}

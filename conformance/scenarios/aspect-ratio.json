@@ -1,0 +1,8 @@
+{
+  "$schema": "./schema.json",
+  "component": "aspect-ratio",
+  "scenarios": [
+    { "id": "video", "viewport": [416, 250] },
+    { "id": "square", "viewport": [224, 224] }
+  ]
+}

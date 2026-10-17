@@ -1,0 +1,25 @@
+{
+  "$schema": "./schema.json",
+  "component": "badge",
+  "scenarios": [
+    {
+      "id": "variants",
+      "viewport": [520, 56],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": "Ghost" },
+        { "snapshot": "hover-ghost" }
+      ]
+    },
+    { "id": "with-icon", "viewport": [240, 56] },
+    {
+      "id": "link",
+      "viewport": [160, 56],
+      "steps": [
+        { "snapshot": "idle" },
+        { "hover": "Open Link" },
+        { "snapshot": "hover" }
+      ]
+    }
+  ]
+}
