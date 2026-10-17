@@ -1,6 +1,7 @@
 //! The questionnaire keeps its answers in a [`State`] updated with [`Event`]s,
 //! which the key-value store cannot hold. The fixture stores the log of the
-//! events instead and replays it to rebuild the state on every view.
+//! events instead and replays it to rebuild the state, which the view owns,
+//! on every view.
 use super::Fixture;
 use crate::store::{Msg, Store, Value};
 
@@ -86,10 +87,6 @@ fn view(store: &Store) -> Element<'_, Msg> {
     for event in log.lines().filter_map(decode) {
         let _ = state.update(questions(), event);
     }
-
-    // The widget borrows its state for as long as the view lives, and the
-    // state is rebuilt on every view: leak the few bytes it takes.
-    let state: &'static State = Box::leak(Box::new(state));
 
     md(questionnaire(questions(), state, move |event| {
         Msg::Set(
