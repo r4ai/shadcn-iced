@@ -105,7 +105,10 @@ impl<'a, Message: 'a> From<Marker> for Element<'a, Message> {
         };
 
         // `text-sm text-muted-foreground min-h-4`
-        let label = text(marker.label).size(style::text::SM).style(muted);
+        let label = text(marker.label)
+            .size(style::text::SM)
+            .line_height(style::text::leading(style::text::SM))
+            .style(muted);
         let label: Element<'a, Message> = if separator {
             // `flex-none text-center`
             label.wrapping(text::Wrapping::None).into()
