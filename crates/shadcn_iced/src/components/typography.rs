@@ -35,6 +35,24 @@ pub fn h2<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
         .line_height(style::text::leading(style::text::XL3))
 }
 
+/// A section heading as in the documentation: an [`h2`] above a bottom
+/// border (`border-b pb-2`) that fills the available width.
+pub fn h2_bordered<'a, Message: 'a>(content: impl text::IntoFragment<'a>) -> Element<'a, Message> {
+    Column::new()
+        .push(h2(content))
+        .push(
+            container(iced::widget::space().height(1))
+                .width(Length::Fill)
+                .style(|theme: &Theme| container::Style {
+                    background: Some(Background::Color(tokens(theme).palette.border)),
+                    ..container::Style::default()
+                }),
+        )
+        .spacing(8)
+        .width(Length::Fill)
+        .into()
+}
+
 /// `text-2xl font-semibold tracking-tight`
 pub fn h3<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
     text(content)

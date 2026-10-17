@@ -1,6 +1,5 @@
 use super::Fixture;
 
-use shadcn_iced::separator::separator;
 use shadcn_iced::typography as ty;
 
 use iced::Center;
@@ -11,10 +10,7 @@ pub fn get(id: &str) -> Option<Fixture> {
         "headings" => Fixture::new(|_| {
             column![
                 ty::h1("Taxing Laughter: The Joke Tax Chronicles"),
-                // `border-b pb-2`
-                column![ty::h2("The People of the Kingdom"), separator()]
-                    .spacing(8)
-                    .width(iced::Fill),
+                ty::h2_bordered("The People of the Kingdom"),
                 ty::h3("The Joke Tax"),
                 ty::h4("People stopped telling jokes"),
             ]
