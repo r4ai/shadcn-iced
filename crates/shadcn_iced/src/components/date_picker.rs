@@ -226,6 +226,8 @@ impl<'a, Message: Clone + 'a> From<DatePicker<'a, Message>> for Element<'a, Mess
         let mut calendar = calendar(picker.month, picker.on_navigate)
             .on_select(picker.on_select)
             .months(picker.months)
+            // The popover is `text-sm`.
+            .leading(20.0 / 14.0)
             .transparent(true);
 
         calendar = match picker.selection {

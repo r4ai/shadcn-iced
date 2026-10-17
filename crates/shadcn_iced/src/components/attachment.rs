@@ -15,9 +15,18 @@ use shadcn_iced_core::primitive::Pressable;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::advanced::graphics::geometry::Renderer as _;
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer::{self, Renderer as _};
+use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::{Clipboard, Shell, overlay};
 use iced::widget::button::Status;
+use iced::widget::canvas::{self, Frame, Path, Stroke};
 use iced::widget::{Column, Row, Stack, container, image, text};
-use iced::{Alignment, Background, Border, Length, Padding, Theme, border};
+use iced::{
+    Alignment, Background, Border, Color, Event, Length, Padding, Point, Rectangle, Size as Bounds,
+    Theme, Vector, border, mouse,
+};
 
 /// The state of an [`Attachment`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -64,15 +73,16 @@ impl Size {
         }
     }
 
-    /// The padding with content, and with media only.
-    fn padding(self, content: bool) -> Padding {
-        match (self, content) {
-            (Size::Default, true) => Padding::from([8, 10]),
-            (Size::Sm, true) => Padding::from([6, 8]),
-            (Size::Xs, true) => Padding::from([4, 6]),
-            (Size::Default, false) => Padding::new(8.0),
-            (Size::Sm, false) => Padding::new(6.0),
-            (Size::Xs, false) => Padding::new(4.0),
+    /// The padding with media (`has-data-[slot=attachment-media]:p-2`,
+    /// which wins), or with content only (`px-2.5 py-2`).
+    fn padding(self, media: bool) -> Padding {
+        match (self, media) {
+            (Size::Default, false) => Padding::from([8, 10]),
+            (Size::Sm, false) => Padding::from([6, 8]),
+            (Size::Xs, false) => Padding::from([4, 6]),
+            (Size::Default, true) => Padding::new(8.0),
+            (Size::Sm, true) => Padding::new(6.0),
+            (Size::Xs, true) => Padding::new(4.0),
         }
     }
 
@@ -190,7 +200,7 @@ impl<'a, Message: Clone + 'a> From<Attachment<'a, Message>> for Element<'a, Mess
         let size = attachment.size;
         let vertical = attachment.vertical;
         let has_content = attachment.title.is_some() || attachment.description.is_some();
-        let padding = size.padding(has_content);
+        let padding = size.padding(attachment.media.is_some() || !has_content);
 
         // `w-24 has-data-[slot=attachment-content]:w-30`, border included.
         let tile_width = if has_content { 120.0 } else { 96.0 };
@@ -247,7 +257,7 @@ impl<'a, Message: Clone + 'a> From<Attachment<'a, Message>> for Element<'a, Mess
                 })
         });
 
-        // `leading-tight`
+        // `leading-tight`, which the `text-xs` description replaces.
         let content = has_content.then(|| {
             Column::new()
                 .push(attachment.title.map(|title| {
@@ -261,7 +271,7 @@ impl<'a, Message: Clone + 'a> From<Attachment<'a, Message>> for Element<'a, Mess
                     // `mt-0.5 text-xs`
                     text(description)
                         .size(style::text::XS)
-                        .line_height(1.25)
+                        .line_height(style::text::leading(style::text::XS))
                         .wrapping(text::Wrapping::None)
                         .style(move |theme: &Theme| {
                             let p = tokens(theme).palette;
@@ -314,7 +324,17 @@ impl<'a, Message: Clone + 'a> From<Attachment<'a, Message>> for Element<'a, Mess
             Length::Shrink
         });
 
-        let body = container(body).padding(padding).width(width);
+        // Inside the 1px border.
+        let body = container(body)
+            .padding(Padding {
+                top: padding.top + 1.0,
+                right: padding.right + 1.0,
+                bottom: padding.bottom + 1.0,
+                left: padding.left + 1.0,
+            })
+            .width(width);
+
+        let pressable = attachment.on_press.is_some();
 
         let card: Element<'a, Message> = match attachment.on_press {
             Some(message) => Pressable::new(body)
@@ -334,7 +354,7 @@ impl<'a, Message: Clone + 'a> From<Attachment<'a, Message>> for Element<'a, Mess
                 .into(),
         };
 
-        match actions {
+        let card = match actions {
             // `absolute top-3 right-3`, inside the border.
             Some(actions) => Stack::new()
                 .push(card)
@@ -345,7 +365,225 @@ impl<'a, Message: Clone + 'a> From<Attachment<'a, Message>> for Element<'a, Mess
                 )
                 .into(),
             None => card,
+        };
+
+        if state == State::Idle || pressable {
+            Element::new(Outline {
+                content: card,
+                size,
+                dashed: state == State::Idle,
+                focusable: pressable,
+            })
+        } else {
+            card
         }
+    }
+}
+
+/// Draws the dashed border of an idle attachment (`border-dashed`) over
+/// its content, whose own border is transparent, and the ring of a pressed
+/// attachment while it holds the focus (`focus-within:ring-1
+/// focus-within:ring-ring/50`).
+struct Outline<'a, Message> {
+    content: Element<'a, Message>,
+    size: Size,
+    dashed: bool,
+    focusable: bool,
+}
+
+/// Whether the trigger of an attachment holds the focus.
+#[derive(Debug, Clone, Copy, Default)]
+struct Focus(bool);
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Outline<'_, Message> {
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<Focus>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(Focus::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Bounds<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let child = self
+            .content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits);
+
+        layout::Node::with_children(child.size(), vec![child])
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            operation,
+        );
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        if self.focusable
+            && let Event::Mouse(mouse::Event::ButtonPressed(_)) = event
+        {
+            let focus = tree.state.downcast_mut::<Focus>();
+            let focused = cursor.is_over(layout.bounds());
+
+            if focus.0 != focused {
+                focus.0 = focused;
+                shell.request_redraw();
+            }
+        }
+
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout.children().next().unwrap(),
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+        );
+
+        let bounds = layout.bounds();
+        let t = tokens(theme);
+        let radius = if self.size == Size::Xs {
+            t.radius_lg()
+        } else {
+            t.radius_xl()
+        };
+
+        if tree.state.downcast_ref::<Focus>().0 {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: bounds.expand(1.0),
+                    border: Border {
+                        color: alpha(t.palette.ring, 0.5),
+                        width: 1.0,
+                        radius: (radius + 1.0).into(),
+                    },
+                    ..renderer::Quad::default()
+                },
+                Color::TRANSPARENT,
+            );
+        }
+
+        if !self.dashed {
+            return;
+        }
+
+        renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
+            let mut frame = Frame::new(renderer, bounds.size());
+
+            // Centered on the 1px border.
+            frame.stroke(
+                &Path::rounded_rectangle(
+                    Point::new(0.5, 0.5),
+                    Bounds::new(bounds.width - 1.0, bounds.height - 1.0),
+                    (radius - 0.5).into(),
+                ),
+                Stroke {
+                    line_dash: canvas::LineDash {
+                        segments: &[3.0, 2.0],
+                        offset: 0,
+                    },
+                    ..Stroke::default()
+                        .with_color(t.palette.border)
+                        .with_width(1.0)
+                },
+            );
+
+            renderer.draw_geometry(frame.into_geometry());
+        });
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            viewport,
+            translation,
+        )
     }
 }
 
@@ -366,6 +604,8 @@ pub fn style(theme: &Theme, state: State, size: Size, status: Status) -> contain
         border: Border {
             color: match state {
                 State::Error => alpha(p.destructive, 0.3),
+                // Drawn dashed over the content.
+                State::Idle => Color::TRANSPARENT,
                 _ => p.border,
             },
             width: 1.0,

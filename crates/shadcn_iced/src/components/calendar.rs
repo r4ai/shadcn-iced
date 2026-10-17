@@ -18,9 +18,16 @@ use shadcn_iced_core::primitive::Pressable;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer::{self, Renderer as _};
+use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::{Clipboard, Shell, overlay};
 use iced::widget::button::{Status, Style};
-use iced::widget::{Column, Row, container, text};
-use iced::{Background, Length, Theme, border};
+use iced::widget::text::LineHeight;
+use iced::widget::{Column, Row, container, pick_list, stack, text};
+use iced::{
+    Background, Border, Color, Event, Length, Point, Rectangle, Size, Theme, Vector, border, mouse,
+};
 
 use std::fmt;
 use std::rc::Rc;
@@ -200,6 +207,16 @@ const MONTHS: [&str; 12] = [
 
 const WEEKDAYS: [&str; 7] = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
+/// `text-[0.8rem]`, which keeps the line height of its context:
+/// `leading-normal` by default.
+const WEEKDAY_SIZE: f32 = 12.8;
+
+/// `mt-2` on every week.
+const WEEK_GAP: f32 = 8.0;
+
+/// `month: gap-4`, also between the months.
+const MONTH_GAP: f32 = 16.0;
+
 /// The number of days in a month.
 pub fn days_in_month(year: i32, month: u32) -> u32 {
     match month {
@@ -235,6 +252,7 @@ pub struct Calendar<'a, Message> {
     fixed_weeks: bool,
     week_numbers: bool,
     dropdowns: Option<(i32, i32)>,
+    leading: f32,
 }
 
 /// Creates a [`Calendar`] displaying `month`.
@@ -259,6 +277,7 @@ pub fn calendar<'a, Message: Clone + 'a>(
         fixed_weeks: false,
         week_numbers: false,
         dropdowns: None,
+        leading: 1.5,
     }
 }
 
@@ -355,6 +374,14 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
     /// given years (`captionLayout="dropdown"`).
     pub fn dropdowns(mut self, from_year: i32, to_year: i32) -> Self {
         self.dropdowns = Some((from_year.min(to_year), from_year.max(to_year)));
+        self
+    }
+
+    /// Sets the line height, relative to the size, that the calendar
+    /// inherits from its context: 1.5 (`leading-normal`) by default, the
+    /// one of `text-sm` in a popover.
+    pub(crate) fn leading(mut self, leading: f32) -> Self {
+        self.leading = leading;
         self
     }
 }
@@ -487,15 +514,20 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
                     .then(|| iced::widget::space().width(cell).height(1)),
             )
             .extend(WEEKDAYS.iter().map(|day| {
-                container(text(*day).size(12.8).style(muted))
-                    .center_x(cell)
-                    .into()
+                container(
+                    text(*day)
+                        .size(WEEKDAY_SIZE)
+                        .line_height(LineHeight::Relative(self.leading))
+                        .style(muted),
+                )
+                .center_x(cell)
+                .into()
             }));
 
         let first = month.first();
         let start = first.add_days(-(first.weekday() as i64));
         // `mt-2` on every week
-        let mut weeks = Column::new().push(weekdays).spacing(8);
+        let mut weeks = Column::new().push(weekdays).spacing(WEEK_GAP);
 
         let (range_start, range_end) = match self.selection {
             Selection::Range(start, end) => (start, end.or(start)),
@@ -510,7 +542,8 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
                 row = row.push(
                     container(
                         text(week_number(start.add_days(week * 7 + 6)).to_string())
-                            .size(12.8)
+                            .size(WEEKDAY_SIZE)
+                            .line_height(LineHeight::Relative(self.leading))
                             .style(muted),
                     )
                     .center(cell),
@@ -570,10 +603,14 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
                     let span: iced::widget::text::Span<'a, (), iced::Font> =
                         iced::widget::span(date.day.to_string()).strikethrough(true);
 
-                    iced::widget::rich_text([span])
-                        .size(style::text::SM)
-                        .line_height(1.0)
-                        .into()
+                    // Still a text for whoever looks for the day.
+                    Element::new(Labeled {
+                        content: iced::widget::rich_text([span])
+                            .size(style::text::SM)
+                            .line_height(1.0)
+                            .into(),
+                        label: date.day.to_string(),
+                    })
                 } else {
                     label.into()
                 };
@@ -625,6 +662,7 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
             // `text-sm font-medium`
             return text(month.to_string())
                 .size(style::text::SM)
+                .line_height(style::text::leading(style::text::SM))
                 .font(font::medium())
                 .into();
         };
@@ -634,27 +672,111 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
         let on_month = self.on_navigate.clone();
         let on_year = self.on_navigate.clone();
 
-        let months = (1..=12).fold(
-            super::select::select(Some(current), move |month| on_month(Month { year, month })),
-            |select, m| select.option(m, &MONTHS[m as usize - 1][..3]),
-        );
-        let years = (from..=to).fold(
-            super::select::select(Some(year), move |year| {
-                on_year(Month {
+        let months = (1..=12)
+            .map(|m| Choice {
+                value: m,
+                label: MONTHS[m as usize - 1][..3].to_owned(),
+            })
+            .collect();
+        let years = (from..=to)
+            .map(|y| Choice {
+                value: y,
+                label: y.to_string(),
+            })
+            .collect();
+
+        // `dropdowns: gap-1.5`
+        Row::new()
+            .push(dropdown(months, current as i32, move |choice| {
+                on_month(Month {
                     year,
+                    month: choice as u32,
+                })
+            }))
+            .push(dropdown(years, year, move |choice| {
+                on_year(Month {
+                    year: choice,
                     month: current,
                 })
-            }),
-            |select, y| select.option(y, y.to_string()),
-        );
-
-        // `gap-1.5`
-        Row::new()
-            .push(months.size(super::select::Size::Sm))
-            .push(years.size(super::select::Size::Sm))
+            }))
             .spacing(6)
+            .align_y(iced::Alignment::Center)
             .into()
     }
+}
+
+/// An option of a caption dropdown.
+#[derive(Debug, Clone, PartialEq)]
+struct Choice {
+    value: i32,
+    label: String,
+}
+
+impl fmt::Display for Choice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.label)
+    }
+}
+
+/// A dropdown of the caption: the label of the current choice with a
+/// chevron (`caption_label: flex items-center gap-1 text-sm font-medium
+/// [&>svg]:size-3.5 [&>svg]:text-muted-foreground`), under an invisible
+/// list (`dropdown: absolute inset-0 opacity-0`).
+fn dropdown<'a, Message: Clone + 'a>(
+    choices: Vec<Choice>,
+    current: i32,
+    on_select: impl Fn(i32) -> Message + 'a,
+) -> Element<'a, Message> {
+    let selected = choices.iter().find(|c| c.value == current).cloned();
+    let label = selected
+        .as_ref()
+        .map(|choice| choice.label.clone())
+        .unwrap_or_default();
+
+    let caption = Row::new()
+        .push(
+            text(label)
+                .size(style::text::SM)
+                .line_height(style::text::leading(style::text::SM))
+                .font(font::medium()),
+        )
+        .push(
+            shadcn_iced_core::icon(lucide::CHEVRON_DOWN)
+                .size(14)
+                .style(muted),
+        )
+        .spacing(4)
+        .align_y(iced::Alignment::Center);
+
+    let list = pick_list(choices, selected, move |choice: Choice| {
+        on_select(choice.value)
+    })
+    .width(Length::Fill)
+    .padding(0)
+    .text_size(style::text::SM)
+    .text_line_height(style::text::leading(style::text::SM))
+    .style(|_theme, _status| pick_list::Style {
+        text_color: Color::TRANSPARENT,
+        placeholder_color: Color::TRANSPARENT,
+        handle_color: Color::TRANSPARENT,
+        background: Background::Color(Color::TRANSPARENT),
+        border: Border::default(),
+    })
+    .menu_style(|theme: &Theme| {
+        let t = tokens(theme);
+        let p = &t.palette;
+
+        iced::overlay::menu::Style {
+            background: Background::Color(p.popover),
+            border: style::ring_border(&t, t.radius_md()),
+            text_color: p.popover_foreground,
+            selected_text_color: p.accent_foreground,
+            selected_background: Background::Color(p.accent),
+            shadow: style::shadow_md(),
+        }
+    });
+
+    stack![caption, list].into()
 }
 
 impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Message> {
@@ -662,7 +784,7 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
         let cell = calendar.cell;
         let count = calendar.months;
         let grid_width = cell * if calendar.week_numbers { 8.0 } else { 7.0 };
-        let mut months = Row::new().spacing(16);
+        let mut months = Row::new().spacing(MONTH_GAP);
         let mut month = calendar.month;
 
         for index in 0..count {
@@ -701,16 +823,19 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
                 Column::new()
                     .push(header)
                     .push(calendar.month_grid(month))
-                    .spacing(16),
+                    .spacing(MONTH_GAP),
             );
             month = month.next();
         }
 
         let bordered = calendar.bordered;
         let transparent = calendar.transparent;
+        // The border of CSS surrounds the padding.
+        let inset = calendar.padding + if bordered { 1.0 } else { 0.0 };
+        let grid = calendar.focus_grid(inset);
 
-        container(months)
-            .padding(calendar.padding)
+        let content = container(months)
+            .padding(inset)
             .style(move |theme: &Theme| {
                 let t = tokens(theme);
                 container::Style {
@@ -722,8 +847,368 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
                     },
                     ..container::Style::default()
                 }
-            })
-            .into()
+            });
+
+        Element::new(Focus {
+            content: content.into(),
+            grid,
+        })
+    }
+}
+
+impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
+    /// Where the days are, and which one gets the focus when the focused
+    /// day is not displayed.
+    fn focus_grid(&self, inset: f32) -> Grid {
+        let cell = self.cell;
+        let grid_width = cell * if self.week_numbers { 8.0 } else { 7.0 };
+        let mut days = Vec::new();
+        let mut month = self.month;
+
+        for index in 0..self.months {
+            let first = month.first();
+            let start = first.add_days(-(first.weekday() as i64));
+            let x = inset
+                + index as f32 * (grid_width + MONTH_GAP)
+                + if self.week_numbers { cell } else { 0.0 };
+            let y = inset + cell + MONTH_GAP + WEEKDAY_SIZE * self.leading + WEEK_GAP;
+
+            for week in 0..6 {
+                let dates: Vec<Date> = (0..7).map(|d| start.add_days(week * 7 + d)).collect();
+
+                if !self.fixed_weeks && dates.iter().all(|date| date.month_of() != month) {
+                    break;
+                }
+
+                for (weekday, date) in dates.into_iter().enumerate() {
+                    let outside = date.month_of() != month;
+
+                    if outside && !self.outside_days {
+                        continue;
+                    }
+
+                    let disabled = self.disabled.as_ref().is_some_and(|f| f(date));
+
+                    days.push(GridDay {
+                        date,
+                        month,
+                        bounds: Rectangle::new(
+                            Point::new(
+                                x + weekday as f32 * cell,
+                                y + week as f32 * (cell + WEEK_GAP),
+                            ),
+                            Size::new(cell, cell),
+                        ),
+                        focusable: !outside && !disabled,
+                        interactive: !disabled && self.on_select.is_some(),
+                    });
+                }
+            }
+
+            month = month.next();
+        }
+
+        // react-day-picker's `calculateFocusTarget`: the selected day, else
+        // today, else the first focusable day.
+        let selected = match self.selection {
+            Selection::Single(date) => date,
+            Selection::Range(start, _) => start,
+            Selection::None => None,
+        };
+        let focusable = || days.iter().filter(|day| day.focusable);
+        let target = focusable()
+            .find(|day| Some(day.date) == selected)
+            .or_else(|| focusable().find(|day| Some(day.date) == self.today))
+            .or_else(|| focusable().next())
+            .map(|day| (day.date, day.month));
+
+        Grid { days, target }
+    }
+}
+
+/// A day of the displayed months.
+struct GridDay {
+    date: Date,
+    /// The month displaying it, which differs for outside days.
+    month: Month,
+    bounds: Rectangle,
+    focusable: bool,
+    interactive: bool,
+}
+
+struct Grid {
+    days: Vec<GridDay>,
+    target: Option<(Date, Month)>,
+}
+
+/// Tracks the focused day like react-day-picker: a pressed day gets the
+/// focus, which moves to another day when the months change, and shows a
+/// ring (`group-data-[focused=true]/day:ring-[3px] ring-ring/50`).
+struct Focus<'a, Message> {
+    content: Element<'a, Message>,
+    grid: Grid,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct FocusState {
+    focused: Option<(Date, Month)>,
+}
+
+impl<Message> Focus<'_, Message> {
+    /// The focused day, moved to the focus target when it is not displayed.
+    fn focused(&self, state: &FocusState) -> Option<&GridDay> {
+        let focused = state.focused?;
+        let displayed = |(date, month): (Date, Month)| {
+            self.grid
+                .days
+                .iter()
+                .find(|day| day.date == date && day.month == month)
+        };
+
+        displayed(focused).or_else(|| displayed(self.grid.target?))
+    }
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Focus<'_, Message> {
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<FocusState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(FocusState::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let child = self
+            .content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits);
+
+        layout::Node::with_children(child.size(), vec![child])
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            operation,
+        );
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event {
+            let bounds = layout.bounds();
+            let state = tree.state.downcast_mut::<FocusState>();
+            let before = state.focused;
+
+            match cursor.position_in(bounds) {
+                // Disabled days cannot take the focus, and the navigation
+                // keeps it in the grid.
+                Some(position) => {
+                    if let Some(day) = self
+                        .grid
+                        .days
+                        .iter()
+                        .find(|day| day.interactive && day.bounds.contains(position))
+                    {
+                        state.focused = Some((day.date, day.month));
+                    }
+                }
+                None => state.focused = None,
+            }
+
+            if state.focused != before {
+                shell.request_redraw();
+            }
+        }
+
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout.children().next().unwrap(),
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+        );
+
+        let Some(day) = self.focused(tree.state.downcast_ref::<FocusState>()) else {
+            return;
+        };
+
+        let t = tokens(theme);
+        let bounds = day.bounds + Vector::new(layout.bounds().x, layout.bounds().y);
+        let ring = bounds.expand(3.0);
+
+        renderer.with_layer(ring, |renderer| {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: ring,
+                    border: Border {
+                        color: alpha(t.palette.ring, 0.5),
+                        width: 3.0,
+                        radius: (t.radius_md() + 3.0).into(),
+                    },
+                    ..renderer::Quad::default()
+                },
+                Color::TRANSPARENT,
+            );
+        });
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            viewport,
+            translation,
+        )
+    }
+}
+
+/// Reports a text to operations, e.g. for content drawn as rich text.
+struct Labeled<'a, Message> {
+    content: Element<'a, Message>,
+    label: String,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Labeled<'_, Message> {
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let child = self
+            .content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits);
+
+        layout::Node::with_children(child.size(), vec![child])
+    }
+
+    fn operate(
+        &mut self,
+        _tree: &mut Tree,
+        layout: Layout<'_>,
+        _renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        operation.text(None, layout.bounds(), &self.label);
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
+        );
     }
 }
 
