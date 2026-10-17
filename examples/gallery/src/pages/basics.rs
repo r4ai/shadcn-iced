@@ -24,75 +24,74 @@ fn sm_muted<'a>(content: impl text::IntoFragment<'a>) -> text::Text<'a> {
     sm(content).style(crate::muted)
 }
 
-pub const BADGE: Page =
-    Page {
-        id: "badge",
-        title: "Badge",
-        description: "Displays a badge or a component that looks like a badge.",
-        view: |_| {
-            column![
-                example(
-                    "Demo",
-                    row![
-                        badge("Badge"),
-                        badge("Secondary").variant(badge::Variant::Secondary),
-                        badge("Destructive").variant(badge::Variant::Destructive),
-                        badge("Outline").variant(badge::Variant::Outline),
-                    ]
-                    .spacing(8)
-                ),
-                example(
-                    "Variants",
-                    row![
-                        badge("Default"),
-                        badge("Secondary").variant(badge::Variant::Secondary),
-                        badge("Destructive").variant(badge::Variant::Destructive),
-                        badge("Outline").variant(badge::Variant::Outline),
-                        badge("Ghost").variant(badge::Variant::Ghost),
-                    ]
-                    .spacing(8)
-                ),
-                example(
-                    "With Icon",
-                    row![
-                        badge("Verified")
-                            .icon(lucide::BADGE_CHECK)
-                            .variant(badge::Variant::Secondary),
-                        badge("Bookmark")
-                            .trailing_icon(lucide::BOOKMARK)
-                            .variant(badge::Variant::Outline),
-                    ]
-                    .spacing(8)
-                ),
-                example(
-                    "With Spinner",
-                    row![
-                        badge("Deleting")
-                            .leading(
-                                spinner()
-                                    .size(12.0)
-                                    .style(|theme| { shadcn_iced::tokens(theme).palette.destructive })
-                            )
-                            .variant(badge::Variant::Destructive),
-                        badge("Generating")
-                            .trailing(spinner().size(12.0).style(|theme| {
-                                shadcn_iced::tokens(theme).palette.secondary_foreground
-                            }))
-                            .variant(badge::Variant::Secondary),
-                    ]
-                    .spacing(8)
-                ),
-                example(
-                    "Link",
-                    badge("Open Link")
-                        .trailing_icon(lucide::ARROW_UP_RIGHT)
-                        .on_press(Message::Noop)
-                ),
-            ]
-            .spacing(24)
-            .into()
-        },
-    };
+pub const BADGE: Page = Page {
+    id: "badge",
+    title: "Badge",
+    description: "Displays a badge or a component that looks like a badge.",
+    view: |_| {
+        column![
+            example(
+                "Demo",
+                row![
+                    badge("Badge"),
+                    badge("Secondary").variant(badge::Variant::Secondary),
+                    badge("Destructive").variant(badge::Variant::Destructive),
+                    badge("Outline").variant(badge::Variant::Outline),
+                ]
+                .spacing(8)
+            ),
+            example(
+                "Variants",
+                row![
+                    badge("Default"),
+                    badge("Secondary").variant(badge::Variant::Secondary),
+                    badge("Destructive").variant(badge::Variant::Destructive),
+                    badge("Outline").variant(badge::Variant::Outline),
+                    badge("Ghost").variant(badge::Variant::Ghost),
+                ]
+                .spacing(8)
+            ),
+            example(
+                "With Icon",
+                row![
+                    badge("Verified")
+                        .icon(lucide::BADGE_CHECK)
+                        .variant(badge::Variant::Secondary),
+                    badge("Bookmark")
+                        .trailing_icon(lucide::BOOKMARK)
+                        .variant(badge::Variant::Outline),
+                ]
+                .spacing(8)
+            ),
+            example(
+                "With Spinner",
+                row![
+                    badge("Deleting")
+                        .leading(
+                            spinner()
+                                .size(12.0)
+                                .style(|theme| { shadcn_iced::tokens(theme).palette.destructive })
+                        )
+                        .variant(badge::Variant::Destructive),
+                    badge("Generating")
+                        .trailing(spinner().size(12.0).style(|theme| {
+                            shadcn_iced::tokens(theme).palette.secondary_foreground
+                        }))
+                        .variant(badge::Variant::Secondary),
+                ]
+                .spacing(8)
+            ),
+            example(
+                "Link",
+                badge("Open Link")
+                    .trailing_icon(lucide::ARROW_UP_RIGHT)
+                    .on_press(Message::Noop)
+            ),
+        ]
+        .spacing(24)
+        .into()
+    },
+};
 
 pub const CARD: Page = Page {
     id: "card",
@@ -585,11 +584,9 @@ pub const SPINNER: Page =
                 example(
                     "Badge",
                     row![
-                        badge("Syncing").leading(
-                            spinner().size(12.0).style(|theme| {
-                                shadcn_iced::tokens(theme).palette.primary_foreground
-                            })
-                        ),
+                        badge("Syncing").leading(spinner().size(12.0).style(|theme| {
+                            shadcn_iced::tokens(theme).palette.primary_foreground
+                        })),
                         badge("Updating")
                             .leading(spinner().size(12.0).style(|theme| {
                                 shadcn_iced::tokens(theme).palette.secondary_foreground
@@ -803,7 +800,10 @@ pub const TABLE: Page = Page {
         ];
 
         let medium = |value: &'static str| -> iced::Element<'static, Message> {
-            text(value).size(14).font(shadcn_iced::font::medium()).into()
+            text(value)
+                .size(14)
+                .font(shadcn_iced::font::medium())
+                .into()
         };
 
         let invoices_table = invoices.iter().fold(

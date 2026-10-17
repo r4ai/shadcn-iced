@@ -363,16 +363,18 @@ impl Demo {
                     let id = self.next_toast;
                     self.next_toast += 1;
                     self.toasts.push(
-                        shadcn_iced::sonner::Toast::new(id, "Agent plan saved").description(format!(
-                            "Direction: {} · Progress signals: {} · Timing: {}",
-                            answers[0].join(", "),
-                            if answers[1].is_empty() {
-                                "None".to_owned()
-                            } else {
-                                answers[1].join(", ")
-                            },
-                            answers[2].join(", ")
-                        )),
+                        shadcn_iced::sonner::Toast::new(id, "Agent plan saved").description(
+                            format!(
+                                "Direction: {} · Progress signals: {} · Timing: {}",
+                                answers[0].join(", "),
+                                if answers[1].is_empty() {
+                                    "None".to_owned()
+                                } else {
+                                    answers[1].join(", ")
+                                },
+                                answers[2].join(", ")
+                            ),
+                        ),
                     );
                     self.questionnaire = shadcn_iced::questionnaire::State::new();
                 }

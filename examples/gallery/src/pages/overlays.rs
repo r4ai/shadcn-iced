@@ -215,7 +215,11 @@ fn delivery_time<'a>(index: u8, selected: bool) -> iced::Element<'a, Message> {
         column![title, text(description).size(14).style(crate::muted)]
             .spacing(4)
             .width(Fill),
-        shadcn_iced::radio_group::radio_item(selected, "", Some(demo(DemoMessage::Position(index)))),
+        shadcn_iced::radio_group::radio_item(
+            selected,
+            "",
+            Some(demo(DemoMessage::Position(index)))
+        ),
     ]
     .spacing(12)
     .align_y(Center);

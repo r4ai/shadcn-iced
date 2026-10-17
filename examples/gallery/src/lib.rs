@@ -180,7 +180,9 @@ impl Gallery {
                                 }
                             }),
                         column![
-                            text("shadcn-iced").size(style::text::SM).font(font::semibold()),
+                            text("shadcn-iced")
+                                .size(style::text::SM)
+                                .font(font::semibold()),
                             text(format!("{} components", PAGES.len())).size(style::text::XS),
                         ],
                     ]
