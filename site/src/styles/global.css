@@ -150,6 +150,8 @@
   position: relative;
   z-index: 1;
   outline: none;
+  /* The canvas is a layer of its own: clip its corners itself. */
+  border-radius: inherit;
 }
 
 [data-preview] canvas:focus-visible {

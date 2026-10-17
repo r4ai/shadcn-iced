@@ -1,0 +1,56 @@
+---
+// A select in the style of shadcn/ui's Select: a trigger button and a
+// listbox of options. The behavior lives in `scripts/ui.ts`: the root
+// keeps its value in `data-value` and fires a bubbling `change` event.
+import Icon from "./Icon.astro";
+
+interface Props {
+  id: string;
+  options: readonly { value: string; label: string }[];
+  value?: string;
+  /** Extra attributes for the root, e.g. `data-theme-option`. */
+  [key: `data-${string}`]: string;
+}
+
+const { id, options, value = options[0]?.value ?? "", ...rest } = Astro.props;
+const selected = options.find((option) => option.value === value) ?? options[0];
+---
+
+<div data-select data-value={value} data-open="false" class="group/select relative" {...rest}>
+  <button
+    type="button"
+    id={id}
+    data-select-trigger
+    role="combobox"
+    aria-haspopup="listbox"
+    aria-expanded="false"
+    aria-controls={`${id}-listbox`}
+    class="border-input dark:bg-input/30 dark:hover:bg-input/50 hover:bg-accent/50 focus-visible:border-ring focus-visible:ring-ring/50 flex h-8 w-full items-center justify-between gap-2 rounded-md border bg-transparent px-2.5 text-sm font-normal whitespace-nowrap shadow-xs transition-colors outline-none focus-visible:ring-3"
+  >
+    <span data-select-label class="truncate">{selected?.label}</span>
+    <Icon name="chevron-down" size={16} class="text-muted-foreground shrink-0 opacity-70" />
+  </button>
+  <ul
+    id={`${id}-listbox`}
+    role="listbox"
+    tabindex="-1"
+    aria-labelledby={id}
+    class="bg-popover text-popover-foreground absolute top-full left-0 z-50 mt-1 hidden max-h-72 w-full min-w-32 overflow-y-auto rounded-md border p-1 font-normal shadow-md outline-none group-data-[open=true]/select:block"
+  >
+    {
+      options.map((option) => (
+        <li
+          role="option"
+          data-value={option.value}
+          aria-selected={String(option.value === value)}
+          class="data-[highlighted=true]:bg-accent data-[highlighted=true]:text-accent-foreground group/option relative flex cursor-default items-center rounded-sm py-1.5 pr-8 pl-2 text-sm select-none"
+        >
+          {option.label}
+          <span class="absolute right-2 hidden size-3.5 items-center justify-center group-aria-selected/option:flex">
+            <Icon name="check" size={16} />
+          </span>
+        </li>
+      ))
+    }
+  </ul>
+</div>
