@@ -347,7 +347,54 @@ struct TimerState {
     dismissed: Vec<u64>,
     last: Option<Instant>,
     expanded: bool,
+    /// Where each toast is drawn, moving between the stack and the list.
+    motions: HashMap<u64, Motion>,
 }
+
+/// How a toast is drawn: its bounds, the opacity of its content and the
+/// opacity of its card (the toasts behind the front one only show their
+/// card).
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Look {
+    bounds: Rectangle,
+    content: f32,
+    card: f32,
+}
+
+impl Look {
+    fn mix(self, other: Self, t: f32) -> Self {
+        let lerp = |a: f32, b: f32| a + (b - a) * t;
+
+        Self {
+            bounds: Rectangle {
+                x: lerp(self.bounds.x, other.bounds.x),
+                y: lerp(self.bounds.y, other.bounds.y),
+                width: lerp(self.bounds.width, other.bounds.width),
+                height: lerp(self.bounds.height, other.bounds.height),
+            },
+            content: lerp(self.content, other.content),
+            card: lerp(self.card, other.card),
+        }
+    }
+}
+
+/// A toast moving from a [`Look`] to another one, when the stack expands
+/// or collapses.
+#[derive(Debug, Clone, Copy)]
+struct Motion {
+    from: Look,
+    to: Look,
+    progress: Transition,
+}
+
+impl Motion {
+    fn look(&self, now: Instant) -> Look {
+        self.from.mix(self.to, self.progress.value(now))
+    }
+}
+
+/// How long the stack takes to expand or collapse.
+const MOVE: Duration = Duration::from_millis(400);
 
 /// How many toasts peek out of a collapsed stack (`visibleToasts`).
 const VISIBLE: usize = 3;
@@ -356,6 +403,50 @@ const VISIBLE: usize = 3;
 const SCALE_STEP: f32 = 0.05;
 
 impl<Message> Timer<'_, Message> {
+    /// How each toast should look, given the layout.
+    fn looks(&self, state: &TimerState, layout: Layout<'_>) -> Vec<Look> {
+        let collapsed = self.is_collapsed(state);
+        let layouts: Vec<Layout<'_>> = layout.children().collect();
+
+        (0..self.toasts.len())
+            .map(|index| {
+                let before = self.before(index);
+
+                if !collapsed || before == 0 {
+                    return Look {
+                        bounds: layouts[index].bounds(),
+                        content: 1.0,
+                        card: 1.0,
+                    };
+                }
+
+                // `--y: translateY(calc(var(--lift-amount) * var(--toasts-before)))
+                // scale(calc(-1 * var(--scale)))`, with the height of the
+                // front toast and its content hidden.
+                let visible = before.min(VISIBLE - 1);
+                let front = layouts[if self.from_top {
+                    0
+                } else {
+                    self.toasts.len() - 1
+                }]
+                .bounds();
+                let lift = self.spacing * visible as f32 * if self.from_top { 1.0 } else { -1.0 };
+                let scale = 1.0 - SCALE_STEP * visible as f32;
+                let center = front.center() + Vector::new(0.0, lift);
+                let size = iced::Size::new(front.width * scale, front.height * scale);
+
+                Look {
+                    bounds: Rectangle::new(
+                        iced::Point::new(center.x - size.width / 2.0, center.y - size.height / 2.0),
+                        size,
+                    ),
+                    content: 0.0,
+                    card: if before < VISIBLE { 1.0 } else { 0.0 },
+                }
+            })
+            .collect()
+    }
+
     /// Whether the toasts are stacked behind the front one.
     fn is_collapsed(&self, state: &TimerState) -> bool {
         !state.expanded && self.toasts.len() > 1
@@ -527,6 +618,36 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
             }
         }
 
+        // The toasts move to their new places.
+        {
+            let looks = self.looks(tree.state.downcast_ref::<TimerState>(), layout);
+            let state = tree.state.downcast_mut::<TimerState>();
+            let now = Instant::now();
+
+            for ((id, _, _), look) in self.toasts.iter().zip(looks) {
+                match state.motions.get_mut(id) {
+                    Some(motion) if motion.to != look => {
+                        motion.from = motion.look(now);
+                        motion.to = look;
+                        motion.progress = Transition::new(0.0);
+                        motion.progress.go(1.0, MOVE, animation::ease_out, now);
+                        shell.request_redraw();
+                    }
+                    Some(_) => {}
+                    None => {
+                        let _ = state.motions.insert(
+                            *id,
+                            Motion {
+                                from: look,
+                                to: look,
+                                progress: Transition::new(1.0),
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
         let Event::Window(window::Event::RedrawRequested(now)) = event else {
             return;
         };
@@ -545,9 +666,13 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
         state.presence.retain(|id, _| ids.contains(id));
         state.exiting.retain(|id| ids.contains(id));
         state.dismissed.retain(|id| ids.contains(id));
+        state.motions.retain(|id, _| ids.contains(id));
 
         let mut next: Option<Duration> = None;
-        let mut animating = false;
+        let mut animating = state
+            .motions
+            .values()
+            .any(|motion| motion.progress.is_animating(*now));
 
         for (id, duration, _) in &self.toasts {
             let presence = state.presence.entry(*id).or_insert_with(|| {
@@ -605,13 +730,11 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
     ) {
         let state = tree.state.downcast_ref::<TimerState>();
         let now = Instant::now();
-        let collapsed = self.is_collapsed(state);
+        let targets = self.looks(state, layout);
 
         // The farthest toasts first.
         let mut order: Vec<usize> = (0..self.toasts.len()).collect();
-        if collapsed {
-            order.sort_by_key(|index| std::cmp::Reverse(self.before(*index)));
-        }
+        order.sort_by_key(|index| std::cmp::Reverse(self.before(*index)));
 
         let layouts: Vec<Layout<'_>> = layout.children().collect();
 
@@ -623,37 +746,33 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
                 .presence
                 .get(id)
                 .map_or(1.0, |presence| presence.value(now));
-            let before = self.before(index);
+            let look = state
+                .motions
+                .get(id)
+                .map_or(targets[index], |motion| motion.look(now));
 
-            if collapsed && before > 0 {
-                if before >= VISIBLE {
-                    continue;
-                }
+            let exiting = state.exiting.contains(id);
+            let height = layout.bounds().height + self.spacing;
 
-                // `--y: translateY(calc(var(--lift-amount) * var(--toasts-before)))
-                // scale(calc(-1 * var(--scale)))`, with the height of the
-                // front toast and its content hidden.
-                let front = layouts[if self.from_top {
-                    0
-                } else {
-                    self.toasts.len() - 1
-                }]
-                .bounds();
-                let lift = self.spacing * before as f32 * if self.from_top { 1.0 } else { -1.0 };
-                let scale = 1.0 - SCALE_STEP * before as f32;
-                let center = front.center() + Vector::new(0.0, lift);
-                let size = iced::Size::new(front.width * scale, front.height * scale);
+            // Enters by sliding from the edge; leaves by fading out.
+            let slide = if exiting {
+                0.0
+            } else if self.from_top {
+                -height * (1.0 - progress)
+            } else {
+                height * (1.0 - progress)
+            };
+
+            // The card of a toast behind the front one, while its content
+            // is hidden.
+            let card = look.card * (1.0 - look.content) * progress;
+
+            if card > 0.0 {
                 let style = toast_style(theme);
 
                 renderer.fill_quad(
                     renderer::Quad {
-                        bounds: Rectangle::new(
-                            iced::Point::new(
-                                center.x - size.width / 2.0,
-                                center.y - size.height / 2.0,
-                            ),
-                            size,
-                        ),
+                        bounds: look.bounds + Vector::new(0.0, slide),
                         border: style.border,
                         shadow: style.shadow,
                         ..renderer::Quad::default()
@@ -661,22 +780,17 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
                     style
                         .background
                         .unwrap_or(Background::Color(iced::Color::TRANSPARENT))
-                        .scale_alpha(progress),
+                        .scale_alpha(card),
                 );
+            }
 
+            let opacity = look.content * progress;
+
+            if opacity <= 0.0 {
                 continue;
             }
-            let exiting = state.exiting.contains(id);
-            let height = layout.bounds().height + self.spacing;
 
-            // Enters by sliding from the edge; leaves by fading out.
-            let offset = if exiting {
-                0.0
-            } else if self.from_top {
-                -height * (1.0 - progress)
-            } else {
-                height * (1.0 - progress)
-            };
+            let bounds = layout.bounds();
 
             animation::draw(
                 toast,
@@ -688,9 +802,9 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'
                 cursor,
                 viewport,
                 Appearance {
-                    opacity: progress,
-                    scale: 1.0,
-                    offset: iced::Vector::new(0.0, offset),
+                    opacity,
+                    scale: look.bounds.width / bounds.width.max(1.0),
+                    offset: look.bounds.center() - bounds.center() + Vector::new(0.0, slide),
                 },
             );
         }

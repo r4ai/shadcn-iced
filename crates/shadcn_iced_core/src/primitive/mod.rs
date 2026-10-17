@@ -1,6 +1,7 @@
 //! Headless building blocks: they handle behavior and leave the look to the
 //! components built on top of them.
 pub mod anchored;
+pub mod animated_width;
 pub mod breakpoint;
 pub mod disclosure;
 pub mod focus;
@@ -10,10 +11,13 @@ pub mod listbox;
 pub mod pressable;
 pub mod roving;
 pub mod split;
+pub mod track;
 pub mod tracked;
 pub mod underline;
+pub mod wheel;
 
 pub use anchored::{Align, Anchored, Side, anchored};
+pub use animated_width::{AnimatedWidth, animated_width};
 pub use breakpoint::Breakpoint;
 pub use disclosure::{Disclosure, disclosure};
 pub use focus::{Focus, FocusWithin, focus_within};
@@ -23,5 +27,7 @@ pub use listbox::Listbox;
 pub use pressable::{Pressable, pressable};
 pub use roving::{Roving, roving};
 pub use split::Split;
+pub use track::{Track, track};
 pub use tracked::{Tracked, tracked};
 pub use underline::{Underline, underline};
+pub use wheel::{Wheel, wheel};

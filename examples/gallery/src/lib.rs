@@ -10,7 +10,7 @@ use iced::widget::{column, container, row, rule, space, text};
 use iced::{Element, Fill, Length, Task, Theme};
 use shadcn_iced::scroll_area::scroll_area as scrollable;
 
-pub use pages::{PAGES, Page};
+pub use pages::{CHARTS, PAGES, Page};
 
 /// The state of the gallery.
 pub struct Gallery {
@@ -245,7 +245,9 @@ impl Gallery {
         .content(scrollable(customizer::view(self)).height(Fill))
         .on_close(Message::Customize(false));
 
-        self.toasters(shadcn_iced::sidebar::layout(nav, main), true)
+        // Smooth wheel scrolling, horizontal with `Shift`.
+        shadcn_iced::primitive::wheel(self.toasters(shadcn_iced::sidebar::layout(nav, main), true))
+            .into()
     }
 
     /// Shows the toasts of the Sonner and Toast pages on top of `content`,
@@ -301,10 +303,10 @@ thread_local! {
 
 /// Renders only the `index`-th example of a page, without its title and
 /// frame (the website draws those around each preview).
-pub fn view_example(gallery: &Gallery, page: usize, index: usize) -> Element<'_, Message> {
+pub fn view_example<'a>(gallery: &'a Gallery, page: &Page, index: usize) -> Element<'a, Message> {
     FOCUS.set(Some(index));
     BUILT.set(0);
-    let view = (PAGES[page].view)(gallery);
+    let view = (page.view)(gallery);
     FOCUS.set(None);
     view
 }
@@ -318,9 +320,9 @@ pub struct ExampleInfo {
 }
 
 /// The examples of a page, in the order they are built.
-pub fn examples(gallery: &Gallery, page: usize) -> Vec<ExampleInfo> {
+pub fn examples(gallery: &Gallery, page: &Page) -> Vec<ExampleInfo> {
     RECORDED.set(Some(Vec::new()));
-    let _ = (PAGES[page].view)(gallery);
+    let _ = (page.view)(gallery);
     RECORDED.take().unwrap_or_default()
 }
 

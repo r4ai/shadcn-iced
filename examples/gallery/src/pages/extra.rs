@@ -410,14 +410,19 @@ fn logo(icon: shadcn_iced::Icon) -> iced::Element<'static, Message> {
 }
 
 /// A collapsible item of the main navigation, with a chevron.
+/// An item of the "Platform" group, which shows its sub-items when pressed.
 fn nav_item(
+    gallery: &crate::Gallery,
     title: &'static str,
     icon: shadcn_iced::Icon,
-    open: bool,
     children: &[&'static str],
 ) -> Item<'static, Message> {
+    let d = &gallery.demo;
+    let open = d.sidebar_open.contains(&title);
+
     let mut item = item(title)
         .icon(icon)
+        .active(!open && children.contains(&d.sidebar_active))
         .content(
             row![
                 text(title).size(14).width(Fill),
@@ -429,11 +434,15 @@ fn nav_item(
             ]
             .align_y(Center),
         )
-        .on_press(Message::Noop);
+        .on_press(demo(DemoMessage::SidebarToggle(title)));
 
     if open {
         for child in children {
-            item = item.child(shadcn_iced::sidebar::item(*child).on_press(Message::Noop));
+            item = item.child(
+                shadcn_iced::sidebar::item(*child)
+                    .active(d.sidebar_active == *child)
+                    .on_press(demo(DemoMessage::SidebarActive(child))),
+            );
         }
     }
 
@@ -462,14 +471,29 @@ pub const SIDEBAR: Page = Page {
             .group(
                 group("Platform")
                     .item(nav_item(
+                        gallery,
                         "Playground",
                         lucide::SQUARE_TERMINAL,
-                        true,
                         &["History", "Starred", "Settings"],
                     ))
-                    .item(nav_item("Models", lucide::BOT, false, &[]))
-                    .item(nav_item("Documentation", lucide::BOOK_OPEN, false, &[]))
-                    .item(nav_item("Settings", lucide::SETTINGS_2, false, &[])),
+                    .item(nav_item(
+                        gallery,
+                        "Models",
+                        lucide::BOT,
+                        &["Genesis", "Explorer", "Quantum"],
+                    ))
+                    .item(nav_item(
+                        gallery,
+                        "Documentation",
+                        lucide::BOOK_OPEN,
+                        &["Introduction", "Get Started", "Tutorials", "Changelog"],
+                    ))
+                    .item(nav_item(
+                        gallery,
+                        "Settings",
+                        lucide::SETTINGS_2,
+                        &["General", "Team", "Billing", "Limits"],
+                    )),
             )
             .group(
                 group("Projects")
@@ -477,25 +501,29 @@ pub const SIDEBAR: Page = Page {
                         item("Design Engineering")
                             .icon(lucide::FRAME)
                             .action(menu_action(lucide::ELLIPSIS, Message::Noop))
-                            .on_press(Message::Noop),
+                            .active(gallery.demo.sidebar_active == "Design Engineering")
+                            .on_press(demo(DemoMessage::SidebarActive("Design Engineering"))),
                     )
                     .item(
                         item("Sales & Marketing")
                             .icon(lucide::CHART_PIE)
                             .action(menu_action(lucide::ELLIPSIS, Message::Noop))
-                            .on_press(Message::Noop),
+                            .active(gallery.demo.sidebar_active == "Sales & Marketing")
+                            .on_press(demo(DemoMessage::SidebarActive("Sales & Marketing"))),
                     )
                     .item(
                         item("Travel")
                             .icon(lucide::MAP)
                             .action(menu_action(lucide::ELLIPSIS, Message::Noop))
-                            .on_press(Message::Noop),
+                            .active(gallery.demo.sidebar_active == "Travel")
+                            .on_press(demo(DemoMessage::SidebarActive("Travel"))),
                     )
                     .item(
                         item("More")
                             .icon(lucide::ELLIPSIS)
                             .badge("24")
-                            .on_press(Message::Noop),
+                            .active(gallery.demo.sidebar_active == "More")
+                            .on_press(demo(DemoMessage::SidebarActive("More"))),
                     ),
             )
             .footer_item(
@@ -519,7 +547,7 @@ pub const SIDEBAR: Page = Page {
                 container(vertical_separator()).height(16),
                 breadcrumb()
                     .link("Build Your Application", Message::Noop)
-                    .page("Data Fetching"),
+                    .page(gallery.demo.sidebar_active),
             ]
             .spacing(8)
             .height(64)

@@ -74,6 +74,11 @@ The `shadcn_iced_core::primitive` module provides the behavioral layer analogous
 | `focus` | Detects when a widget subtree holds keyboard focus (`focus_within`) to draw focus rings around composite inputs (`InputGroup`, `InputOtp`). |
 | `pressable` | Provides pointer press, release, and hover interaction tracking for custom interactive surfaces. |
 | `split` | Implements draggable, resizable pane dividers used by `Resizable`. |
+| `track` | Lays out the items of a `Carousel` on a track that slides to the current item and can be dragged (swiped). |
+| `animated_width` | Animates the width of its content when it changes, like the `Sidebar` collapsing to icons. |
+| `wheel` | Wraps a whole view to make wheel scrolling smooth (wheel notches are spread over a few frames) and horizontal with <kbd>Shift</kbd>, for every scrollable under it. |
+
+`anchored` also keeps a submenu open while the pointer crosses the triangle between its trigger and the submenu (a pointer grace area, or "safe triangle", as in Radix), so that the pointer can move diagonally to it.
 
 ### Native Animations
 

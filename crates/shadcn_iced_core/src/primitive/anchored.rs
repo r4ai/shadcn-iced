@@ -328,6 +328,8 @@ struct State {
     point: Option<Point>,
     hover: Hover,
     anchor_hovered: bool,
+    /// Whether the pointer is over the anchor, grace area aside.
+    anchor_over: bool,
     content_hovered: bool,
     /// Whether hover content was dismissed (<kbd>Escape</kbd>) and stays
     /// closed until the pointer leaves.
@@ -338,6 +340,77 @@ struct State {
     /// The key event that opened the content, replayed into it once it is
     /// shown (<kbd>↓</kbd> highlights the first item).
     replay: Option<Event>,
+    /// The bounds of the hover content, once shown.
+    content_bounds: Option<Rectangle>,
+    /// The area the pointer can cross on its way to the hover content.
+    grace: Option<Grace>,
+}
+
+thread_local! {
+    /// The [`Grace`] area the pointer is in, if any.
+    static GRACE: std::cell::Cell<Option<Grace>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether `position` is in the pointer grace area of an open submenu: the
+/// triangle between the point where the pointer left its trigger and the
+/// near edge of the submenu (Radix's "pointer grace area", also known as a
+/// safe triangle).
+///
+/// The items under it are not highlighted and the submenus under it do not
+/// open, so that the pointer can move diagonally to the submenu.
+pub fn is_in_pointer_grace(position: Point) -> bool {
+    GRACE
+        .get()
+        .is_some_and(|grace| Instant::now() < grace.deadline && grace.contains(position))
+}
+
+/// The pointer grace area of hover content (see [`is_in_pointer_grace`]).
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Grace {
+    triangle: [Point; 3],
+    /// The pointer must reach the content before then (Radix's 300ms).
+    deadline: Instant,
+}
+
+impl Grace {
+    /// The grace area from `exit`, where the pointer left the anchor, to
+    /// the content on its left or right, if it is on one of those sides.
+    fn new(exit: Point, content: Rectangle, now: Instant) -> Option<Self> {
+        // Moved back a little, so that the pointer can wobble.
+        const BLEED: f32 = 5.0;
+
+        let (x, apex) = if content.x >= exit.x {
+            (content.x, Point::new(exit.x - BLEED, exit.y))
+        } else if content.x + content.width <= exit.x {
+            (
+                content.x + content.width,
+                Point::new(exit.x + BLEED, exit.y),
+            )
+        } else {
+            return None;
+        };
+
+        Some(Self {
+            triangle: [
+                apex,
+                Point::new(x, content.y),
+                Point::new(x, content.y + content.height),
+            ],
+            deadline: now + Duration::from_millis(300),
+        })
+    }
+
+    fn contains(&self, point: Point) -> bool {
+        let [a, b, c] = self.triangle;
+        let side =
+            |p: Point, q: Point| (q.x - p.x) * (point.y - p.y) - (q.y - p.y) * (point.x - p.x);
+
+        let (d1, d2, d3) = (side(a, b), side(b, c), side(c, a));
+        let negative = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
+        let positive = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
+
+        !(negative && positive)
+    }
 }
 
 impl State {
@@ -545,7 +618,48 @@ where
                 close_delay,
             } => {
                 if let Event::Mouse(_) | Event::Window(window::Event::RedrawRequested(_)) = event {
-                    state.anchor_hovered = cursor.is_over(bounds);
+                    let is_open = matches!(state.hover, Hover::Open | Hover::Closing(_));
+                    let over = cursor.is_over(bounds);
+                    let now = Instant::now();
+
+                    // The pointer leaves the anchor towards the open
+                    // content: it stays open while the pointer moves
+                    // through the triangle between them.
+                    if state.anchor_over
+                        && !over
+                        && is_open
+                        && let Some(position) = cursor.position()
+                        && let Some(content) = state.content_bounds
+                    {
+                        state.grace = Grace::new(position, content, now);
+
+                        if let Some(grace) = state.grace {
+                            shell.request_redraw_at(grace.deadline);
+                        }
+                    }
+
+                    let in_grace = !over
+                        && state.grace.is_some_and(|grace| {
+                            now < grace.deadline
+                                && cursor
+                                    .position()
+                                    .is_some_and(|position| grace.contains(position))
+                        });
+
+                    if in_grace {
+                        GRACE.set(state.grace);
+                    } else if let Some(grace) = state.grace.take()
+                        && GRACE.get() == Some(grace)
+                    {
+                        GRACE.set(None);
+                    }
+
+                    // Another anchor under the grace area (the trigger of a
+                    // sibling submenu) does not open its content.
+                    let blocked = !is_open && cursor.position().is_some_and(is_in_pointer_grace);
+
+                    state.anchor_over = over;
+                    state.anchor_hovered = (over && !blocked) || in_grace;
                     state.tick(*open_delay, *close_delay, shell);
                 }
             }
@@ -1239,6 +1353,7 @@ where
             && let Event::Mouse(_) | Event::Window(window::Event::RedrawRequested(_)) = event
         {
             self.state.content_hovered = cursor.is_over(bounds);
+            self.state.content_bounds = Some(bounds);
             self.state.tick(open_delay, close_delay, shell);
         }
 
@@ -1873,5 +1988,23 @@ mod tests {
         );
 
         assert_eq!(point.x, 592.0);
+    }
+
+    #[test]
+    fn grace_area_leads_to_the_submenu() {
+        let now = Instant::now();
+        // A submenu on the right of a trigger left at (100, 50).
+        let content = Rectangle::new(Point::new(200.0, 0.0), Size::new(150.0, 200.0));
+        let grace = Grace::new(Point::new(100.0, 50.0), content, now).expect("grace area");
+
+        // Diagonally down to the submenu, over the items below the trigger.
+        assert!(grace.contains(Point::new(150.0, 100.0)));
+        assert!(grace.contains(Point::new(199.0, 190.0)));
+        // Away from it.
+        assert!(!grace.contains(Point::new(150.0, 180.0)));
+        assert!(!grace.contains(Point::new(80.0, 50.0)));
+
+        // Content overlapping the exit point has no grace area.
+        assert!(Grace::new(Point::new(250.0, 50.0), content, now).is_none());
     }
 }

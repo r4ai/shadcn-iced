@@ -38,7 +38,7 @@ fn noop<T>(_: T) -> Message {
 }
 
 /// `text-sm text-muted-foreground`
-fn muted<'a>(content: &'a str) -> iced::widget::Text<'a> {
+fn muted<'a>(content: impl text::IntoFragment<'a>) -> iced::widget::Text<'a> {
     text(content).size(14).style(crate::muted)
 }
 
@@ -333,6 +333,7 @@ pub const SLIDER: Page = Page {
     view: |gallery| {
         let narrow =
             |content: Element<'static, Message>| container(content).width(Fill).max_width(320);
+        let values = |slot: usize| gallery.demo.sliders[slot].as_slice();
 
         column![
             example(
@@ -347,8 +348,8 @@ pub const SLIDER: Page = Page {
             example(
                 "Range",
                 narrow(
-                    shadcn_iced::slider::range_slider(0.0..=100.0, &[25.0, 50.0], |_, _| {
-                        Message::Noop
+                    shadcn_iced::slider::range_slider(0.0..=100.0, values(0), move |thumb, v| {
+                        demo(DemoMessage::Slider(0, thumb, v))
                     })
                     .step(5.0)
                     .into()
@@ -357,8 +358,8 @@ pub const SLIDER: Page = Page {
             example(
                 "Multiple Thumbs",
                 narrow(
-                    shadcn_iced::slider::range_slider(0.0..=100.0, &[10.0, 20.0, 70.0], |_, _| {
-                        Message::Noop
+                    shadcn_iced::slider::range_slider(0.0..=100.0, values(1), move |thumb, v| {
+                        demo(DemoMessage::Slider(1, thumb, v))
                     })
                     .step(10.0)
                     .into()
@@ -367,8 +368,12 @@ pub const SLIDER: Page = Page {
             example(
                 "Vertical",
                 row![
-                    shadcn_iced::slider::vertical(0.0..=100.0, 50.0, noop),
-                    shadcn_iced::slider::vertical(0.0..=100.0, 25.0, noop),
+                    shadcn_iced::slider::vertical(0.0..=100.0, values(2)[0], |v| demo(
+                        DemoMessage::Slider(2, 0, v)
+                    )),
+                    shadcn_iced::slider::vertical(0.0..=100.0, values(3)[0], |v| demo(
+                        DemoMessage::Slider(3, 0, v)
+                    )),
                 ]
                 .spacing(24)
             ),
@@ -379,11 +384,17 @@ pub const SLIDER: Page = Page {
                         row![
                             text("Temperature").size(14).font(font::medium()),
                             iced::widget::space().width(Fill),
-                            muted("0.3, 0.7"),
+                            muted(
+                                values(4)
+                                    .iter()
+                                    .map(|v| format!("{v:.1}"))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ),
                         ]
                         .align_y(Center),
-                        shadcn_iced::slider::range_slider(0.0..=1.0, &[0.3, 0.7], |_, _| {
-                            Message::Noop
+                        shadcn_iced::slider::range_slider(0.0..=1.0, values(4), move |thumb, v| {
+                            demo(DemoMessage::Slider(4, thumb, v))
                         })
                         .step(0.1),
                     ]
@@ -1001,13 +1012,13 @@ pub const FIELD: Page = Page {
     view: |gallery| {
         let d = &gallery.demo;
 
-        let month = select(None::<&'static str>, noop)
+        let month = select(d.card_month, |m| demo(DemoMessage::CardMonth(m)))
             .placeholder("MM")
             .options([
                 "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12",
             ])
             .width(Fill);
-        let year = select(None::<&'static str>, noop)
+        let year = select(d.card_year, |y| demo(DemoMessage::CardYear(y)))
             .placeholder("YYYY")
             .options(["2024", "2025", "2026", "2027", "2028", "2029"])
             .width(Fill);
@@ -1039,7 +1050,10 @@ pub const FIELD: Page = Page {
                             row![
                                 field("Month", month),
                                 field("Year", year),
-                                field("CVV", input("123", "")),
+                                field(
+                                    "CVV",
+                                    input("123", &d.cvv).on_input(|v| demo(DemoMessage::Cvv(v)))
+                                ),
                             ]
                             .spacing(16)
                         )
@@ -1065,7 +1079,7 @@ pub const FIELD: Page = Page {
                         button::button("Submit").on_press(Message::Noop),
                         button::button("Cancel")
                             .variant(button::Variant::Outline)
-                            .on_press(Message::Noop),
+                            .on_press(demo(DemoMessage::ResetPayment)),
                     ]
                     .spacing(8)
                     .into(),

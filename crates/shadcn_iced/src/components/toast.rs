@@ -305,6 +305,9 @@ const PEEK: f32 = 12.0;
 /// How long a toast takes to slide in or out (`500ms`).
 const SLIDE: Duration = Duration::from_millis(500);
 
+/// How long the stack takes to expand or collapse.
+const EXPAND: Duration = Duration::from_millis(400);
+
 /// `cubic-bezier(0.22, 1, 0.36, 1)`
 fn ease(t: f32) -> f32 {
     animation::cubic_bezier(0.22, 1.0, 0.36, 1.0, t)
@@ -325,6 +328,8 @@ struct State {
     exiting: Vec<u64>,
     closed: Vec<u64>,
     expanded: bool,
+    /// From collapsed (0) to expanded (1).
+    expand: Transition,
     last: Option<Instant>,
 }
 
@@ -472,6 +477,12 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Stack<'
 
         if hovered != state.expanded {
             state.expanded = hovered;
+            state.expand.go(
+                if hovered { 1.0 } else { 0.0 },
+                EXPAND,
+                ease,
+                Instant::now(),
+            );
             shell.invalidate_layout();
             shell.request_redraw();
         }
@@ -493,7 +504,7 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Stack<'
         state.closed.retain(|id| ids.contains(id));
 
         let mut next: Option<Duration> = None;
-        let mut animating = false;
+        let mut animating = state.expand.is_animating(*now);
 
         for (id, timeout, _) in &self.toasts {
             let presence = state.presence.entry(*id).or_insert_with(|| {
@@ -571,7 +582,9 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Stack<'
             let slide = Vector::new(0.0, layout.bounds().height * 1.5 * (1.0 - progress));
             let behind = count - 1 - index;
 
-            if state.expanded || behind == 0 {
+            let expand = state.expand.value(now);
+
+            if expand >= 1.0 || behind == 0 {
                 animation::draw(
                     toast,
                     child,
@@ -602,19 +615,48 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Stack<'
                 width,
                 height: front.height * scale,
             };
-            let style = self::style(theme);
+            let card_style = self::style(theme);
+
+            // Expanding: the card moves and grows from its place in the
+            // stack to its own, while its content fades in.
+            let target = layout.bounds() + slide;
+            let lerp = |a: f32, b: f32| a + (b - a) * expand;
+            let card = Rectangle {
+                x: lerp(bounds.x, target.x),
+                y: lerp(bounds.y, target.y),
+                width: lerp(bounds.width, target.width),
+                height: lerp(bounds.height, target.height),
+            };
 
             renderer.fill_quad(
                 renderer::Quad {
-                    bounds,
-                    border: style.border,
-                    shadow: style.shadow,
+                    bounds: card,
+                    border: card_style.border,
+                    shadow: card_style.shadow,
                     ..renderer::Quad::default()
                 },
-                style
+                card_style
                     .background
                     .unwrap_or(Background::Color(iced::Color::TRANSPARENT)),
             );
+
+            if expand > 0.0 {
+                animation::draw(
+                    toast,
+                    child,
+                    renderer,
+                    theme,
+                    style,
+                    layout,
+                    cursor,
+                    viewport,
+                    Appearance {
+                        opacity: expand,
+                        scale: card.width / target.width.max(1.0),
+                        offset: card.center() - layout.bounds().center(),
+                    },
+                );
+            }
         }
     }
 
