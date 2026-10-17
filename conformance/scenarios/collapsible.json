@@ -1,0 +1,51 @@
+{
+  "$schema": "./schema.json",
+  "component": "collapsible",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [400, 200],
+      "steps": [
+        { "snapshot": "closed" },
+        {
+          "expect": {
+            "visible": ["@peduarte starred 3 repositories"],
+            "hidden": ["@radix-ui/colors", "@stitches/react"]
+          }
+        },
+        { "hover": { "at": [334, 32] } },
+        { "snapshot": "hover-trigger" },
+        { "click": { "at": [334, 32] } },
+        { "expect": { "visible": ["@radix-ui/colors", "@stitches/react"] } },
+        { "snapshot": "open" },
+        { "click": { "at": [334, 32] } },
+        { "expect": { "hidden": ["@radix-ui/colors", "@stitches/react"] } },
+        { "snapshot": "closed-again" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [400, 200],
+      "steps": [
+        { "press": "Tab" },
+        { "press": "Enter" },
+        { "expect": { "visible": ["@radix-ui/colors", "@stitches/react"] } },
+        { "snapshot": "open" },
+        { "press": "Space" },
+        { "expect": { "hidden": ["@radix-ui/colors", "@stitches/react"] } },
+        { "snapshot": "closed" }
+      ]
+    },
+    {
+      "id": "default-open",
+      "viewport": [400, 200],
+      "steps": [
+        { "expect": { "visible": ["@radix-ui/colors", "@stitches/react"] } },
+        { "snapshot": "open" },
+        { "click": { "at": [334, 32] } },
+        { "expect": { "hidden": ["@radix-ui/colors", "@stitches/react"] } },
+        { "snapshot": "closed" }
+      ]
+    }
+  ]
+}

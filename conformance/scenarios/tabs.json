@@ -1,0 +1,122 @@
+{
+  "$schema": "./schema.json",
+  "component": "tabs",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [440, 120],
+      "steps": [
+        { "snapshot": "account" },
+        {
+          "expect": {
+            "visible": ["Make changes to your account here."],
+            "hidden": ["Change your password here."]
+          }
+        },
+        { "hover": "Password" },
+        { "snapshot": "hover-inactive" },
+        { "click": "Password" },
+        {
+          "expect": {
+            "visible": ["Change your password here."],
+            "hidden": ["Make changes to your account here."]
+          }
+        },
+        { "snapshot": "password" },
+        { "click": "Account" },
+        {
+          "expect": {
+            "visible": ["Make changes to your account here."],
+            "hidden": ["Change your password here."]
+          }
+        },
+        { "snapshot": "account-again" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [440, 120],
+      "steps": [
+        { "click": "Account" },
+        { "press": "ArrowRight" },
+        { "press": "Enter" },
+        {
+          "expect": {
+            "visible": ["Change your password here."],
+            "hidden": ["Make changes to your account here."]
+          }
+        },
+        { "snapshot": "password" },
+        { "press": "ArrowLeft" },
+        { "press": "Enter" },
+        {
+          "expect": {
+            "visible": ["Make changes to your account here."],
+            "hidden": ["Change your password here."]
+          }
+        },
+        { "snapshot": "account" }
+      ]
+    },
+    {
+      "id": "line",
+      "viewport": [320, 100],
+      "steps": [
+        { "snapshot": "overview" },
+        { "click": "Analytics" },
+        {
+          "expect": {
+            "visible": ["Track performance and engagement."],
+            "hidden": ["View your key metrics."]
+          }
+        },
+        { "snapshot": "analytics" }
+      ]
+    },
+    {
+      "id": "vertical",
+      "viewport": [360, 140],
+      "steps": [
+        { "snapshot": "account" },
+        { "click": "Notifications" },
+        {
+          "expect": {
+            "visible": ["Choose what you get notified about."],
+            "hidden": ["Update your account details."]
+          }
+        },
+        { "snapshot": "notifications" }
+      ]
+    },
+    {
+      "id": "disabled",
+      "viewport": [320, 100],
+      "steps": [
+        { "snapshot": "idle" },
+        { "click": "Disabled" },
+        {
+          "expect": {
+            "visible": ["Home content."],
+            "hidden": ["Disabled content."]
+          }
+        },
+        { "snapshot": "after-click" }
+      ]
+    },
+    {
+      "id": "icons",
+      "viewport": [320, 100],
+      "steps": [
+        { "snapshot": "preview" },
+        { "click": "Code" },
+        {
+          "expect": {
+            "visible": ["Source code."],
+            "hidden": ["A live preview."]
+          }
+        },
+        { "snapshot": "code" }
+      ]
+    }
+  ]
+}
