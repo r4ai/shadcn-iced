@@ -4,7 +4,7 @@
   "scenarios": [
     {
       "id": "default",
-      "viewport": [450, 380],
+      "viewport": [450, 420],
       "steps": [
         { "snapshot": "first" },
         { "hover": { "at": [418, 182] } },
@@ -23,7 +23,7 @@
     },
     {
       "id": "keyboard",
-      "viewport": [450, 380],
+      "viewport": [450, 420],
       "steps": [
         { "click": { "at": [418, 182] } },
         { "wait": 800 },
