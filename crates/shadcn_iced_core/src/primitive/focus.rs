@@ -333,3 +333,141 @@ where
 {
     FocusWithin::new(content, style)
 }
+
+/// The keyboard focus of a control, with the `:focus-visible` heuristic of
+/// browsers.
+///
+/// Controls keep it in their widget state and expose it to operations:
+///
+/// - as a [`Focusable`](operation::Focusable), so that iced's focus
+///   operations ([`focus_next`](operation::focusable::focus_next), ...) move
+///   the focus to them; focus moved by an operation is *visible*, like
+///   focus moved with <kbd>Tab</kbd> in a browser;
+/// - as a custom state (`operation.custom(id, bounds, &mut focus)`), so that
+///   [`Labelled`](super::labelled::Labelled) and
+///   [`Roving`](super::roving::Roving) can focus and activate them.
+///
+/// Focus gained with the pointer is not visible until the user presses a key,
+/// like `:focus-visible` in browsers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Focus {
+    focused: bool,
+    visible: bool,
+    activate: bool,
+}
+
+impl Focus {
+    /// Whether the control is focused.
+    pub fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    /// Whether the control shows its focus (`:focus-visible`).
+    pub fn is_visible(&self) -> bool {
+        self.focused && self.visible
+    }
+
+    /// Focuses the control with the pointer: the focus is not visible.
+    pub fn focus_with_pointer(&mut self) {
+        self.focused = true;
+        self.visible = false;
+    }
+
+    /// Focuses the control with the keyboard: the focus is visible.
+    pub fn focus_with_keyboard(&mut self) {
+        self.focused = true;
+        self.visible = true;
+    }
+
+    /// Records a key press while focused, which makes the focus visible.
+    pub fn key_pressed(&mut self) {
+        if self.focused {
+            self.visible = true;
+        }
+    }
+
+    /// Unfocuses the control.
+    pub fn blur(&mut self) {
+        self.focused = false;
+        self.visible = false;
+    }
+
+    /// Asks the control to activate itself (e.g. to toggle a checkbox whose
+    /// label was clicked) the next time it handles an event.
+    pub fn request_activation(&mut self) {
+        self.activate = true;
+    }
+
+    /// Returns whether an activation was requested, and clears the request.
+    pub fn take_activation(&mut self) -> bool {
+        std::mem::take(&mut self.activate)
+    }
+}
+
+impl operation::Focusable for Focus {
+    fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    fn focus(&mut self) {
+        self.focus_with_keyboard();
+    }
+
+    fn unfocus(&mut self) {
+        self.blur();
+    }
+}
+
+/// Reports whether a descendant of a widget is focused.
+pub fn is_focus_within<Message, Theme, Renderer>(
+    element: &mut Element<'_, Message, Theme, Renderer>,
+    tree: &mut Tree,
+    layout: Layout<'_>,
+    renderer: &Renderer,
+) -> bool
+where
+    Renderer: iced::advanced::Renderer,
+{
+    let mut query = FocusQuery { focused: false };
+
+    element
+        .as_widget_mut()
+        .operate(tree, layout, renderer, &mut query);
+
+    query.focused
+}
+
+/// An operation visiting the [`Focus`] states of controls, in order.
+pub(crate) struct Controls<F: FnMut(usize, &mut Focus) + Send> {
+    pub(crate) index: usize,
+    pub(crate) f: F,
+}
+
+impl<F: FnMut(usize, &mut Focus) + Send> Operation for Controls<F> {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+        operate(self);
+    }
+
+    fn custom(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
+        if let Some(focus) = state.downcast_mut::<Focus>() {
+            (self.f)(self.index, focus);
+            self.index += 1;
+        }
+    }
+}
+
+/// Calls `f` with the index and [`Focus`] of every control of a widget, in
+/// order.
+pub fn for_each_control<Message, Theme, Renderer>(
+    element: &mut Element<'_, Message, Theme, Renderer>,
+    tree: &mut Tree,
+    layout: Layout<'_>,
+    renderer: &Renderer,
+    f: impl FnMut(usize, &mut Focus) + Send,
+) where
+    Renderer: iced::advanced::Renderer,
+{
+    element
+        .as_widget_mut()
+        .operate(tree, layout, renderer, &mut Controls { index: 0, f });
+}

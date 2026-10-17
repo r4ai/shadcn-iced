@@ -8,19 +8,27 @@
 //!   self-managed overlays (dropdown menus, popovers, ...) need.
 //! - It never draws the focus ring of the browser; components decide.
 //!
+//! It can also take the keyboard focus ([`Pressable::focusable`]), like a
+//! `<button>`: <kbd>Tab</kbd> (iced's focus operations) focuses it,
+//! <kbd>Space</kbd> and <kbd>Enter</kbd> press it, and its style knows
+//! whether the focus is visible (`:focus-visible`): focus gained with the
+//! keyboard is, focus gained with the pointer is not until a key is pressed.
+//!
 //! It reuses [`button::Style`] and [`button::Status`], so any iced button
 //! style function works with it.
+use super::focus::{Focus, Ring};
 use crate::animation::{self, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::widget::{Id, Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 
+use iced::keyboard::{self, key::Named};
 use iced::time::Instant;
 use iced::widget::button::{Status, Style};
 use iced::{
-    Background, Color, Element, Event, Length, Padding, Rectangle, Size, Vector, mouse, touch,
-    window,
+    Background, Color, Element, Event, Length, Padding, Rectangle, Size, Vector, border, mouse,
+    touch, window,
 };
 
 /// A clickable surface.
@@ -35,7 +43,12 @@ pub struct Pressable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer
     interaction: Option<mouse::Interaction>,
     press_offset: f32,
     clip_background: bool,
-    style: Box<dyn Fn(&Theme, Status) -> Style + 'a>,
+    style: Box<dyn Fn(&Theme, Status, bool) -> Style + 'a>,
+    ring: Option<Box<dyn Fn(&Theme, Status, bool) -> Option<Ring> + 'a>>,
+    focusable: bool,
+    tab_stop: bool,
+    enter: bool,
+    id: Option<Id>,
 }
 
 enum OnPress<'a, Message> {
@@ -72,11 +85,16 @@ where
             interaction: None,
             press_offset: 0.0,
             clip_background: false,
-            style: Box::new(|_, _| Style {
+            style: Box::new(|_, _, _| Style {
                 background: None,
                 text_color: Color::BLACK,
                 ..Style::default()
             }),
+            ring: None,
+            focusable: false,
+            tab_stop: true,
+            enter: true,
+            id: None,
         }
     }
 
@@ -151,7 +169,55 @@ where
 
     /// Sets the style function.
     pub fn style(mut self, style: impl Fn(&Theme, Status) -> Style + 'a) -> Self {
+        self.style = Box::new(move |theme, status, _| style(theme, status));
+        self
+    }
+
+    /// Sets the style function, which also receives whether the
+    /// [`Pressable`] shows its keyboard focus (`focus-visible:`).
+    pub fn focus_style(mut self, style: impl Fn(&Theme, Status, bool) -> Style + 'a) -> Self {
         self.style = Box::new(style);
+        self
+    }
+
+    /// Sets a ring drawn *outside* of the bounds (`ring-3`), given the
+    /// status and whether the keyboard focus is visible.
+    pub fn ring(mut self, ring: impl Fn(&Theme, Status, bool) -> Option<Ring> + 'a) -> Self {
+        self.ring = Some(Box::new(ring));
+        self
+    }
+
+    /// Makes the [`Pressable`] take the keyboard focus, like a `<button>`.
+    ///
+    /// It is then focused by iced's focus operations (<kbd>Tab</kbd>) and by
+    /// a press, loses the focus when the pointer presses elsewhere, and is
+    /// pressed by <kbd>Space</kbd> or <kbd>Enter</kbd> while focused. A
+    /// disabled [`Pressable`] is never focused.
+    pub fn focusable(mut self, focusable: bool) -> Self {
+        self.focusable = focusable;
+        self
+    }
+
+    /// Sets whether a focusable [`Pressable`] is reached with
+    /// <kbd>Tab</kbd> (`tabindex="0"`, the default), or only by the arrow
+    /// keys of its group and by its label (`tabindex="-1"`), for roving
+    /// focus (see [`Roving`](super::roving::Roving)).
+    pub fn tab_stop(mut self, tab_stop: bool) -> Self {
+        self.tab_stop = tab_stop;
+        self
+    }
+
+    /// Sets whether <kbd>Enter</kbd> presses a focused [`Pressable`], in
+    /// addition to <kbd>Space</kbd>. Defaults to `true`; checkboxes and
+    /// radios only react to <kbd>Space</kbd>.
+    pub fn activate_on_enter(mut self, enter: bool) -> Self {
+        self.enter = enter;
+        self
+    }
+
+    /// Sets the [`Id`] reported to focus operations.
+    pub fn id(mut self, id: impl Into<Id>) -> Self {
+        self.id = Some(id.into());
         self
     }
 }
@@ -163,6 +229,7 @@ struct State {
     status: Option<Status>,
     previous: Option<Status>,
     transition: Transition,
+    focus: Focus,
 }
 
 impl<'a, Message, Theme, Renderer> Pressable<'a, Message, Theme, Renderer> {
@@ -257,6 +324,19 @@ where
         renderer: &Renderer,
         operation: &mut dyn Operation,
     ) {
+        if self.focusable && !self.disabled {
+            let state = tree.state.downcast_mut::<State>();
+            let bounds = layout.bounds();
+
+            operation.custom(self.id.as_ref(), bounds, &mut state.focus);
+
+            // Out of the tab order (`tabindex="-1"`) unless focused, so that
+            // focus operations can still move the focus away.
+            if self.tab_stop || state.focus.is_focused() {
+                operation.focusable(self.id.as_ref(), bounds, &mut state.focus);
+            }
+        }
+
         operation.container(None, layout.bounds());
         operation.traverse(&mut |operation| {
             self.content.as_widget_mut().operate(
@@ -279,6 +359,15 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        // An activation requested by a label or a roving group.
+        if tree.state.downcast_mut::<State>().focus.take_activation()
+            && !self.disabled
+            && let Some(on_press) = &self.on_press
+        {
+            shell.publish(on_press.get());
+            shell.request_redraw();
+        }
+
         self.content.as_widget_mut().update(
             &mut tree.children[0],
             event,
@@ -325,6 +414,50 @@ where
         if state.is_hovered != is_hovered {
             state.is_hovered = is_hovered;
             shell.request_redraw();
+        }
+
+        if self.focusable {
+            if self.disabled {
+                state.focus.blur();
+            } else {
+                match event {
+                    // Like text inputs, a press focuses the pressable or
+                    // takes the focus away from it.
+                    Event::Mouse(mouse::Event::ButtonPressed(_))
+                    | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                        if is_hovered {
+                            state.focus.focus_with_pointer();
+                            shell.request_redraw();
+                        } else if state.focus.is_focused() {
+                            state.focus.blur();
+                            shell.request_redraw();
+                        }
+                    }
+                    Event::Keyboard(keyboard::Event::KeyPressed { key, .. })
+                        if state.focus.is_focused() =>
+                    {
+                        if !state.focus.is_visible() {
+                            state.focus.key_pressed();
+                            shell.request_redraw();
+                        }
+
+                        let activates = match key {
+                            keyboard::Key::Named(Named::Space) => true,
+                            keyboard::Key::Named(Named::Enter) => self.enter,
+                            _ => false,
+                        };
+
+                        if activates
+                            && !shell.is_event_captured()
+                            && let Some(on_press) = &self.on_press
+                        {
+                            shell.publish(on_press.get());
+                            shell.capture_event();
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
 
         if shell.is_event_captured() || self.disabled {
@@ -382,18 +515,25 @@ where
         let status = self.status(state, cursor, bounds);
         let now = Instant::now();
 
+        let focused = state.focus.is_visible();
+
         let style = match (state.previous, state.status) {
             (Some(previous), Some(current))
                 if current == status && state.transition.is_animating(now) =>
             {
                 mix_styles(
-                    &(self.style)(theme, previous),
-                    &(self.style)(theme, current),
+                    &(self.style)(theme, previous, focused),
+                    &(self.style)(theme, current, focused),
                     state.transition.value(now),
                 )
             }
-            _ => (self.style)(theme, status),
+            _ => (self.style)(theme, status, focused),
         };
+
+        let ring = self
+            .ring
+            .as_ref()
+            .and_then(|ring| ring(theme, status, focused));
 
         let viewport = if self.clip {
             bounds.intersection(viewport).unwrap_or(*viewport)
@@ -402,6 +542,22 @@ where
         };
 
         let draw = |renderer: &mut Renderer| {
+            if let Some(ring) = ring {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: bounds.expand(ring.width),
+                        border: iced::Border {
+                            color: ring.color,
+                            width: ring.width,
+                            radius: border::radius(ring.radius + ring.width),
+                        },
+                        snap: style.snap,
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(Color::TRANSPARENT),
+                );
+            }
+
             let inset = if self.clip_background {
                 style.border.width
             } else {
