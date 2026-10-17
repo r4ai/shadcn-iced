@@ -148,7 +148,7 @@ cargo run -p gallery
 Two example apps with mock data show the components working together, on the website ([/examples](https://shadcn-iced.r4ai.dev/examples)) or on your desktop:
 
 ```sh
-cargo run -p dashboard  # a store dashboard: metrics, charts, sales and invoices
+cargo run -p dashboard  # the dashboard-01 block: sidebar, metrics, chart and data table
 cargo run -p settings   # an app's settings: profile, account, appearance, notifications
 ```
 

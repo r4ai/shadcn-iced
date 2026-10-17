@@ -7,7 +7,7 @@ use crate::{Message, example};
 pub const DASHBOARD: Page = Page {
     id: "dashboard",
     title: "Dashboard",
-    description: "The dashboard of a fictional store: metrics, charts, recent sales and invoices.",
+    description: "The dashboard-01 block of shadcn/ui: an inset sidebar, metrics, an interactive chart and a data table.",
     view: |gallery| {
         example(
             "Dashboard",

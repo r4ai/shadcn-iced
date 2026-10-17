@@ -89,8 +89,9 @@ export function minHeight(id: string) {
     popover: 400,
     sonner: 400,
     toast: 400,
-    // The example apps, near their natural height.
-    dashboard: 760,
+    // The example apps: the dashboard fills its frame and scrolls inside
+    // it, the settings grow to their natural height.
+    dashboard: 860,
     settings: 720,
   };
 
