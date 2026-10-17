@@ -42,6 +42,18 @@ export interface ChartPage {
   examples: Example[];
 }
 
+/** An example app (`/examples/<id>`): a crate of its own, previewed whole. */
+export interface AppPage {
+  /** The id of the page in the gallery, and the name of the crate. */
+  id: string;
+  title: string;
+  description: string;
+  /** The command that runs the app (`cargo run -p dashboard`). */
+  command: Highlighted;
+  /** A single example: the app, with the code of its `src/lib.rs`. */
+  examples: Example[];
+}
+
 /** Loads a component with its highlighted code, or `undefined`. */
 export async function loadComponent(id: string): Promise<ComponentDetail | undefined> {
   return (await loaders[id]?.())?.default;
@@ -77,6 +89,9 @@ export function minHeight(id: string) {
     popover: 400,
     sonner: 400,
     toast: 400,
+    // The example apps, near their natural height.
+    dashboard: 760,
+    settings: 720,
   };
 
   return tall[id] ?? 320;

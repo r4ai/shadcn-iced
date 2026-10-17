@@ -15,6 +15,8 @@ import { Route as DocsRouteRouteImport } from './pages/docs/route'
 import { Route as ChartsIndexRouteImport } from './pages/charts/index'
 import { Route as ChartsKindRouteImport } from './pages/charts/$kind'
 import { Route as DocsIndexRouteImport } from './pages/docs/index'
+import { Route as ExamplesIndexRouteImport } from './pages/examples/index'
+import { Route as ExamplesNameRouteImport } from './pages/examples/$name'
 import { Route as DocsComponentsIndexRouteImport } from './pages/docs/components/index'
 import { Route as DocsInstallationIndexRouteImport } from './pages/docs/installation/index'
 import { Route as DocsThemingIndexRouteImport } from './pages/docs/theming/index'
@@ -50,6 +52,16 @@ const DocsIndexRoute = DocsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DocsRouteRoute,
 } as any)
+const ExamplesIndexRoute = ExamplesIndexRouteImport.update({
+  id: '/examples/',
+  path: '/examples/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExamplesNameRoute = ExamplesNameRouteImport.update({
+  id: '/examples/$name',
+  path: '/examples/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsComponentsIndexRoute = DocsComponentsIndexRouteImport.update({
   id: '/components/',
   path: '/components/',
@@ -76,8 +88,10 @@ export interface FileRoutesByFullPath {
   '/docs': typeof DocsRouteRouteWithChildren
   '/404': typeof R404Route
   '/charts/$kind': typeof ChartsKindRoute
+  '/examples/$name': typeof ExamplesNameRoute
   '/charts/': typeof ChartsIndexRoute
   '/docs/': typeof DocsIndexRoute
+  '/examples/': typeof ExamplesIndexRoute
   '/docs/components/': typeof DocsComponentsIndexRoute
   '/docs/installation/': typeof DocsInstallationIndexRoute
   '/docs/theming/': typeof DocsThemingIndexRoute
@@ -87,8 +101,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/404': typeof R404Route
   '/charts/$kind': typeof ChartsKindRoute
+  '/examples/$name': typeof ExamplesNameRoute
   '/charts': typeof ChartsIndexRoute
   '/docs': typeof DocsIndexRoute
+  '/examples': typeof ExamplesIndexRoute
   '/docs/components': typeof DocsComponentsIndexRoute
   '/docs/installation': typeof DocsInstallationIndexRoute
   '/docs/theming': typeof DocsThemingIndexRoute
@@ -100,8 +116,10 @@ export interface FileRoutesById {
   '/docs': typeof DocsRouteRouteWithChildren
   '/404': typeof R404Route
   '/charts/$kind': typeof ChartsKindRoute
+  '/examples/$name': typeof ExamplesNameRoute
   '/charts/': typeof ChartsIndexRoute
   '/docs/': typeof DocsIndexRoute
+  '/examples/': typeof ExamplesIndexRoute
   '/docs/components/': typeof DocsComponentsIndexRoute
   '/docs/installation/': typeof DocsInstallationIndexRoute
   '/docs/theming/': typeof DocsThemingIndexRoute
@@ -114,8 +132,10 @@ export interface FileRouteTypes {
     | '/docs'
     | '/404'
     | '/charts/$kind'
+    | '/examples/$name'
     | '/charts/'
     | '/docs/'
+    | '/examples/'
     | '/docs/components/'
     | '/docs/installation/'
     | '/docs/theming/'
@@ -125,8 +145,10 @@ export interface FileRouteTypes {
     | '/'
     | '/404'
     | '/charts/$kind'
+    | '/examples/$name'
     | '/charts'
     | '/docs'
+    | '/examples'
     | '/docs/components'
     | '/docs/installation'
     | '/docs/theming'
@@ -137,8 +159,10 @@ export interface FileRouteTypes {
     | '/docs'
     | '/404'
     | '/charts/$kind'
+    | '/examples/$name'
     | '/charts/'
     | '/docs/'
+    | '/examples/'
     | '/docs/components/'
     | '/docs/installation/'
     | '/docs/theming/'
@@ -150,7 +174,9 @@ export interface RootRouteChildren {
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
   R404Route: typeof R404Route
   ChartsKindRoute: typeof ChartsKindRoute
+  ExamplesNameRoute: typeof ExamplesNameRoute
   ChartsIndexRoute: typeof ChartsIndexRoute
+  ExamplesIndexRoute: typeof ExamplesIndexRoute
 }
 
 declare module '@tanstack/solid-router' {
@@ -196,6 +222,20 @@ declare module '@tanstack/solid-router' {
       fullPath: '/docs/'
       preLoaderRoute: typeof DocsIndexRouteImport
       parentRoute: typeof DocsRouteRoute
+    }
+    '/examples/': {
+      id: '/examples/'
+      path: '/examples'
+      fullPath: '/examples/'
+      preLoaderRoute: typeof ExamplesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/examples/$name': {
+      id: '/examples/$name'
+      path: '/examples/$name'
+      fullPath: '/examples/$name'
+      preLoaderRoute: typeof ExamplesNameRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/docs/components/': {
       id: '/docs/components/'
@@ -253,7 +293,9 @@ const rootRouteChildren: RootRouteChildren = {
   DocsRouteRoute: DocsRouteRouteWithChildren,
   R404Route: R404Route,
   ChartsKindRoute: ChartsKindRoute,
+  ExamplesNameRoute: ExamplesNameRoute,
   ChartsIndexRoute: ChartsIndexRoute,
+  ExamplesIndexRoute: ExamplesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

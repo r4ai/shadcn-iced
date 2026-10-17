@@ -145,6 +145,13 @@ You can explore all components and customize themes interactively in the browser
 cargo run -p gallery
 ```
 
+Two example apps with mock data show the components working together, on the website ([/examples](https://shadcn-iced.r4ai.dev/examples)) or on your desktop:
+
+```sh
+cargo run -p dashboard  # a store dashboard: metrics, charts, sales and invoices
+cargo run -p settings   # an app's settings: profile, account, appearance, notifications
+```
+
 ## Documentation
 
 - **[Website & Live Previews](https://shadcn-iced.r4ai.dev)** — Interactive component showcase, theme customizer, and example code.

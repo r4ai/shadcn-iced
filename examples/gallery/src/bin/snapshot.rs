@@ -26,7 +26,7 @@
 //! hover, self-managed overlays) is captured.
 //!
 //! Snapshots are written to `target/snapshots/`.
-use gallery::{Gallery, Message, PAGES};
+use gallery::{APPS, Gallery, Message, PAGES, Page};
 use shadcn_iced::Mode;
 
 use iced::keyboard::{Key, key::Named};
@@ -42,6 +42,14 @@ enum Action {
     Type(String),
     Key(Key),
     Wait(u64),
+}
+
+/// The gallery on its page, or an example app on its own.
+fn view<'a>(gallery: &'a Gallery, app: Option<&Page>) -> iced::Element<'a, Message> {
+    match app {
+        Some(page) => gallery::view_example(gallery, page, 0),
+        None => gallery.view(),
+    }
 }
 
 fn point(value: &str) -> Point {
@@ -251,7 +259,11 @@ fn main() {
             _ => (spec.clone(), vec![Mode::Light, Mode::Dark]),
         };
 
-        let Some(index) = Gallery::page_by_id(&id) else {
+        // An example app (`dashboard`, `settings`) renders on its own, as
+        // on the website.
+        let app = APPS.iter().find(|page| page.id == id);
+
+        let Some(index) = Gallery::page_by_id(&id).or(app.map(|_| 0)) else {
             eprintln!("unknown page: {id}");
             continue;
         };
@@ -273,7 +285,8 @@ fn main() {
 
             for action in &before {
                 let messages: Vec<Message> = {
-                    let mut ui = Simulator::with_size(gallery::settings(), size, gallery.view());
+                    let mut ui =
+                        Simulator::with_size(gallery::settings(), size, view(&gallery, app));
                     perform(&mut ui, action);
                     ui.into_messages().collect()
                 };
@@ -284,7 +297,7 @@ fn main() {
             }
 
             let theme = gallery.theme();
-            let mut ui = Simulator::with_size(gallery::settings(), size, gallery.view());
+            let mut ui = Simulator::with_size(gallery::settings(), size, view(&gallery, app));
 
             for action in &live {
                 perform(&mut ui, action);

@@ -5,7 +5,7 @@
 //! ```sh
 //! cargo run -p gallery --bin site_data > site/src/data/gallery.json
 //! ```
-use gallery::{CHARTS, Gallery, PAGES, Page};
+use gallery::{APPS, CHARTS, Gallery, PAGES, Page};
 use shadcn_iced::Mode;
 
 fn string(value: &str) -> String {
@@ -59,8 +59,9 @@ fn main() {
     let gallery = Gallery::new(0, Mode::Light);
 
     println!(
-        "{{\"pages\":[\n{}\n],\"charts\":[\n{}\n]}}",
+        "{{\"pages\":[\n{}\n],\"charts\":[\n{}\n],\"apps\":[\n{}\n]}}",
         pages(&gallery, PAGES),
         pages(&gallery, CHARTS),
+        pages(&gallery, APPS),
     );
 }

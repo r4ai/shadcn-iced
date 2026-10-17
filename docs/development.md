@@ -49,6 +49,14 @@ To open the gallery directly on a specific component page, set the `GALLERY_PAGE
 GALLERY_PAGE=sonner cargo run -p gallery
 ```
 
+The example apps (`examples/dashboard`, `examples/settings`) are crates of their own: a library with the state, `update` and `view` of the app, and a `main.rs` that runs it. The gallery maps their views (`pages/apps.rs`) for the website's `/examples` pages, and the `snapshot` binary renders them by id (`dashboard`, `settings`):
+
+```sh
+cargo run -p dashboard
+cargo run -p settings
+cargo run -p gallery --bin snapshot -- settings:dark --click Notifications --size 1280x1000
+```
+
 ## Headless Visual QA (`snapshot`)
 
 The `gallery` package includes a `snapshot` binary that renders component pages headlessly using `iced_test::Simulator` and saves PNG images to `target/snapshots/`.

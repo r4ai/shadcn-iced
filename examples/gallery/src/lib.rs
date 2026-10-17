@@ -10,7 +10,7 @@ use iced::widget::{column, container, row, rule, space, text};
 use iced::{Element, Fill, Length, Task, Theme};
 use shadcn_iced::scroll_area::scroll_area as scrollable;
 
-pub use pages::{CHARTS, PAGES, Page};
+pub use pages::{APPS, CHARTS, PAGES, Page};
 
 /// The state of the gallery.
 pub struct Gallery {
@@ -27,6 +27,9 @@ pub struct Gallery {
     pub copied: bool,
     pub theme: Theme,
     pub demo: pages::Demo,
+    /// The state of the example apps ([`APPS`]).
+    pub dashboard: dashboard::Dashboard,
+    pub settings: settings::Settings,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +47,8 @@ pub enum Message {
     CopyTheme,
     ResetTheme,
     Demo(pages::DemoMessage),
+    Dashboard(dashboard::Message),
+    Settings(settings::Message),
     Noop,
 }
 
@@ -72,6 +77,8 @@ impl Gallery {
             copied: false,
             theme: Theme::Light,
             demo: pages::Demo::default(),
+            dashboard: dashboard::Dashboard::default(),
+            settings: settings::Settings::default(),
         };
         gallery.rebuild_theme();
         gallery
@@ -145,10 +152,14 @@ impl Gallery {
                 *self = Self {
                     customize,
                     demo: std::mem::take(&mut self.demo),
+                    dashboard: std::mem::take(&mut self.dashboard),
+                    settings: std::mem::take(&mut self.settings),
                     ..Self::new(self.page, self.mode)
                 };
             }
             Message::Demo(message) => return self.demo.update(message),
+            Message::Dashboard(message) => self.dashboard.update(message),
+            Message::Settings(message) => self.settings.update(message),
             Message::Noop => {}
         }
 

@@ -839,6 +839,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
+name = "dashboard"
+version = "0.0.0"
+dependencies = [
+ "iced",
+ "shadcn_iced",
+]
+
+[[package]]
 name = "data-url"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1272,8 +1280,10 @@ dependencies = [
 name = "gallery"
 version = "0.0.0"
 dependencies = [
+ "dashboard",
  "iced",
  "iced_test",
+ "settings",
  "shadcn_iced",
 ]
 
@@ -3485,6 +3495,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "settings"
+version = "0.0.0"
+dependencies = [
+ "iced",
+ "shadcn_iced",
 ]
 
 [[package]]
