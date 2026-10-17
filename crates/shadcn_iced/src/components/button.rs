@@ -153,6 +153,8 @@ pub struct Button<'a, Message> {
     size: Size,
     disabled: bool,
     width: Option<Length>,
+    text_size: Option<f32>,
+    padding_x: Option<f32>,
     position: style::Position,
     vertical: bool,
     rounded: bool,
@@ -179,6 +181,8 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
             size: Size::Default,
             disabled: false,
             width: None,
+            text_size: None,
+            padding_x: None,
             position: style::Position::Alone,
             vertical: false,
             rounded: false,
@@ -246,6 +250,20 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
         self
     }
 
+    /// Overrides the font size of the label set by the [`Size`], e.g.
+    /// `text-sm` for the `xs` buttons of an input group.
+    pub fn text_size(mut self, size: f32) -> Self {
+        self.text_size = Some(size);
+        self
+    }
+
+    /// Overrides the horizontal padding set by the [`Size`], inside of the
+    /// border, e.g. `px-1.5`.
+    pub fn padding_x(mut self, padding: f32) -> Self {
+        self.padding_x = Some(padding);
+        self
+    }
+
     /// Sets the width. Buttons shrink to fit their content by default.
     pub fn width(mut self, width: impl Into<Length>) -> Self {
         self.width = Some(width.into());
@@ -258,11 +276,15 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         let size = button.size;
         let height = size.height();
         let icon_size = size.icon_size();
-        let padding = size.padding(button.leading.is_some(), button.trailing.is_some());
+        let text_size = button.text_size.unwrap_or(size.text_size());
+        let padding = match button.padding_x {
+            Some(padding) => Padding::from([0.0, 1.0 + padding]),
+            None => size.padding(button.leading.is_some(), button.trailing.is_some()),
+        };
 
         let label = match button.content {
             Content::Label(label) => text(label)
-                .size(size.text_size())
+                .size(text_size)
                 .font(font::medium())
                 .wrapping(text::Wrapping::None)
                 .into(),
@@ -313,7 +335,7 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         // `hover:underline underline-offset-4`
         let content = if button.variant == Variant::Link && !button.disabled {
             underline(content)
-                .text_size(size.text_size())
+                .text_size(text_size)
                 .hover_area(Padding {
                     left: padding.left,
                     right: padding.right,
