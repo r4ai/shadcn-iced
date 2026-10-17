@@ -62,6 +62,7 @@ function Controlled() {
 export default {
   default: () => <Density />,
   keyboard: () => <Controlled />,
+  tab: () => <Controlled />,
   description: () => (
     <RadioGroup defaultValue="comfortable">
       <Field orientation="horizontal">

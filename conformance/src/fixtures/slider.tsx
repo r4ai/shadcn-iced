@@ -22,6 +22,7 @@ function Controlled() {
 export default {
   default: () => <Slider defaultValue={[50]} max={100} step={1} />,
   controlled: () => <Controlled />,
+  keyboard: () => <Controlled />,
   range: () => <Slider defaultValue={[25, 75]} max={100} step={1} />,
   vertical: () => (
     <div className="h-40">

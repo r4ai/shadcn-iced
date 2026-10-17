@@ -17,7 +17,7 @@ pub fn get(id: &str) -> Option<Fixture> {
         .init(|store| {
             store.set("value", 50.0f32);
         }),
-        "controlled" => Fixture::new(|store| {
+        "controlled" | "keyboard" => Fixture::new(|store| {
             let value = store.num("value");
 
             column![

@@ -51,7 +51,7 @@ pub fn get(id: &str) -> Option<Fixture> {
             .spacing(12)
             .into()
         }),
-        "keyboard" => Fixture::new(controlled),
+        "keyboard" | "tab" => Fixture::new(controlled),
         _ => return None,
     })
 }

@@ -97,6 +97,50 @@
     {
       "id": "invalid",
       "viewport": [200, 128]
+    },
+    {
+      "id": "tab",
+      "viewport": [200, 152],
+      "steps": [
+        {
+          "press": "Tab"
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "ArrowUp"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: default"],
+            "hidden": ["Selected: comfortable"]
+          }
+        },
+        {
+          "press": "End"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: default"]
+          }
+        },
+        {
+          "press": "ArrowDown"
+        },
+        {
+          "press": "ArrowDown"
+        },
+        {
+          "expect": {
+            "visible": ["Selected: compact"],
+            "hidden": ["Selected: default"]
+          }
+        },
+        {
+          "snapshot": "end"
+        }
+      ]
     }
   ]
 }

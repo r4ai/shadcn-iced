@@ -23,6 +23,7 @@ const account = () => (
 export default {
   default: account,
   keyboard: account,
+  tab: account,
   line: () => (
     <Tabs defaultValue="overview">
       <TabsList variant="line">

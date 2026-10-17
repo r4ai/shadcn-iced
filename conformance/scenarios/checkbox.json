@@ -106,6 +106,30 @@
           "snapshot": "after-click"
         }
       ]
+    },
+    {
+      "id": "tab",
+      "viewport": [288, 88],
+      "steps": [
+        {
+          "press": "Tab"
+        },
+        {
+          "snapshot": "focused"
+        },
+        {
+          "press": "Space"
+        },
+        {
+          "expect": {
+            "visible": ["Accepted"],
+            "hidden": ["Not accepted"]
+          }
+        },
+        {
+          "snapshot": "checked"
+        }
+      ]
     }
   ]
 }

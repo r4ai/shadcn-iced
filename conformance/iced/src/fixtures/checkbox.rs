@@ -42,7 +42,7 @@ pub fn get(id: &str) -> Option<Fixture> {
             .spacing(12)
             .into()
         }),
-        "keyboard" => Fixture::new(|store| controlled(store, false)),
+        "keyboard" | "tab" => Fixture::new(|store| controlled(store, false)),
         "disabled" => Fixture::new(|store| controlled(store, true)),
         _ => return None,
     })
