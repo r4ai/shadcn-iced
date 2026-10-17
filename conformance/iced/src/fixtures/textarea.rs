@@ -29,6 +29,7 @@ pub fn get(id: &str) -> Option<Fixture> {
                         format!("You typed: {value}")
                     })
                     .size(14)
+                    .line_height(shadcn_iced::style::text::leading(14.0))
                     .style(|theme: &Theme| text::Style {
                         color: Some(tokens(theme).palette.muted_foreground),
                     }),
