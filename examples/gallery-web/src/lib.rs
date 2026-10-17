@@ -6,8 +6,8 @@
 //! the examples of a page of the native gallery do.
 //!
 //! The page talks to the previews with the exported functions ([`mount`],
-//! [`set_theme`] and [`theme_code`]), and the previews call back two
-//! functions of `window`:
+//! [`unmount`], [`set_theme`] and [`theme_code`]), and the previews call back
+//! two functions of `window`:
 //!
 //! - `shadcnIcedPreviewResized(target, height)`, with the natural height of an
 //!   example, so the page can size its preview to fit,
@@ -47,6 +47,9 @@ enum Request {
         target: String,
         page: usize,
         example: usize,
+    },
+    Unmount {
+        target: String,
     },
     Theme(Options),
 }
@@ -154,6 +157,12 @@ pub fn mount(target: String, page: &str, example: usize) -> bool {
     true
 }
 
+/// Closes the live preview mounted on `target`, when the page removes it.
+#[wasm_bindgen]
+pub fn unmount(target: String) {
+    send(Request::Unmount { target });
+}
+
 /// Sets the theme of every preview: the mode, the base color, the theme
 /// (accent) and the radius, with the names of the `/create` page of
 /// shadcn/ui (e.g. `"zinc"`, `"blue"`, `"large"`).
@@ -239,6 +248,22 @@ impl Previews {
                 );
 
                 return open.map(|_| Message::Opened);
+            }
+            Message::Request(Request::Unmount { target }) => {
+                let Some(id) = self
+                    .windows
+                    .iter()
+                    .find_map(|(id, preview)| (preview.target == target).then_some(*id))
+                else {
+                    return Task::none();
+                };
+
+                let _ = self.windows.remove(&id);
+                if self.active == Some(id) {
+                    self.active = None;
+                }
+
+                return window::close(id);
             }
             Message::Request(Request::Theme(options)) => {
                 for message in options.messages(&self.gallery) {
