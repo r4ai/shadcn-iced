@@ -1,0 +1,57 @@
+{
+  "$schema": "./schema.json",
+  "component": "resizable",
+  "scenarios": [
+    {
+      "id": "default",
+      "viewport": [440, 240],
+      "steps": [
+        { "snapshot": "initial" },
+        { "expect": { "visible": ["One", "Two", "Three"] } },
+        {
+          "drag": { "from": { "at": [208, 116] }, "to": { "at": [128, 116] } }
+        },
+        { "snapshot": "horizontal-dragged" },
+        { "drag": { "from": { "at": [250, 67] }, "to": { "at": [250, 130] } } },
+        { "snapshot": "vertical-dragged" }
+      ]
+    },
+    {
+      "id": "vertical",
+      "viewport": [440, 240],
+      "steps": [
+        { "snapshot": "initial" },
+        { "drag": { "from": { "at": [200, 67] }, "to": { "at": [200, 150] } } },
+        { "snapshot": "dragged" }
+      ]
+    },
+    {
+      "id": "handle",
+      "viewport": [440, 240],
+      "steps": [
+        { "snapshot": "initial" },
+        { "hover": { "at": [112, 117] } },
+        { "snapshot": "hover-handle" },
+        {
+          "drag": { "from": { "at": [112, 117] }, "to": { "at": [250, 117] } }
+        },
+        { "snapshot": "dragged" }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "viewport": [440, 240],
+      "steps": [
+        { "press": "Tab" },
+        { "snapshot": "focused" },
+        { "press": "ArrowRight" },
+        { "press": "ArrowRight" },
+        { "snapshot": "resized-right" },
+        { "press": "ArrowLeft" },
+        { "press": "ArrowLeft" },
+        { "press": "ArrowLeft" },
+        { "snapshot": "resized-left" }
+      ]
+    }
+  ]
+}
