@@ -34,9 +34,7 @@ const components = pages.map((page) => {
     id: page.id,
     title: page.title,
     description: page.description,
-    source: existsSync(join(root, component))
-      ? { file: component, code: read(component).trimEnd() }
-      : null,
+    source: existsSync(join(root, component)) ? { file: component, code: read(component).trimEnd() } : null,
     examples: page.examples.map((example, index) => {
       const { code } = exampleSource(read(example.file), example.line, example.column);
       return {

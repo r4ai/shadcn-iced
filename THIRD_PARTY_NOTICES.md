@@ -4,7 +4,10 @@
 
 The design of the components (colors, spacing, radii, variants) and the
 theme presets in `crates/shadcn_iced_core/src/theme/presets.rs` are ported from
-[shadcn/ui](https://github.com/shadcn-ui/ui).
+[shadcn/ui](https://github.com/shadcn-ui/ui). The website (`site/`) ports the
+design of ui.shadcn.com and its components, and includes
+`site/src/styles/shadcn/tailwind.css` and `site/src/styles/shadcn/typeset.css`
+from it.
 
 ```
 MIT License
