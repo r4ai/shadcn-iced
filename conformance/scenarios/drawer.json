@@ -1,0 +1,88 @@
+{
+  "$schema": "./schema.json",
+  "component": "drawer",
+  "scenarios": [
+    {
+      "id": "default",
+      "description": "Opens from the bottom with a click and closes with Escape.",
+      "viewport": [640, 400],
+      "steps": [
+        { "snapshot": "closed" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "click": "Open Drawer" },
+        {
+          "expect": {
+            "visible": ["Are you absolutely sure?", "Submit", "Cancel"]
+          }
+        },
+        { "snapshot": "open" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "snapshot": "closed-after-escape" }
+      ]
+    },
+    {
+      "id": "footer",
+      "description": "Closes with the Cancel button; Submit does not close it by itself.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open Drawer" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "hover": "Submit" },
+        { "snapshot": "submit-hover" },
+        { "click": "Cancel" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } }
+      ]
+    },
+    {
+      "id": "outside-click",
+      "description": "Closes when the backdrop is clicked.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open Drawer" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "click": { "at": [320, 20] } },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "snapshot": "closed" }
+      ]
+    },
+    {
+      "id": "swipe-handle",
+      "description": "The bottom drawer with its swipe handle.",
+      "viewport": [640, 400],
+      "steps": [
+        { "click": "Open Drawer" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "snapshot": "open" }
+      ]
+    },
+    {
+      "id": "directions",
+      "description": "A drawer attached to each edge of the window.",
+      "viewport": [640, 400],
+      "steps": [
+        { "snapshot": "closed" },
+        { "click": "up" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "snapshot": "up" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "click": "right" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "snapshot": "right" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "click": "down" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "snapshot": "down" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "click": "left" },
+        { "expect": { "visible": ["Are you absolutely sure?"] } },
+        { "snapshot": "left" },
+        { "press": "Escape" },
+        { "expect": { "hidden": ["Are you absolutely sure?"] } }
+      ]
+    }
+  ]
+}
