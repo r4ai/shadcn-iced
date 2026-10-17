@@ -10,6 +10,7 @@ pub mod listbox;
 pub mod pressable;
 pub mod roving;
 pub mod split;
+pub mod toaster;
 pub mod tracked;
 pub mod underline;
 

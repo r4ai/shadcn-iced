@@ -2,8 +2,11 @@
 //!
 //! Port of <https://ui.shadcn.com/docs/components/sonner>. Toasts live in
 //! your state; the [`toaster`] displays them in a corner of the window and
-//! asks you to remove each one once its duration has elapsed (or when its
-//! close button is pressed):
+//! asks you to remove each one once it has been dismissed: when its duration
+//! has elapsed, when its action or close button is pressed, or when it is
+//! swiped away. Like sonner, the toasts stack behind the newest one and
+//! expand into a list on hover; the behavior and the animations live in
+//! [`shadcn_iced_core::primitive::toaster`].
 //!
 //! ```no_run
 //! # use shadcn_iced::sonner::{toaster, Toast};
@@ -14,23 +17,17 @@
 //! ```
 use super::button::{Size, Variant, button};
 
-use shadcn_iced_core::animation::{self, Appearance, Transition};
 use shadcn_iced_core::icon::{Icon, lucide};
 use shadcn_iced_core::primitive::Layer;
+use shadcn_iced_core::primitive::toaster::{self as stack, Action, Direction, Edge};
 use shadcn_iced_core::{Element, font, style, tokens};
 
-use iced::advanced::layout::{self, Layout};
-use iced::advanced::renderer::{self, Renderer as _};
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
-use iced::advanced::{Clipboard, Shell, overlay};
-use iced::time::{Duration, Instant};
+use iced::time::Duration;
 use iced::widget::{Column, Row, container, text};
-use iced::{
-    Alignment, Background, Event, Length, Padding, Rectangle, Size as Bounds, Theme, Vector, mouse,
-    window,
-};
+use iced::{Alignment, Background, Length, Padding, Theme};
 
-use std::collections::HashMap;
+/// The gap between toasts (`--gap`).
+const GAP: f32 = 14.0;
 
 /// The kind of a [`Toast`], which decides its icon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -78,6 +75,8 @@ pub struct Toast<Message> {
     pub action: Option<(String, Message)>,
     /// How long the toast stays on screen. Defaults to 4 seconds.
     pub duration: Duration,
+    /// Whether the toast can be swiped away. Defaults to `true`.
+    pub dismissible: bool,
 }
 
 impl<Message> Toast<Message> {
@@ -89,7 +88,8 @@ impl<Message> Toast<Message> {
             description: None,
             kind: Kind::Default,
             action: None,
-            duration: Duration::from_secs(4),
+            duration: stack::LIFETIME,
+            dismissible: true,
         }
     }
 
@@ -105,7 +105,7 @@ impl<Message> Toast<Message> {
         self
     }
 
-    /// Adds an action button.
+    /// Adds an action button, which dismisses the toast once pressed.
     pub fn action(mut self, label: impl Into<String>, message: Message) -> Self {
         self.action = Some((label.into(), message));
         self
@@ -114,6 +114,12 @@ impl<Message> Toast<Message> {
     /// Sets how long the toast stays on screen.
     pub fn duration(mut self, duration: Duration) -> Self {
         self.duration = duration;
+        self
+    }
+
+    /// Sets whether the toast can be swiped away (`dismissible`).
+    pub fn dismissible(mut self, dismissible: bool) -> Self {
+        self.dismissible = dismissible;
         self
     }
 }
@@ -143,6 +149,8 @@ pub struct Toaster<'a, Message> {
     on_dismiss: Box<dyn Fn(u64) -> Message + 'a>,
     position: Position,
     close_button: bool,
+    expand: bool,
+    visible_toasts: usize,
 }
 
 /// Displays `toasts` over `base`, which is usually the root of your view.
@@ -157,6 +165,8 @@ pub fn toaster<'a, Message: Clone + 'a>(
         on_dismiss: Box::new(on_dismiss),
         position: Position::BottomRight,
         close_button: false,
+        expand: false,
+        visible_toasts: stack::VISIBLE,
     }
 }
 
@@ -172,12 +182,26 @@ impl<'a, Message: Clone + 'a> Toaster<'a, Message> {
         self.position = position;
         self
     }
+
+    /// Always shows the toasts expanded instead of stacked (`expand`).
+    pub fn expand(mut self, expand: bool) -> Self {
+        self.expand = expand;
+        self
+    }
+
+    /// Sets how many toasts are visible at once (`visibleToasts`, 3 by
+    /// default).
+    pub fn visible_toasts(mut self, count: usize) -> Self {
+        self.visible_toasts = count;
+        self
+    }
 }
 
+/// The content of a toast; its box is drawn by the toaster.
 fn view<'a, Message: Clone + 'a>(
     toast: &Toast<Message>,
-    dismiss: Option<Message>,
-) -> Element<'a, Message> {
+    close_button: bool,
+) -> Element<'a, Action<Message>> {
     // `[data-icon]`: 16x16, `margin: 0 4px 0 -3px`, in the toast's color
     // (shadcn/ui does not enable sonner's rich colors).
     let icon = toast.kind.icon().map(|icon| {
@@ -205,16 +229,17 @@ fn view<'a, Message: Clone + 'a>(
         .spacing(2)
         .width(Length::Fill);
 
-    let action = toast
-        .action
-        .clone()
-        .map(|(label, message)| button(label).size(Size::Xs).on_press(message));
+    let action = toast.action.clone().map(|(label, message)| {
+        button(label)
+            .size(Size::Xs)
+            .on_press(Action::PublishAndDismiss(message))
+    });
 
-    let close = dismiss.map(|dismiss| {
+    let close = (close_button && toast.kind != Kind::Loading).then(|| {
         super::button::icon_button(lucide::X)
             .variant(Variant::Ghost)
             .size(Size::IconXs)
-            .on_press(dismiss)
+            .on_press(Action::Dismiss)
     });
 
     container(
@@ -227,8 +252,8 @@ fn view<'a, Message: Clone + 'a>(
             .align_y(Alignment::Center),
     )
     .padding(16)
+    // `--width`
     .width(356)
-    .style(toast_style)
     .into()
 }
 
@@ -253,66 +278,50 @@ fn toast_style(theme: &Theme) -> container::Style {
 
 impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message> {
     fn from(toaster: Toaster<'a, Message>) -> Self {
+        use iced::alignment::{Horizontal, Vertical};
+
         let open = !toaster.toasts.is_empty();
 
-        let top = matches!(
-            toaster.position,
-            Position::TopLeft | Position::TopCenter | Position::TopRight
-        );
-        let mut items: Vec<_> = toaster
+        let (align_x, align_y) = match toaster.position {
+            Position::TopLeft => (Horizontal::Left, Vertical::Top),
+            Position::TopCenter => (Horizontal::Center, Vertical::Top),
+            Position::TopRight => (Horizontal::Right, Vertical::Top),
+            Position::BottomLeft => (Horizontal::Left, Vertical::Bottom),
+            Position::BottomCenter => (Horizontal::Center, Vertical::Bottom),
+            Position::BottomRight => (Horizontal::Right, Vertical::Bottom),
+        };
+
+        // `getDefaultSwipeDirections`: towards the edges of the position.
+        let edge = match align_y {
+            Vertical::Top => (Edge::Top, Direction::Up),
+            _ => (Edge::Bottom, Direction::Down),
+        };
+        let side = match align_x {
+            Horizontal::Left => Some(Direction::Left),
+            Horizontal::Right => Some(Direction::Right),
+            Horizontal::Center => None,
+        };
+
+        let close_button = toaster.close_button;
+        let toasts = toaster
             .toasts
             .iter()
             .map(|toast| {
-                (
-                    toast.id,
-                    (toast.kind != Kind::Loading).then_some(toast.duration),
-                    view(
-                        toast,
-                        toaster.close_button.then(|| (toaster.on_dismiss)(toast.id)),
-                    ),
-                )
+                stack::Toast::new(toast.id, view(toast, close_button))
+                    .duration((toast.kind != Kind::Loading).then_some(toast.duration))
+                    .dismissible(toast.dismissible)
             })
             .collect();
 
-        if top {
-            items.reverse();
-        }
+        let stack = stack::Toaster::new(toasts, toaster.on_dismiss)
+            .edge(edge.0)
+            .swipe_directions(std::iter::once(edge.1).chain(side))
+            .gap(GAP)
+            .visible(toaster.visible_toasts)
+            .expand(toaster.expand)
+            .surface(toast_style);
 
-        let (align_x, align_y) = match toaster.position {
-            Position::TopLeft => (
-                iced::alignment::Horizontal::Left,
-                iced::alignment::Vertical::Top,
-            ),
-            Position::TopCenter => (
-                iced::alignment::Horizontal::Center,
-                iced::alignment::Vertical::Top,
-            ),
-            Position::TopRight => (
-                iced::alignment::Horizontal::Right,
-                iced::alignment::Vertical::Top,
-            ),
-            Position::BottomLeft => (
-                iced::alignment::Horizontal::Left,
-                iced::alignment::Vertical::Bottom,
-            ),
-            Position::BottomCenter => (
-                iced::alignment::Horizontal::Center,
-                iced::alignment::Vertical::Bottom,
-            ),
-            Position::BottomRight => (
-                iced::alignment::Horizontal::Right,
-                iced::alignment::Vertical::Bottom,
-            ),
-        };
-
-        let timer = Timer {
-            toasts: items,
-            spacing: 14.0,
-            from_top: top,
-            on_dismiss: toaster.on_dismiss,
-        };
-
-        Layer::new(toaster.base, Element::new(timer), open)
+        Layer::new(toaster.base, stack, open)
             .backdrop(None)
             .modal(false)
             .animation(shadcn_iced_core::primitive::layer::Animation::None)
@@ -321,426 +330,5 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
             // sonner's `--offset: 24px`
             .padding(24)
             .into()
-    }
-}
-
-/// Lays toasts out, animates them in and out, and dismisses them once their
-/// duration has elapsed. Timers pause while the cursor is over the toasts,
-/// like sonner.
-///
-/// Like sonner, the toasts are stacked behind the newest one, which they
-/// peek out of (scaled down by 5% and lifted by the gap for each toast in
-/// front of them, up to three toasts), until the cursor expands them into
-/// a list.
-struct Timer<'a, Message> {
-    toasts: Vec<(u64, Option<Duration>, Element<'a, Message>)>,
-    spacing: f32,
-    from_top: bool,
-    on_dismiss: Box<dyn Fn(u64) -> Message + 'a>,
-}
-
-#[derive(Default)]
-struct TimerState {
-    elapsed: HashMap<u64, Duration>,
-    presence: HashMap<u64, Transition>,
-    exiting: Vec<u64>,
-    dismissed: Vec<u64>,
-    last: Option<Instant>,
-    expanded: bool,
-}
-
-/// How many toasts peek out of a collapsed stack (`visibleToasts`).
-const VISIBLE: usize = 3;
-
-/// How much each toast behind the front one shrinks.
-const SCALE_STEP: f32 = 0.05;
-
-impl<Message> Timer<'_, Message> {
-    /// Whether the toasts are stacked behind the front one.
-    fn is_collapsed(&self, state: &TimerState) -> bool {
-        !state.expanded && self.toasts.len() > 1
-    }
-
-    /// The number of toasts in front of the toast at `index`.
-    fn before(&self, index: usize) -> usize {
-        if self.from_top {
-            index
-        } else {
-            self.toasts.len() - 1 - index
-        }
-    }
-}
-
-/// How long a toast takes to slide in (sonner's `400ms`).
-const ENTER: Duration = Duration::from_millis(400);
-
-/// How long a toast takes to fade out.
-const EXIT: Duration = Duration::from_millis(200);
-
-impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer> for Timer<'a, Message> {
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<TimerState>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(TimerState::default())
-    }
-
-    fn children(&self) -> Vec<Tree> {
-        self.toasts
-            .iter()
-            .map(|(_, _, toast)| Tree::new(toast))
-            .collect()
-    }
-
-    fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(
-            &self
-                .toasts
-                .iter()
-                .map(|(_, _, toast)| toast)
-                .collect::<Vec<_>>(),
-        );
-    }
-
-    fn size(&self) -> Bounds<Length> {
-        Bounds::new(Length::Shrink, Length::Shrink)
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &iced::Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        if self.is_collapsed(tree.state.downcast_ref::<TimerState>()) {
-            let nodes: Vec<layout::Node> = self
-                .toasts
-                .iter_mut()
-                .zip(&mut tree.children)
-                .map(|((_, _, toast), tree)| {
-                    toast.as_widget_mut().layout(
-                        tree,
-                        renderer,
-                        &layout::Limits::new(iced::Size::ZERO, limits.max()),
-                    )
-                })
-                .collect();
-
-            let front = self.before(0).max(self.before(self.toasts.len() - 1));
-            let front = if self.from_top { 0 } else { front };
-            let front_size = nodes[front].size();
-            let width = nodes.iter().map(|n| n.size().width).fold(0.0, f32::max);
-            // The toasts behind peek out by the gap.
-            let peek = self.spacing * (self.toasts.len().min(VISIBLE) - 1) as f32;
-            let y = if self.from_top { 0.0 } else { peek };
-
-            return layout::Node::with_children(
-                iced::Size::new(width, front_size.height + peek),
-                nodes
-                    .into_iter()
-                    .map(|node| node.move_to(iced::Point::new(0.0, y)))
-                    .collect(),
-            );
-        }
-
-        let mut y = 0.0;
-        let mut width: f32 = 0.0;
-        let mut nodes = Vec::with_capacity(self.toasts.len());
-
-        for ((_, _, toast), tree) in self.toasts.iter_mut().zip(&mut tree.children) {
-            let node = toast
-                .as_widget_mut()
-                .layout(
-                    tree,
-                    renderer,
-                    &layout::Limits::new(iced::Size::ZERO, limits.max()),
-                )
-                .move_to(iced::Point::new(0.0, y));
-
-            y += node.size().height + self.spacing;
-            width = width.max(node.size().width);
-            nodes.push(node);
-        }
-
-        layout::Node::with_children(iced::Size::new(width, (y - self.spacing).max(0.0)), nodes)
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &iced::Renderer,
-        operation: &mut dyn Operation,
-    ) {
-        for (((_, _, toast), tree), layout) in self
-            .toasts
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-        {
-            toast
-                .as_widget_mut()
-                .operate(tree, layout, renderer, operation);
-        }
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &iced::Renderer,
-        clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) {
-        if let Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft) = event {
-            let state = tree.state.downcast_mut::<TimerState>();
-            let expanded = cursor.is_over(layout.bounds());
-
-            if state.expanded != expanded {
-                state.expanded = expanded;
-                shell.invalidate_layout();
-                shell.request_redraw();
-            }
-        }
-
-        let exiting = tree.state.downcast_ref::<TimerState>().exiting.clone();
-        let collapsed = self.is_collapsed(tree.state.downcast_ref::<TimerState>());
-        let fronts: Vec<bool> = (0..self.toasts.len())
-            .map(|index| !collapsed || self.before(index) == 0)
-            .collect();
-
-        for ((((id, _, toast), child), layout), front) in self
-            .toasts
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-            .zip(fronts)
-        {
-            if front && !exiting.contains(id) {
-                toast.as_widget_mut().update(
-                    child, event, layout, cursor, renderer, clipboard, shell, viewport,
-                );
-            }
-        }
-
-        let Event::Window(window::Event::RedrawRequested(now)) = event else {
-            return;
-        };
-
-        let state = tree.state.downcast_mut::<TimerState>();
-        let delta = state
-            .last
-            .map(|last| now.saturating_duration_since(last))
-            .unwrap_or_default();
-        state.last = Some(*now);
-
-        let paused = cursor.is_over(layout.bounds());
-        let ids: Vec<u64> = self.toasts.iter().map(|(id, _, _)| *id).collect();
-
-        state.elapsed.retain(|id, _| ids.contains(id));
-        state.presence.retain(|id, _| ids.contains(id));
-        state.exiting.retain(|id| ids.contains(id));
-        state.dismissed.retain(|id| ids.contains(id));
-
-        let mut next: Option<Duration> = None;
-        let mut animating = false;
-
-        for (id, duration, _) in &self.toasts {
-            let presence = state.presence.entry(*id).or_insert_with(|| {
-                let mut presence = Transition::new(0.0);
-                presence.go(1.0, ENTER, animation::ease_out, *now);
-                presence
-            });
-
-            if state.exiting.contains(id) {
-                // Dismissed once the fade-out is over.
-                if !presence.is_animating(*now) && !state.dismissed.contains(id) {
-                    state.dismissed.push(*id);
-                    shell.publish((self.on_dismiss)(*id));
-                }
-            } else if let Some(duration) = duration {
-                let elapsed = state.elapsed.entry(*id).or_default();
-
-                if !paused {
-                    *elapsed += delta;
-                }
-
-                if *elapsed >= *duration {
-                    state.exiting.push(*id);
-                    presence.go(0.0, EXIT, animation::ease_in, *now);
-
-                    if !animation::enabled() && !state.dismissed.contains(id) {
-                        state.dismissed.push(*id);
-                        shell.publish((self.on_dismiss)(*id));
-                    }
-                } else {
-                    let remaining = *duration - *elapsed;
-                    next = Some(next.map_or(remaining, |next| next.min(remaining)));
-                }
-            }
-
-            animating |= presence.is_animating(*now);
-        }
-
-        if animating {
-            shell.request_redraw();
-        } else if let Some(next) = next {
-            shell.request_redraw_at(*now + next.min(Duration::from_millis(250)));
-        }
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut iced::Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        let state = tree.state.downcast_ref::<TimerState>();
-        let now = Instant::now();
-        let collapsed = self.is_collapsed(state);
-
-        // The farthest toasts first.
-        let mut order: Vec<usize> = (0..self.toasts.len()).collect();
-        if collapsed {
-            order.sort_by_key(|index| std::cmp::Reverse(self.before(*index)));
-        }
-
-        let layouts: Vec<Layout<'_>> = layout.children().collect();
-
-        for index in order {
-            let (id, _, toast) = &self.toasts[index];
-            let child = &tree.children[index];
-            let layout = layouts[index];
-            let progress = state
-                .presence
-                .get(id)
-                .map_or(1.0, |presence| presence.value(now));
-            let before = self.before(index);
-
-            if collapsed && before > 0 {
-                if before >= VISIBLE {
-                    continue;
-                }
-
-                // `--y: translateY(calc(var(--lift-amount) * var(--toasts-before)))
-                // scale(calc(-1 * var(--scale)))`, with the height of the
-                // front toast and its content hidden.
-                let front = layouts[if self.from_top {
-                    0
-                } else {
-                    self.toasts.len() - 1
-                }]
-                .bounds();
-                let lift = self.spacing * before as f32 * if self.from_top { 1.0 } else { -1.0 };
-                let scale = 1.0 - SCALE_STEP * before as f32;
-                let center = front.center() + Vector::new(0.0, lift);
-                let size = iced::Size::new(front.width * scale, front.height * scale);
-                let style = toast_style(theme);
-
-                renderer.fill_quad(
-                    renderer::Quad {
-                        bounds: Rectangle::new(
-                            iced::Point::new(
-                                center.x - size.width / 2.0,
-                                center.y - size.height / 2.0,
-                            ),
-                            size,
-                        ),
-                        border: style.border,
-                        shadow: style.shadow,
-                        ..renderer::Quad::default()
-                    },
-                    style
-                        .background
-                        .unwrap_or(Background::Color(iced::Color::TRANSPARENT))
-                        .scale_alpha(progress),
-                );
-
-                continue;
-            }
-            let exiting = state.exiting.contains(id);
-            let height = layout.bounds().height + self.spacing;
-
-            // Enters by sliding from the edge; leaves by fading out.
-            let offset = if exiting {
-                0.0
-            } else if self.from_top {
-                -height * (1.0 - progress)
-            } else {
-                height * (1.0 - progress)
-            };
-
-            animation::draw(
-                toast,
-                child,
-                renderer,
-                theme,
-                style,
-                layout,
-                cursor,
-                viewport,
-                Appearance {
-                    opacity: progress,
-                    scale: 1.0,
-                    offset: iced::Vector::new(0.0, offset),
-                },
-            );
-        }
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-        renderer: &iced::Renderer,
-    ) -> mouse::Interaction {
-        let collapsed = self.is_collapsed(tree.state.downcast_ref::<TimerState>());
-
-        self.toasts
-            .iter()
-            .zip(&tree.children)
-            .zip(layout.children())
-            .enumerate()
-            .filter(|(index, _)| !collapsed || self.before(*index) == 0)
-            .map(|(_, (((_, _, toast), tree), layout))| {
-                toast
-                    .as_widget()
-                    .mouse_interaction(tree, layout, cursor, viewport, renderer)
-            })
-            .max()
-            .unwrap_or_default()
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &iced::Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
-        let overlays: Vec<_> = self
-            .toasts
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-            .filter_map(|(((_, _, toast), tree), layout)| {
-                toast
-                    .as_widget_mut()
-                    .overlay(tree, layout, renderer, viewport, translation)
-            })
-            .collect();
-
-        (!overlays.is_empty()).then(|| overlay::Group::with_children(overlays).overlay())
     }
 }
