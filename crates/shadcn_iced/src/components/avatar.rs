@@ -14,10 +14,11 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::Icon;
+use shadcn_iced_core::primitive::focus::{self, focus_within};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::widget::{Stack, container, image, space, text};
-use iced::{Background, Border, Color, Length, Padding, Theme, border};
+use iced::{Background, Color, Length, Padding, Theme, border};
 
 /// The size of an [`Avatar`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -126,7 +127,8 @@ impl Avatar {
     }
 
     /// Draws a ring of the background color around the avatar
-    /// (`ring-2 ring-background`), as used in avatar groups.
+    /// (`ring-2 ring-background`), as used in avatar groups. Like CSS rings,
+    /// it is drawn outside of the avatar and takes no space.
     pub fn ring(mut self, ring: bool) -> Self {
         self.ring = ring;
         self
@@ -148,7 +150,7 @@ impl Avatar {
     }
 
     fn outer_diameter(&self) -> f32 {
-        self.diameter.unwrap_or(self.size.diameter()) + if self.ring { 4.0 } else { 0.0 }
+        self.diameter.unwrap_or(self.size.diameter())
     }
 }
 
@@ -210,25 +212,19 @@ impl<'a, Message: 'a> From<Avatar> for Element<'a, Message> {
 
             // `absolute right-0 bottom-0 rounded-full ring-2 ring-background`
             stack = stack.push(
-                container(
-                    // The 2px ring is drawn inside of the avatar's bounds.
-                    container(icon)
-                        .center(badge + 4.0)
-                        .style(move |theme: &Theme| {
-                            let p = tokens(theme).palette;
+                container(ring(
+                    container(icon).center(badge).style(move |theme: &Theme| {
+                        let p = tokens(theme).palette;
 
-                            container::Style {
-                                background: Some(Background::Color(color.unwrap_or(p.primary))),
-                                text_color: Some(p.primary_foreground),
-                                border: Border {
-                                    color: p.background,
-                                    width: 2.0,
-                                    radius: border::radius(f32::MAX),
-                                },
-                                ..container::Style::default()
-                            }
-                        }),
-                )
+                        container::Style {
+                            background: Some(Background::Color(color.unwrap_or(p.primary))),
+                            text_color: Some(p.primary_foreground),
+                            border: border::rounded(f32::MAX),
+                            ..container::Style::default()
+                        }
+                    }),
+                    badge,
+                ))
                 .align_right(diameter)
                 .align_bottom(diameter),
             );
@@ -239,18 +235,28 @@ impl<'a, Message: 'a> From<Avatar> for Element<'a, Message> {
             .height(Length::Fixed(diameter));
 
         if avatar.ring {
-            container(stack)
-                .padding(2)
-                .style(|theme: &Theme| container::Style {
-                    background: Some(Background::Color(tokens(theme).palette.background)),
-                    border: border::rounded(f32::MAX),
-                    ..container::Style::default()
-                })
-                .into()
+            ring(stack, diameter)
         } else {
             stack.into()
         }
     }
+}
+
+/// Draws a `ring-2 ring-background` outside of a circle of the given
+/// diameter.
+fn ring<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+    diameter: f32,
+) -> Element<'a, Message> {
+    focus_within(content, move |theme: &Theme, _| focus::Style {
+        ring: Some(focus::Ring {
+            color: tokens(theme).palette.background,
+            width: 2.0,
+            radius: diameter / 2.0,
+        }),
+        ..focus::Style::default()
+    })
+    .into()
 }
 
 /// `bg-muted text-muted-foreground rounded-full`
@@ -276,8 +282,8 @@ pub fn avatar_group<'a, Message: 'a>(
     let mut height: f32 = 0.0;
 
     for avatar in avatars {
-        // Each avatar is wrapped in a 2px ring and overlaps the previous one
-        // by 8px (`-space-x-2`).
+        // Each avatar has a 2px ring and overlaps the previous one by 8px
+        // (`-space-x-2`).
         let avatar = avatar.ring(true);
         let outer = avatar.outer_diameter();
         let element: Element<'a, Message> = avatar.into();
@@ -285,7 +291,7 @@ pub fn avatar_group<'a, Message: 'a>(
         stack = stack.push(container(element).padding(Padding::ZERO.left(offset)));
         width = width.max(offset + outer);
         height = height.max(outer);
-        offset += outer - 8.0 - 4.0;
+        offset += outer - 8.0;
     }
 
     stack.width(width).height(height).into()
