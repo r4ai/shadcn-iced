@@ -11,20 +11,23 @@
 //!
 //! - `shadcnIcedPreviewResized(target, height)`, with the natural height of an
 //!   example, so the page can size its preview to fit,
-//! - `shadcnIcedPreviewScroll(dx, dy)`, with the wheel scrolls the example does
-//!   not use, so the page still scrolls over a preview.
+//! - `shadcnIcedPreviewWheel(captured)`, with whether an example used the
+//!   wheel event it is handling, so the page lets the browser scroll over a
+//!   preview otherwise (see [`wheel`]).
 //!
 //! Build it with `site/scripts/build-wasm.mjs`.
 #![cfg(target_arch = "wasm32")]
 
+mod natural;
+mod wheel;
+
 use gallery::{Gallery, Page};
-use shadcn_iced::primitive::wheel;
 use shadcn_iced::theme::{Accent, BaseColor, Radius};
 use shadcn_iced::{ApplicationExt, Mode};
 
 use iced::futures::channel::mpsc;
 use iced::widget::{container, sensor, space};
-use iced::{Element, Fill, Size, Subscription, Task, Theme, event, mouse, window};
+use iced::{Element, Fill, Size, Subscription, Task, Theme, event, window};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
@@ -40,8 +43,8 @@ extern "C" {
     #[wasm_bindgen(catch, js_namespace = window, js_name = shadcnIcedPreviewResized)]
     fn preview_resized(target: &str, height: f32) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(catch, js_namespace = window, js_name = shadcnIcedPreviewScroll)]
-    fn preview_scroll(dx: f32, dy: f32) -> Result<(), JsValue>;
+    #[wasm_bindgen(catch, js_namespace = window, js_name = shadcnIcedPreviewWheel)]
+    fn preview_wheel(captured: bool) -> Result<(), JsValue>;
 }
 
 /// A request of the page.
@@ -213,7 +216,6 @@ enum Message {
     Request(Request),
     Measured(window::Id, Size),
     Pressed(window::Id),
-    Scrolled(mouse::ScrollDelta),
     Opened,
 }
 
@@ -286,14 +288,6 @@ impl Previews {
                 }
             }
             Message::Pressed(id) => self.active = Some(id),
-            Message::Scrolled(delta) => {
-                let (dx, dy) = match delta {
-                    mouse::ScrollDelta::Lines { x, y } => (x * 40.0, y * 40.0),
-                    mouse::ScrollDelta::Pixels { x, y } => (x, y),
-                };
-
-                let _ = preview_scroll(-dx, -dy);
-            }
             Message::Opened => {}
         }
 
@@ -318,12 +312,17 @@ impl Previews {
         // The toasts show in the preview that was clicked last.
         let example = self.gallery.toasters(example, self.active == Some(id));
 
-        let example = sensor(example.map(Message::Gallery))
-            .on_show(move |size| Message::Measured(id, size))
+        let example = sensor(natural::natural(example.map(Message::Gallery)))
             .on_resize(move |size| Message::Measured(id, size));
 
         // Smooth wheel scrolling, horizontal with `Shift`.
-        wheel(container(example).padding(PADDING).center(Fill)).into()
+        let example =
+            shadcn_iced::primitive::wheel(container(example).padding(PADDING).center(Fill));
+
+        wheel::wheel(example, |captured| {
+            let _ = preview_wheel(captured);
+        })
+        .into()
     }
 
     fn theme(&self, _window: window::Id) -> Theme {
@@ -333,15 +332,10 @@ impl Previews {
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
             Subscription::run(requests).map(Message::Request),
-            event::listen_with(|event, status, window| match event {
-                iced::Event::Mouse(mouse::Event::ButtonPressed(_))
+            event::listen_with(|event, _status, window| match event {
+                iced::Event::Mouse(iced::mouse::Event::ButtonPressed(_))
                 | iced::Event::Touch(iced::touch::Event::FingerPressed { .. }) => {
                     Some(Message::Pressed(window))
-                }
-                iced::Event::Mouse(mouse::Event::WheelScrolled { delta })
-                    if status == event::Status::Ignored =>
-                {
-                    Some(Message::Scrolled(delta))
                 }
                 _ => None,
             }),

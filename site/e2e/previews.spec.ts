@@ -54,3 +54,32 @@ test("the previews follow the theme of the customizer", async ({ page }) => {
   await page.getByRole("option", { name: "Zinc" }).click();
   await expect(code).toContainText("BaseColor::Zinc");
 });
+
+test("a preview grows to fit an example taller than it starts", async ({ page }) => {
+  await visit(page, "/docs/components/table/");
+  await waitForFirstPreview(page);
+  await expect.poll(async () => (await frames(page).first().boundingBox())!.height).toBeGreaterThan(400);
+});
+
+test("the wheel scrolls the page over a preview", async ({ page }) => {
+  await visit(page, "/docs/components/button/");
+  const canvas = await waitForFirstPreview(page);
+  const box = (await canvas.boundingBox())!;
+
+  // Clear of the button in the middle of the example.
+  await page.mouse.move(box.x + 20, box.y + 20);
+  await page.mouse.wheel(0, 200);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+});
+
+test("the wheel scrolls a scroll area of a preview, not the page", async ({ page }) => {
+  await visit(page, "/docs/components/scroll-area/");
+  const canvas = await waitForFirstPreview(page);
+  const box = (await canvas.boundingBox())!;
+
+  // The scroll area is in the middle of the example.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 200);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});

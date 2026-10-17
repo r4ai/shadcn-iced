@@ -74,6 +74,7 @@ The `shadcn_iced_core::primitive` module provides the behavioral layer analogous
 | `focus` | Detects when a widget subtree holds keyboard focus (`focus_within`) to draw focus rings around composite inputs (`InputGroup`, `InputOtp`). |
 | `pressable` | Provides pointer press, release, and hover interaction tracking for custom interactive surfaces. |
 | `split` | Implements draggable, resizable pane dividers used by `Resizable`. |
+| `toaster` | Stacks, animates, expands, times out and swipes away the toasts of `Sonner`, porting sonner's transitions (`translateY`, `scale`, height and opacity, `400ms ease`). |
 | `track` | Lays out the items of a `Carousel` on a track that slides to the current item and can be dragged (swiped). |
 | `animated_width` | Animates the width of its content when it changes, like the `Sidebar` collapsing to icons. |
 | `wheel` | Wraps a whole view to make wheel scrolling smooth (wheel notches are spread over a few frames) and horizontal with <kbd>Shift</kbd>, for every scrollable under it. |
@@ -95,7 +96,7 @@ The documentation website (`site/`) renders live interactive widgets rather than
 
 - `examples/gallery-web` compiles the `gallery` examples to `wasm32-unknown-unknown`.
 - A single `iced::daemon` instance runs per documentation page. Each example on the page is mounted as an independent `iced` window backed by its own HTML `<canvas>`, drawn with WebGPU (or the `tiny-skia` software renderer as a fallback).
-- The web page communicates with the WASM runtime via exported bindings (`mount`, `unmount`, `set_theme`, `theme_code`), while the WASM runtime notifies the page of natural content height changes (`shadcnIcedPreviewResized`) and unhandled mouse wheel events (`shadcnIcedPreviewScroll`) so page scrolling remains seamless.
+- The web page communicates with the WASM runtime via exported bindings (`mount`, `unmount`, `set_theme`, `theme_code`), while the WASM runtime notifies the page of natural content height changes (`shadcnIcedPreviewResized`) and, during the dispatch of each wheel event, whether an example used it (`shadcnIcedPreviewWheel`), so the browser scrolls the page natively over a preview unless the example scrolls itself.
 
 ## Differences from Web `shadcn/ui`
 

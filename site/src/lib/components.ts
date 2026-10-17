@@ -63,8 +63,6 @@ export const moduleName = (id: string) => id.replaceAll("-", "_");
 export function minHeight(id: string) {
   const tall: Record<string, number> = {
     sheet: 560,
-    // The demo is `h-[560px]`: it cannot grow past its frame.
-    sidebar: 640,
     drawer: 520,
     dialog: 480,
     "alert-dialog": 400,
