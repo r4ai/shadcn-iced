@@ -1,6 +1,7 @@
 // Generates `src/data/components.json`: every page of the gallery with the
-// source of its examples (for the Code tabs) and of its component (for the
-// manual installation), from `cargo run -p gallery --bin site_data`.
+// source of its examples (for the Code tabs), their heights (to size their
+// previews before they run) and the source of its component (for the manual
+// installation), from `cargo run -p gallery --bin site_data`.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -18,7 +19,7 @@ const json = execFileSync("cargo", ["run", "--quiet", "-p", "gallery", "--bin", 
   stdio: ["ignore", "pipe", "inherit"],
 });
 
-const { pages, charts: chartPages } = JSON.parse(json);
+const { widths, pages, charts: chartPages } = JSON.parse(json);
 const sources = new Map();
 const read = (file) => {
   if (!sources.has(file)) {
@@ -43,6 +44,7 @@ const components = pages.map((page) => {
         file: example.file,
         line: example.line,
         code,
+        heights: example.heights,
       };
     }),
   };
@@ -59,12 +61,13 @@ const charts = chartPages.map((page) => ({
     file: example.file,
     line: example.line,
     code: exampleSource(read(example.file), example.line, example.column).code,
+    heights: example.heights,
   })),
 }));
 
 const out = join(site, "src/data/components.json");
 mkdirSync(dirname(out), { recursive: true });
-writeFileSync(out, JSON.stringify({ components, charts }, null, 2) + "\n");
+writeFileSync(out, JSON.stringify({ widths, components, charts }, null, 2) + "\n");
 
 const count = components.reduce((n, c) => n + c.examples.length, 0);
 console.log(`${components.length} components, ${count} examples → ${out}`);

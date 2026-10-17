@@ -34,6 +34,7 @@ export function Showcase() {
                   page={item.component.id}
                   example={item.example.index}
                   minHeight={item.height}
+                  heights={item.example.heights}
                   class="rounded-b-none"
                 />
                 <figcaption class="flex items-center justify-between gap-2 border-t px-4 py-2.5 text-sm">

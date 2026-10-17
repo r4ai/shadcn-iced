@@ -22,6 +22,7 @@ declare module "virtual:site/charts" {
 declare module "virtual:site/components" {
   import type { ComponentDetail, ComponentSummary } from "~/lib/components";
 
+  export const widths: number[];
   export const components: ComponentSummary[];
   export const loaders: Record<string, () => Promise<{ default: ComponentDetail }>>;
 }

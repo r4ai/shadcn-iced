@@ -61,6 +61,22 @@ test("a preview grows to fit an example taller than it starts", async ({ page })
   await expect.poll(async () => (await frames(page).first().boundingBox())!.height).toBeGreaterThan(400);
 });
 
+test("a preview starts at the height of its example", async ({ page }) => {
+  // The page holds back the previews: the frame has only the styles.
+  await page.route("**/wasm/**", () => {});
+  await visit(page, "/docs/components/typography/");
+  const before = (await frames(page).first().boundingBox())!.height;
+  expect(before).toBeGreaterThan(600);
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await page.reload();
+  await waitForFirstPreview(page);
+  // The example measured itself: the frame takes its height.
+  const frame = frames(page).first();
+  await expect.poll(() => frame.evaluate((element: HTMLElement) => element.style.height)).not.toBe("");
+  expect(Math.abs((await frame.boundingBox())!.height - before)).toBeLessThanOrEqual(2);
+});
+
 test("the wheel scrolls the page over a preview", async ({ page }) => {
   await visit(page, "/docs/components/button/");
   const canvas = await waitForFirstPreview(page);

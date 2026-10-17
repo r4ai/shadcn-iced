@@ -25,7 +25,7 @@ const PICKS = [
 
 const PREVIEWS = PICKS.flatMap(([id, title]) => {
   const example = components.find((c) => c.id === id)?.examples.find((e) => e.title === title);
-  return example ? [{ id, example: example.index }] : [];
+  return example ? [{ id, example: example.index, heights: example.heights }] : [];
 });
 
 export const Route = createFileRoute("/docs/theming/")({
@@ -60,7 +60,7 @@ function Theming() {
         <For each={PREVIEWS}>
           {(preview) => (
             <div class="overflow-hidden rounded-2xl border">
-              <PreviewFrame page={preview.id} example={preview.example} minHeight={300} />
+              <PreviewFrame page={preview.id} example={preview.example} minHeight={300} heights={preview.heights} />
             </div>
           )}
         </For>
