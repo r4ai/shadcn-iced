@@ -17,9 +17,10 @@
 //!     .into()
 //! # }
 //! ```
-use super::button::{Size as ButtonSize, Variant as ButtonVariant, icon_button};
+use super::button::{self, Size as ButtonSize, Variant as ButtonVariant, icon_button};
 
 use shadcn_iced_core::icon::{Icon, lucide};
+use shadcn_iced_core::primitive::Pressable;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -56,7 +57,15 @@ impl Size {
 
     /// `leading-relaxed`
     fn line_height(self) -> f32 {
-        (self.text_size() * 1.625).round()
+        self.text_size() * 1.625
+    }
+
+    /// The line height of the title (`text-sm`, `text-xs` when small).
+    fn title_height(self) -> f32 {
+        match self {
+            Size::Default => 20.0,
+            Size::Sm => 16.0,
+        }
     }
 
     fn inset(self) -> f32 {
@@ -86,7 +95,7 @@ pub struct CodeBlock<'a, Message> {
     lines: Vec<(String, Line)>,
     title: Option<String>,
     title_icon: Option<Icon>,
-    actions: Vec<Element<'a, Message>>,
+    actions: Vec<Action<'a, Message>>,
     floating: bool,
     footer: Option<Element<'a, Message>>,
     variant: Variant,
@@ -136,14 +145,15 @@ impl<'a, Message: Clone + 'a> CodeBlock<'a, Message> {
     /// Appends an action to the header (`CodeBlockActions`), e.g. an
     /// [`action`] button.
     pub fn action(mut self, action: impl Into<Element<'a, Message>>) -> Self {
-        self.actions.push(action.into());
+        self.actions.push(Action::Element(action.into()));
         self
     }
 
     /// Appends a copy button (`CodeBlockCopyButton`) producing `on_press`;
     /// `copied` swaps its icon for a check.
-    pub fn copy_button(self, on_press: Message, copied: bool) -> Self {
-        self.action(copy_button(on_press, copied))
+    pub fn copy_button(mut self, on_press: Message, copied: bool) -> Self {
+        self.actions.push(Action::Copy(on_press, copied));
+        self
     }
 
     /// Floats the actions over the top right corner of the content when
@@ -230,6 +240,47 @@ impl<'a, Message: Clone + 'a> CodeBlock<'a, Message> {
         }
         self
     }
+}
+
+/// An action of the header, built once the variant is known.
+enum Action<'a, Message> {
+    Element(Element<'a, Message>),
+    Copy(Message, bool),
+}
+
+/// A ghost `icon-xs` button taking the color of a destructive code block
+/// (`text-destructive`), until hovered (`hover:text-foreground`).
+fn destructive_action<'a, Message: Clone + 'a>(
+    icon: Icon,
+    on_press: Message,
+) -> Element<'a, Message> {
+    let size = ButtonSize::IconXs;
+
+    Pressable::new(
+        container(icon.sized(size.icon_size()))
+            .center_x(Length::Fill)
+            .center_y(Length::Fill),
+    )
+    .on_press(on_press)
+    .width(size.height())
+    .height(size.height())
+    .press_offset(1.0)
+    .clip_background(true)
+    .style(move |theme, status| {
+        let t = tokens(theme);
+        let mut style = button::style(theme, status, ButtonVariant::Ghost);
+
+        if !matches!(
+            status,
+            iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed
+        ) {
+            style.text_color = t.palette.destructive;
+        }
+
+        style.border.radius = size.radius(&t).into();
+        style
+    })
+    .into()
 }
 
 /// A ghost `icon-xs` button for the actions of a code block.
@@ -436,6 +487,7 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
                 .push(
                     text(title)
                         .size(size.text_size())
+                        .line_height(Pixels(size.title_height()))
                         .font(font::medium())
                         .wrapping(text::Wrapping::None),
                 )
@@ -446,9 +498,19 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
 
         // `CodeBlockActions`: `gap-1`
         let actions = (!block.actions.is_empty()).then(|| {
-            Row::with_children(block.actions)
-                .spacing(4)
-                .align_y(Alignment::Center)
+            Row::with_children(block.actions.into_iter().map(|action| match action {
+                Action::Element(element) => element,
+                Action::Copy(on_press, copied) => {
+                    let icon = if copied { lucide::CHECK } else { lucide::COPY };
+
+                    match variant {
+                        Variant::Default => self::action(icon, on_press),
+                        Variant::Destructive => destructive_action(icon, on_press),
+                    }
+                }
+            }))
+            .spacing(4)
+            .align_y(Alignment::Center)
         });
 
         let (header_actions, floating_actions) = if block.floating && title.is_none() {
@@ -478,7 +540,8 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
                     .push(header_actions)
                     .spacing(8)
                     .align_y(Alignment::Center)
-                    .height(20),
+                    // The actions are pulled out of the row (`-my-1`).
+                    .height(size.title_height()),
             )
             .padding(Padding::new(inset).bottom(0).right(inset - 6.0))
             .style(move |theme: &Theme| {
@@ -536,6 +599,8 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
                 .width(Length::Fill),
         )
         .width(Length::Fill)
+        // Inside the 1px border.
+        .padding(1)
         .clip(true)
         .style(move |theme: &Theme| self::style(theme, variant))
         .into()
@@ -589,7 +654,7 @@ mod tests {
 
     #[test]
     fn line_heights() {
-        assert_eq!(Size::Default.line_height(), 23.0);
-        assert_eq!(Size::Sm.line_height(), 20.0);
+        assert_eq!(Size::Default.line_height(), 22.75);
+        assert_eq!(Size::Sm.line_height(), 19.5);
     }
 }
