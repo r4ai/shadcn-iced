@@ -93,10 +93,31 @@ export function snapshotPath(
   return join(component, scenario, `${snapshot}-${theme}.png`)
 }
 
-/** The accepted score of every snapshot (see `baseline.json`). */
-export function readBaseline(): Record<string, number> {
+/** What is accepted today (`baseline.json`). */
+export interface Baseline {
+  /** The accepted score of every snapshot, by snapshot key. */
+  scores: Record<string, number>
+  /**
+   * The known failures of shadcn_iced (expectations that do not hold yet),
+   * by run key (`component/scenario/theme`).
+   */
+  knownFailures: Record<string, string[]>
+}
+
+export function readBaseline(): Baseline {
   const path = join(root, "baseline.json")
-  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")).scores : {}
+  const baseline = existsSync(path)
+    ? JSON.parse(readFileSync(path, "utf8"))
+    : {}
+  return {
+    scores: baseline.scores ?? {},
+    knownFailures: baseline.knownFailures ?? {},
+  }
+}
+
+/** The key of a run in `baseline.json`. */
+export function runKey(component: string, scenario: string, theme: Theme) {
+  return `${component}/${scenario}/${theme}`
 }
 
 /** How much worse than its baseline the score of a snapshot may get. */
@@ -110,7 +131,13 @@ export interface RunRecord {
   scenario: string
   theme: Theme
   reference: { failures: string[] }
-  iced: { status: string; failures: string[] }
+  iced: {
+    status: string
+    /** Errors and expectations that do not hold. */
+    failures: string[]
+    /** The failures recorded in `baseline.json`. */
+    known: string[]
+  }
   snapshots: {
     name: string
     key: string

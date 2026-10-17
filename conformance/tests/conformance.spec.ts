@@ -21,6 +21,7 @@ import {
   allowance,
   out,
   readBaseline,
+  runKey,
   readScenarios,
   snapshotKey,
   snapshotPath,
@@ -93,6 +94,9 @@ for (const file of readScenarios()) {
             iced: {
               status: iced?.status ?? "not run",
               failures: [
+                ...(iced?.status === "ok"
+                  ? []
+                  : [`status: ${iced?.status ?? "not run"}`]),
                 ...(iced?.errors ?? []),
                 ...(iced?.checks ?? [])
                   .filter((check) => !check.ok)
@@ -101,6 +105,10 @@ for (const file of readScenarios()) {
                       `step ${check.step}: ${JSON.stringify(check.text)} should be ${check.expected}`
                   ),
               ],
+              known:
+                baseline.knownFailures[
+                  runKey(file.component, scenario.id, theme)
+                ] ?? [],
             },
             snapshots: [],
           }
@@ -156,7 +164,7 @@ for (const file of readScenarios()) {
                   key,
                   path: path.replaceAll("\\", "/"),
                   score: comparison?.score ?? null,
-                  baseline: baseline[key] ?? null,
+                  baseline: baseline.scores[key] ?? null,
                   reference: comparison?.reference ?? null,
                   iced: comparison?.iced ?? null,
                 })
@@ -229,9 +237,20 @@ for (const file of readScenarios()) {
           expect
             .soft(record.reference.failures, "shadcn/ui expectations")
             .toEqual([])
-          expect.soft(record.iced.status, "shadcn_iced run").toBe("ok")
+          // Known failures are accepted until they are fixed; then they must
+          // leave the baseline, so that they cannot come back unnoticed.
+          const { failures, known } = record.iced
           expect
-            .soft(record.iced.failures, "shadcn_iced expectations")
+            .soft(
+              failures.filter((failure) => !known.includes(failure)),
+              "new shadcn_iced failures"
+            )
+            .toEqual([])
+          expect
+            .soft(
+              known.filter((failure) => !failures.includes(failure)),
+              "fixed shadcn_iced failures (run `pnpm baseline`)"
+            )
             .toEqual([])
 
           for (const snapshot of record.snapshots) {

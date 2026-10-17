@@ -28,7 +28,8 @@ const runs: RunRecord[] = readdirSync(runsDirectory)
   .filter((name) => name.endsWith(".json"))
   .map((name) => JSON.parse(readFileSync(join(runsDirectory, name), "utf8")))
 
-type Status = "fail" | "regressed" | "improved" | "new" | "ok"
+type Status =
+  "fail" | "regressed" | "fixed" | "improved" | "new" | "known" | "ok"
 
 interface Row {
   run: RunRecord
@@ -37,14 +38,16 @@ interface Row {
 }
 
 function status(run: RunRecord, snapshot: Row["snapshot"]): Status {
+  const { failures, known } = run.iced
   if (
     run.reference.failures.length ||
-    run.iced.failures.length ||
-    run.iced.status !== "ok"
+    failures.some((failure) => !known.includes(failure))
   ) {
     return "fail"
   }
-  if (!snapshot || snapshot.score === null) return "fail"
+  if (known.some((failure) => !failures.includes(failure))) return "fixed"
+  if (!snapshot || snapshot.score === null)
+    return failures.length ? "known" : "fail"
   if (snapshot.baseline === null) return "new"
   if (snapshot.score > snapshot.baseline + allowance(snapshot.baseline)) {
     return "regressed"
@@ -52,7 +55,7 @@ function status(run: RunRecord, snapshot: Row["snapshot"]): Status {
   if (snapshot.score < snapshot.baseline - allowance(snapshot.baseline)) {
     return "improved"
   }
-  return "ok"
+  return failures.length ? "known" : "ok"
 }
 
 const rows: Row[] = runs.flatMap<Row>((run) =>
@@ -84,8 +87,10 @@ function card({ run, snapshot, status }: Row) {
   const title = snapshot?.key ?? `${run.component}/${run.scenario}/${run.theme}`
   const failures = [
     ...run.reference.failures.map((failure) => `shadcn/ui: ${failure}`),
-    ...(run.iced.status === "ok" ? [] : [`shadcn_iced: ${run.iced.status}`]),
-    ...run.iced.failures.map((failure) => `shadcn_iced: ${failure}`),
+    ...run.iced.failures.map(
+      (failure) =>
+        `shadcn_iced${run.iced.known.includes(failure) ? " (known)" : ""}: ${failure}`
+    ),
   ]
 
   const score =
@@ -146,7 +151,7 @@ const html = `<!doctype html>
   h2 { font-size: 15px; margin: 0; font-family: ui-monospace, monospace; }
   .score, .size { color: var(--muted); }
   .status { font-weight: 600; text-transform: uppercase; font-size: 12px; }
-  .fail, .regressed { color: #d33; } .improved { color: #2a2; } .new { color: #c80; } .ok { color: var(--muted); }
+  .fail, .regressed { color: #d33; } .improved, .fixed { color: #2a2; } .new, .known { color: #c80; } .ok { color: var(--muted); }
   .failures { color: #d33; margin: 8px 0; }
   .images { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
   figure { margin: 0; } figcaption { color: var(--muted); font-size: 12px; }
@@ -182,7 +187,7 @@ ${rows.map(card).join("\n")}
     const query = filter.value.trim()
     for (const article of document.querySelectorAll("article")) {
       const matches = article.dataset.key.includes(query)
-      const problem = ["fail", "regressed", "new"].includes(article.dataset.status)
+      const problem = ["fail", "regressed", "fixed", "new", "known"].includes(article.dataset.status)
       article.hidden = !matches || (problems.checked && !problem)
     }
     document.body.classList.toggle("zoom", zoom.checked)

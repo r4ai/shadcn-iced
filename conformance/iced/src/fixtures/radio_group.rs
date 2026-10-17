@@ -5,8 +5,8 @@ use shadcn_iced::font;
 use shadcn_iced::radio_group::{RadioGroup, radio_group};
 use shadcn_iced::tokens;
 
-use iced::widget::{column, text};
 use iced::Theme;
+use iced::widget::{column, text};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
