@@ -36,7 +36,7 @@ pnpm qa          # = pnpm iced && pnpm test; pnpm report
 
 Text is rasterized differently by browsers and iced, so snapshots are never pixel-identical. The **score** of a snapshot pair is the share of its content (pixels that are not background in either image) that differs: `0` is identical and `1` is entirely different. A pixel only counts when no pixel of the other image within one physical pixel (half a logical pixel) has its color or lies between its neighbors' colors, so anti-aliasing and sub-pixel offsets are ignored while any difference of a logical pixel or more in size, position or color counts. The diff images show counted pixels in red and tolerated ones in yellow. The report also shows the size of the content of both images, which makes layout differences (paddings, heights, gaps) easy to spot.
 
-`baseline.json` records the accepted score of every snapshot. A run fails when a score gets worse than its baseline by more than `max(0.01, 10%)`, so any regression is caught while the known differences are fixed one by one. After improving a component:
+`baseline.json` records the accepted score of every snapshot. A run fails when a score gets worse than its baseline by more than `max(0.01, 10%)` (see [Determinism](#determinism)), so any regression is caught while the known differences are fixed one by one. After improving a component:
 
 ```sh
 pnpm iced button && pnpm test -g button && pnpm baseline button/
@@ -52,9 +52,9 @@ Snapshots must not depend on the machine running the suite:
 - **Rasterization**: Chromium runs with `--font-render-hinting=none --disable-lcd-text --disable-gpu --force-color-profile=srgb --hide-scrollbars` (no hinting, grayscale anti-aliasing, software rendering, sRGB, no native scrollbars); iced always renders with `tiny-skia` at a scale factor of 2 with no system dependency. Playwright, hence Chromium, is pinned to an exact version.
 - **Time and locale**: the browser clock is fixed at `2025-06-15T12:00:00Z` (`NOW` in `tests/spec.ts`; iced fixtures must use this date as "today"), with the `en-US` locale, the `UTC` timezone and reduced motion. Animations are disabled on both sides.
 - **Server**: the suite runs against a production build served by `vite preview` on `CONFORMANCE_PORT` (4517 by default), never reusing a running server, which could serve another checkout.
-- **Scoring**: the comparison tolerates anti-aliasing and sub-pixel offsets (see above), and scores may get worse by `max(0.01, 10%)` before failing.
+- **Scoring**: the comparison tolerates anti-aliasing and sub-pixel offsets (see above). On the platform the baseline was produced on (`platform` in `baseline.json`, Linux like CI), scores may get worse by `max(0.01, 10%)` before failing; elsewhere by `max(0.05, 20%)`, since browsers still rasterize text a bit differently on each operating system (measured between Windows and Linux: 0.0015 median, 0.01 at the 90th percentile, 0.05 at most). `CONFORMANCE_STRICT=1` forces the strict allowance.
 
-The remaining differences between operating systems are small, but the baseline is produced on Linux: the `Conformance` workflow uploads the `baseline.json` of its run with its report, to be committed when the scores of another platform are off.
+Produce the baseline on Linux (natively, in WSL or in CI): the `Conformance` workflow uploads the `baseline.json` of its run with its report, ready to be committed.
 
 ## Writing scenarios
 

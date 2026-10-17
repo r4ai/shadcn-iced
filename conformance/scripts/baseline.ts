@@ -26,7 +26,13 @@ const filters = process.argv.slice(2)
 const matches = (key: string) =>
   !filters.length || filters.some((filter) => key.includes(filter))
 
-const { scores, knownFailures } = readBaseline()
+const { platform, scores, knownFailures } = readBaseline()
+
+if (platform !== process.platform) {
+  console.warn(
+    `baseline.json was produced on ${platform}, not ${process.platform}: its scores will be replaced. Prefer producing it on Linux, like CI.`
+  )
+}
 let updated = 0
 
 for (const name of readdirSync(join(out, "runs"))) {
@@ -73,7 +79,11 @@ const sorted = <T>(record: Record<string, T>) =>
 writeFileSync(
   join(root, "baseline.json"),
   JSON.stringify(
-    { scores: sorted(scores), knownFailures: sorted(knownFailures) },
+    {
+      platform: process.platform,
+      scores: sorted(scores),
+      knownFailures: sorted(knownFailures),
+    },
     null,
     2
   ) + "\n"

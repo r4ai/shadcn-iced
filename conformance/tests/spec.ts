@@ -95,6 +95,11 @@ export function snapshotPath(
 
 /** What is accepted today (`baseline.json`). */
 export interface Baseline {
+  /**
+   * The platform (`process.platform`) the baseline was produced on: Linux,
+   * like CI. Browsers rasterize text a bit differently on other platforms.
+   */
+  platform: string
   /** The accepted score of every snapshot, by snapshot key. */
   scores: Record<string, number>
   /**
@@ -110,6 +115,7 @@ export function readBaseline(): Baseline {
     ? JSON.parse(readFileSync(path, "utf8"))
     : {}
   return {
+    platform: baseline.platform ?? "linux",
     scores: baseline.scores ?? {},
     knownFailures: baseline.knownFailures ?? {},
   }
@@ -120,9 +126,25 @@ export function runKey(component: string, scenario: string, theme: Theme) {
   return `${component}/${scenario}/${theme}`
 }
 
-/** How much worse than its baseline the score of a snapshot may get. */
+/**
+ * Whether scores are compared strictly with the baseline: on the platform it
+ * was produced on, or when `CONFORMANCE_STRICT=1`.
+ */
+export const strict =
+  process.env.CONFORMANCE_STRICT === "1" ||
+  readBaseline().platform === process.platform
+
+/**
+ * How much worse than its baseline the score of a snapshot may get.
+ *
+ * Browsers rasterize text a bit differently on every operating system
+ * (scores move by 0.002 on average and up to 0.05 between Windows and
+ * Linux), so other platforms than the one of the baseline get more slack.
+ */
 export function allowance(baseline: number) {
-  return Math.max(0.01, baseline * 0.1)
+  return strict
+    ? Math.max(0.01, baseline * 0.1)
+    : Math.max(0.05, baseline * 0.2)
 }
 
 /** What the Playwright runner records for each run (scenario × theme). */

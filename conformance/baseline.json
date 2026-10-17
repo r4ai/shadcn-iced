@@ -1,4 +1,5 @@
 {
+  "platform": "win32",
   "scores": {
     "accordion/borders/first-open/dark": 0.3032,
     "accordion/borders/first-open/light": 0.2909,
