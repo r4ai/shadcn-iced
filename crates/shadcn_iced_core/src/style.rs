@@ -68,6 +68,23 @@ pub mod text {
     pub const XL3: f32 = 30.0;
     /// `text-4xl`
     pub const XL4: f32 = 36.0;
+
+    /// The line height that Tailwind pairs with a font size, e.g. 20px for
+    /// `text-sm` (14px). iced defaults to 1.3 times the size instead.
+    pub fn leading(size: f32) -> iced::widget::text::LineHeight {
+        let height = match size {
+            XS => 16.0,
+            SM => 20.0,
+            BASE => 24.0,
+            LG | XL => 28.0,
+            XL2 => 32.0,
+            XL3 => 36.0,
+            XL4 => 40.0,
+            _ => size * 1.5,
+        };
+
+        iced::widget::text::LineHeight::Absolute(iced::Pixels(height))
+    }
 }
 
 /// Tailwind's spacing scale: `spacing(n)` is `n * 0.25rem`.
