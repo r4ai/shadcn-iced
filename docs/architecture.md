@@ -14,6 +14,8 @@ examples/
   gallery-web/        WebAssembly runtime powering the live previews on the website
   hello/              Minimal starter application
 site/                 Documentation website (TanStack Start, Solid, Vite)
+conformance/          Comparison with the latest shadcn/ui: a shadcn/ui app, Playwright
+                      tests and a headless iced runner (`iced/`) sharing scenarios
 scripts/
   check-copy.sh       CI script verifying that copied components compile standalone
 ```
@@ -91,6 +93,8 @@ The documentation website (`site/`) renders live interactive widgets rather than
 - The web page communicates with the WASM runtime via exported bindings (`mount`, `unmount`, `set_theme`, `theme_code`), while the WASM runtime notifies the page of natural content height changes (`shadcnIcedPreviewResized`) and unhandled mouse wheel events (`shadcnIcedPreviewScroll`) so page scrolling remains seamless.
 
 ## Differences from Web `shadcn/ui`
+
+The [conformance suite](../conformance/README.md) measures how far every component is from the latest `shadcn/ui`, in snapshots and behavior; its `baseline.json` lists the accepted scores and the known behavioral differences. Text is shaped with kerning (iced's `advanced-shaping` feature, enabled by `shadcn_iced_core`) so that it measures like in browsers.
 
 Because `iced` is a native retained/immediate-mode GUI library rather than a browser DOM environment, several aspects differ from the React implementation of `shadcn/ui`:
 
