@@ -3,7 +3,7 @@
 import { LoaderCircle, TriangleAlert } from "lucide-solid";
 import { createSignal, createUniqueId, onCleanup, onMount, Show } from "solid-js";
 
-import { loadPreviews, onResized, previewsCrashed, wake } from "~/lib/previews";
+import { loadPreviews, onResized, previewsCrashed, scrollOver, wake } from "~/lib/previews";
 import { cn } from "~/lib/utils";
 
 interface PreviewFrameProps {
@@ -50,11 +50,13 @@ export function PreviewFrame(props: PreviewFrameProps) {
     );
     observer.observe(frame);
 
+    const stopScrollOver = scrollOver(frame);
     const stopResized = onResized(target, (natural) => setHeight(Math.max(props.minHeight, Math.ceil(natural))));
 
     onCleanup(() => {
       disposed = true;
       observer.disconnect();
+      stopScrollOver();
       stopResized();
       if (mounted) ready.then((previews) => previews.unmount(target));
     });

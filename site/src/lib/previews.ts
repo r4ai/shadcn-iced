@@ -12,7 +12,7 @@ export interface Previews {
 declare global {
   interface Window {
     shadcnIcedPreviewResized?: (target: string, height: number) => void;
-    shadcnIcedPreviewScroll?: (dx: number, dy: number) => void;
+    shadcnIcedPreviewWheel?: (captured: boolean) => void;
   }
 }
 
@@ -76,7 +76,42 @@ export function onResized(target: string, listener: (height: number) => void) {
 
 if (typeof window !== "undefined") {
   window.shadcnIcedPreviewResized = (target, height) => resized.get(target)?.(height);
-  window.shadcnIcedPreviewScroll = (dx, dy) => window.scrollBy(dx, dy);
+  window.shadcnIcedPreviewWheel = (captured) => (wheelCaptured = captured);
+}
+
+/** Whether the preview under the wheel event being dispatched used it. */
+let wheelCaptured: boolean | undefined;
+
+/** Holds back the cancel of winit, before it handles the event. */
+function holdWheel(event: WheelEvent) {
+  if (!(event.target instanceof HTMLCanvasElement)) return;
+  wheelCaptured = undefined;
+  event.preventDefault = () => {};
+}
+
+/** Cancels the event unless iced said it did not use it. */
+function settleWheel(event: WheelEvent) {
+  if (!(event.target instanceof HTMLCanvasElement)) return;
+  if (wheelCaptured !== false) Event.prototype.preventDefault.call(event);
+  wheelCaptured = undefined;
+}
+
+/**
+ * Lets the browser scroll the page over the preview in `frame`, as it does
+ * elsewhere, unless the preview uses the wheel event (e.g. a scroll area).
+ * winit cancels every wheel event over its canvas, so its cancel is held back
+ * until iced, which handles the event within the listener of winit, tells
+ * whether it used it. Without an answer (an overlay of the preview used it),
+ * the event stays cancelled.
+ */
+export function scrollOver(frame: HTMLElement) {
+  frame.addEventListener("wheel", holdWheel, { capture: true, passive: true });
+  frame.addEventListener("wheel", settleWheel, { passive: false });
+
+  return () => {
+    frame.removeEventListener("wheel", holdWheel, { capture: true });
+    frame.removeEventListener("wheel", settleWheel);
+  };
 }
 
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
