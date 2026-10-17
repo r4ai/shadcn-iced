@@ -187,10 +187,12 @@ impl<'a, Message: 'a> From<Field<'a, Message>> for Element<'a, Message> {
         };
 
         // `has-[>[data-slot=field-content]]:items-start` and
-        // `[&>[role=checkbox],[role=radio]]:mt-px`.
-        let control = |control| {
+        // `[&>[role=checkbox],[role=radio]]:mt-px`, for the checkboxes and
+        // radios on the left of horizontal fields (controls on the right
+        // of responsive fields are usually switches).
+        let control = |control, nudge: bool| {
             container(control).padding(Padding {
-                top: if has_description { 1.0 } else { 0.0 },
+                top: if has_description && nudge { 1.0 } else { 0.0 },
                 ..Padding::ZERO
             })
         };
@@ -211,14 +213,14 @@ impl<'a, Message: 'a> From<Field<'a, Message>> for Element<'a, Message> {
                 .width(Length::Fill)
                 .into(),
             Orientation::Horizontal => Row::new()
-                .push(control(field.control))
+                .push(control(field.control, true))
                 .push(content(label, description, error))
                 .spacing(8)
                 .align_y(align)
                 .into(),
             Orientation::Responsive => Row::new()
                 .push(content(label, description, error))
-                .push(control(field.control))
+                .push(control(field.control, false))
                 .spacing(8)
                 .align_y(align)
                 .into(),

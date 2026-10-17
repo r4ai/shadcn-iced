@@ -12,7 +12,7 @@
 //! ```
 use shadcn_iced_core::icon::Icon;
 use shadcn_iced_core::primitive::Pressable;
-use shadcn_iced_core::theme::alpha;
+use shadcn_iced_core::theme::{alpha, over};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::widget::button::{Status, Style};
@@ -281,6 +281,12 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
                 // `focus-visible:border-ring`
                 if focused {
                     style.border.color = t.palette.ring;
+                }
+
+                // Joined items overlap their borders, drawn once in
+                // shadcn/ui (`border-l-0`): opaque, they blend in as one.
+                if variant == Variant::Outline && position != Position::Alone {
+                    style.border.color = over(style.border.color, t.palette.background);
                 }
 
                 style.border.radius = if vertical {

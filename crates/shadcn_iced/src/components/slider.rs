@@ -526,12 +526,10 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
         for index in 0..self.values.len() {
             let thumb = self.thumb(bounds, index);
 
-            let focused = state.focus.get(index).is_some_and(Focus::is_visible);
-
-            // `hover:ring-3 active:ring-3 focus-visible:ring-3 ring-ring/50`
-            if state.dragging == Some(index)
-                || (state.dragging.is_none() && hovered == Some(index))
-                || focused
+            // `hover:ring-3 active:ring-3 ring-ring/50`. Its
+            // `focus-visible:ring-3` never applies: the focus is on the
+            // `<input>` inside the thumb.
+            if state.dragging == Some(index) || (state.dragging.is_none() && hovered == Some(index))
             {
                 renderer.fill_quad(
                     renderer::Quad {
