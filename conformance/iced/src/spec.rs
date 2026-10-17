@@ -57,14 +57,37 @@ impl Theme {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum Step {
-    Snapshot { snapshot: String },
-    Hover { hover: Locator },
-    Click { click: Locator },
-    Drag { drag: Drag },
-    Press { press: String },
-    Type { r#type: String },
-    Wait { wait: u64 },
-    Expect { expect: Expectation },
+    Snapshot {
+        snapshot: String,
+    },
+    Hover {
+        hover: Locator,
+        /// The number of intermediate pointer moves (1 by default: a jump).
+        #[serde(default = "one")]
+        steps: u32,
+    },
+    Click {
+        click: Locator,
+    },
+    RightClick {
+        #[serde(rename = "rightClick")]
+        right_click: Locator,
+    },
+    Drag {
+        drag: Drag,
+    },
+    Press {
+        press: String,
+    },
+    Type {
+        r#type: String,
+    },
+    Wait {
+        wait: u64,
+    },
+    Expect {
+        expect: Expectation,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -77,11 +100,14 @@ pub struct Drag {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum Locator {
-    /// The center of the `nth` (0-based) visible text with this content.
+    /// The center of the `nth` (0-based) visible text with this content,
+    /// or containing it when not `exact`.
     Text {
         text: String,
         #[serde(default)]
         nth: usize,
+        #[serde(default = "yes")]
+        exact: bool,
     },
     /// A logical position in the page.
     At { at: [f32; 2] },
@@ -97,6 +123,14 @@ pub struct Expectation {
     /// Texts that must not be visible.
     #[serde(default)]
     pub hidden: Vec<String>,
+}
+
+fn one() -> u32 {
+    1
+}
+
+fn yes() -> bool {
+    true
 }
 
 fn default_viewport() -> [f32; 2] {

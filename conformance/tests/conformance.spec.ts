@@ -57,11 +57,14 @@ async function locate(page: Page, locator: Locator) {
     return { x: locator.at[0], y: locator.at[1] }
   }
 
-  const { text, nth = 0 } =
-    typeof locator === "string" ? { text: locator } : locator
+  const {
+    text,
+    nth = 0,
+    exact = true,
+  } = typeof locator === "string" ? { text: locator } : locator
 
   const element = page
-    .getByText(text, { exact: true })
+    .getByText(text, { exact })
     .filter({ visible: true })
     .nth(nth)
 
@@ -159,7 +162,12 @@ for (const file of readScenarios()) {
                 })
               } else if ("hover" in step) {
                 const { x, y } = await locate(page, step.hover)
+                await page.mouse.move(x, y, { steps: step.steps ?? 1 })
+              } else if ("rightClick" in step) {
+                const { x, y } = await locate(page, step.rightClick)
                 await page.mouse.move(x, y)
+                await page.mouse.down({ button: "right" })
+                await page.mouse.up({ button: "right" })
               } else if ("click" in step) {
                 const { x, y } = await locate(page, step.click)
                 await page.mouse.move(x, y)

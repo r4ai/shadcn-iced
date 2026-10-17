@@ -2,23 +2,32 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Conformance scenarios of a component",
   "type": "object",
-  "required": ["component", "scenarios"],
+  "required": [
+    "component",
+    "scenarios"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "component": {
       "description": "The component, named like its shadcn/ui registry item and its fixture files (`src/fixtures/<component>.tsx`, `iced/src/fixtures/<component>.rs`).",
       "type": "string"
     },
     "scenarios": {
       "type": "array",
-      "items": { "$ref": "#/$defs/scenario" }
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
     }
   },
   "$defs": {
     "scenario": {
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -26,47 +35,77 @@
           "type": "string",
           "pattern": "^[a-z0-9-]+$"
         },
-        "description": { "type": "string" },
+        "description": {
+          "type": "string"
+        },
         "viewport": {
           "description": "The logical size of the page, [width, height]. Defaults to [320, 120].",
           "type": "array",
-          "items": { "type": "number" },
+          "items": {
+            "type": "number"
+          },
           "minItems": 2,
           "maxItems": 2
         },
         "themes": {
           "description": "Defaults to both.",
           "type": "array",
-          "items": { "enum": ["light", "dark"] }
+          "items": {
+            "enum": [
+              "light",
+              "dark"
+            ]
+          }
         },
         "steps": {
           "description": "Defaults to a single snapshot named `default`.",
           "type": "array",
-          "items": { "$ref": "#/$defs/step" }
+          "items": {
+            "$ref": "#/$defs/step"
+          }
         }
       }
     },
     "locator": {
       "oneOf": [
-        { "type": "string", "description": "The center of the first visible text with this exact content." },
+        {
+          "type": "string",
+          "description": "The center of the first visible text with this exact content."
+        },
         {
           "type": "object",
-          "required": ["text"],
+          "required": [
+            "text"
+          ],
           "additionalProperties": false,
           "properties": {
-            "text": { "type": "string" },
-            "nth": { "type": "integer", "minimum": 0, "description": "0-based, in document order." }
+            "text": {
+              "type": "string"
+            },
+            "nth": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "0-based, in document order."
+            },
+            "exact": {
+              "type": "boolean",
+              "description": "Matches texts containing `text` when false (the smallest element on the web). Defaults to true."
+            }
           }
         },
         {
           "type": "object",
-          "required": ["at"],
+          "required": [
+            "at"
+          ],
           "additionalProperties": false,
           "properties": {
             "at": {
               "description": "A logical position in the page, [x, y].",
               "type": "array",
-              "items": { "type": "number" },
+              "items": {
+                "type": "number"
+              },
               "minItems": 2,
               "maxItems": 2
             }
@@ -78,72 +117,146 @@
       "oneOf": [
         {
           "type": "object",
-          "required": ["snapshot"],
+          "required": [
+            "snapshot"
+          ],
           "additionalProperties": false,
-          "properties": { "snapshot": { "type": "string", "pattern": "^[a-z0-9-]+$" } }
+          "properties": {
+            "snapshot": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$"
+            }
+          }
         },
         {
           "type": "object",
-          "required": ["hover"],
+          "required": [
+            "hover"
+          ],
           "additionalProperties": false,
-          "properties": { "hover": { "$ref": "#/$defs/locator" } }
+          "properties": {
+            "hover": {
+              "$ref": "#/$defs/locator"
+            },
+            "steps": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Intermediate pointer moves from the current position (1: a jump)."
+            }
+          }
         },
         {
           "type": "object",
-          "required": ["click"],
+          "required": [
+            "click"
+          ],
           "additionalProperties": false,
-          "properties": { "click": { "$ref": "#/$defs/locator" } }
+          "properties": {
+            "click": {
+              "$ref": "#/$defs/locator"
+            }
+          }
         },
         {
           "type": "object",
-          "required": ["drag"],
+          "required": [
+            "rightClick"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "rightClick": {
+              "$ref": "#/$defs/locator"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "drag"
+          ],
           "additionalProperties": false,
           "properties": {
             "drag": {
               "type": "object",
-              "required": ["from", "to"],
+              "required": [
+                "from",
+                "to"
+              ],
               "additionalProperties": false,
               "properties": {
-                "from": { "$ref": "#/$defs/locator" },
-                "to": { "$ref": "#/$defs/locator" }
+                "from": {
+                  "$ref": "#/$defs/locator"
+                },
+                "to": {
+                  "$ref": "#/$defs/locator"
+                }
               }
             }
           }
         },
         {
           "type": "object",
-          "required": ["press"],
+          "required": [
+            "press"
+          ],
           "additionalProperties": false,
           "properties": {
             "press": {
               "type": "string",
-              "description": "A key combination with Playwright's names, e.g. `ArrowDown`, `Shift+Tab`, `Enter` or `a`."
+              "description": "A key combination with Playwright's names, e.g. `ArrowDown`, `Shift+Tab`, `Enter` or `a`. On the iced side, Tab moves the focus like iced applications do (`focus_next`/`focus_previous`) when no widget captures it."
             }
           }
         },
         {
           "type": "object",
-          "required": ["type"],
+          "required": [
+            "type"
+          ],
           "additionalProperties": false,
-          "properties": { "type": { "type": "string", "description": "Types text, a character at a time." } }
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "Types text, a character at a time."
+            }
+          }
         },
         {
           "type": "object",
-          "required": ["wait"],
+          "required": [
+            "wait"
+          ],
           "additionalProperties": false,
-          "properties": { "wait": { "type": "integer", "minimum": 0, "description": "Milliseconds." } }
+          "properties": {
+            "wait": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Milliseconds."
+            }
+          }
         },
         {
           "type": "object",
-          "required": ["expect"],
+          "required": [
+            "expect"
+          ],
           "additionalProperties": false,
           "properties": {
             "expect": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "visible": { "type": "array", "items": { "type": "string" } },
-                "hidden": { "type": "array", "items": { "type": "string" } }
+                "visible": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "hidden": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }

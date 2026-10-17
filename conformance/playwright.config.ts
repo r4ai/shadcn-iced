@@ -34,9 +34,13 @@ export default defineConfig({
       ],
     },
   },
+  // A production build: the dev server reloads pages when it discovers
+  // dependencies. Never reuse a running server, which may serve another
+  // checkout.
   webServer: {
-    command: `pnpm exec vite --port ${port} --strictPort`,
+    command: `pnpm exec vite build --logLevel warn && pnpm exec vite preview --port ${port} --strictPort`,
     url: `http://localhost:${port}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
+    timeout: 180_000,
   },
 })

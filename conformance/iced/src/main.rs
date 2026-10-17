@@ -191,13 +191,17 @@ fn perform(
             write_png(&path, &rgba, width, height)?;
             outcome.snapshots.push(snapshot.clone());
         }
-        Step::Hover { hover } => {
+        Step::Hover { hover, steps } => {
             let position = locate(harness, hover)?;
-            harness.move_to(position);
+            harness.move_in_steps(position, *steps);
         }
         Step::Click { click } => {
             let position = locate(harness, click)?;
             harness.click(position);
+        }
+        Step::RightClick { right_click } => {
+            let position = locate(harness, right_click)?;
+            harness.right_click(position);
         }
         Step::Drag { drag } => {
             let from = locate(harness, &drag.from)?;
@@ -209,7 +213,7 @@ fn perform(
         Step::Wait { wait } => harness.wait(*wait),
         Step::Expect { expect } => {
             for text in &expect.visible {
-                let ok = !harness.visible_texts(text).is_empty();
+                let ok = !harness.visible_texts(text, true).is_empty();
                 outcome.checks.push(Check {
                     step: index,
                     text: text.clone(),
@@ -219,7 +223,7 @@ fn perform(
             }
 
             for text in &expect.hidden {
-                let ok = harness.visible_texts(text).is_empty();
+                let ok = harness.visible_texts(text, true).is_empty();
                 outcome.checks.push(Check {
                     step: index,
                     text: text.clone(),
@@ -236,11 +240,11 @@ fn perform(
 fn locate(harness: &mut Harness, locator: &Locator) -> Result<iced::Point, String> {
     match locator {
         Locator::At { at: [x, y] } => Ok(iced::Point::new(*x, *y)),
-        Locator::Text { text, nth } => harness
-            .locate_text(text, *nth)
+        Locator::Text { text, nth, exact } => harness
+            .locate_text(text, *nth, *exact)
             .ok_or_else(|| format!("text {text:?} (#{nth}) not found")),
         Locator::Plain(text) => harness
-            .locate_text(text, 0)
+            .locate_text(text, 0, true)
             .ok_or_else(|| format!("text {text:?} not found")),
     }
 }

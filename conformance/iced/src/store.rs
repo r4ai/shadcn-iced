@@ -3,6 +3,8 @@
 //!
 //! On the shadcn/ui side, fixtures are uncontrolled React components; here,
 //! the store plays the part of their internal state.
+use iced::widget::text_editor;
+
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,12 +19,15 @@ pub enum Value {
 pub enum Msg {
     Set(&'static str, Value),
     Toggle(&'static str),
+    /// Applies an action to the text editor content of a key.
+    Edit(&'static str, text_editor::Action),
     Noop,
 }
 
 #[derive(Debug, Default)]
 pub struct Store {
     values: HashMap<&'static str, Value>,
+    editors: HashMap<&'static str, text_editor::Content>,
 }
 
 impl Store {
@@ -35,6 +40,9 @@ impl Store {
                 let value = !self.bool(key);
                 let _ = self.values.insert(key, Value::Bool(value));
             }
+            Msg::Edit(key, action) => {
+                self.editors.entry(key).or_default().perform(action);
+            }
             Msg::Noop => {}
         }
     }
@@ -42,6 +50,21 @@ impl Store {
     pub fn set(&mut self, key: &'static str, value: impl Into<Value>) -> &mut Self {
         let _ = self.values.insert(key, value.into());
         self
+    }
+
+    /// Sets the text of the text editor content of a key.
+    pub fn set_editor(&mut self, key: &'static str, text: &str) -> &mut Self {
+        let _ = self
+            .editors
+            .insert(key, text_editor::Content::with_text(text));
+        self
+    }
+
+    /// The text editor content of a key, set with [`Store::set_editor`].
+    pub fn editor(&self, key: &str) -> &text_editor::Content {
+        self.editors
+            .get(key)
+            .unwrap_or_else(|| panic!("no editor content for {key:?}: call `set_editor` in `init`"))
     }
 
     pub fn bool(&self, key: &str) -> bool {
@@ -98,6 +121,12 @@ impl<T: Into<Value>> From<Option<T>> for Value {
     fn from(value: Option<T>) -> Self {
         value.map_or(Value::None, Into::into)
     }
+}
+
+/// Returns a function producing a [`Msg`] that edits the text editor
+/// content of `key`, e.g. `textarea(store.editor("text")).on_action(edit("text"))`.
+pub fn edit(key: &'static str) -> impl Fn(text_editor::Action) -> Msg + Clone {
+    move |action| Msg::Edit(key, action)
 }
 
 /// Returns a function producing a [`Msg`] that sets `key` to its argument,

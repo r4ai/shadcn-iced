@@ -15,15 +15,20 @@ export type Theme = "light" | "dark"
 export type Locator =
   /** The center of the first visible text with this exact content. */
   | string
-  /** The center of the `nth` (0-based) visible text with this exact content. */
-  | { text: string; nth?: number }
+  /**
+   * The center of the `nth` (0-based) visible text with this content, or
+   * containing it when `exact` is false (the smallest element on the web).
+   */
+  | { text: string; nth?: number; exact?: boolean }
   /** A logical position in the page. */
   | { at: [number, number] }
 
 export type Step =
   | { snapshot: string }
-  | { hover: Locator }
+  /** `steps` intermediate pointer moves (1 by default: a jump). */
+  | { hover: Locator; steps?: number }
   | { click: Locator }
+  | { rightClick: Locator }
   | { drag: { from: Locator; to: Locator } }
   /** A key combination with Playwright's names, e.g. `ArrowDown` or `Shift+Tab`. */
   | { press: string }

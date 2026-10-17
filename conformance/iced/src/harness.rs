@@ -12,7 +12,7 @@ use iced_test::core::renderer::{Headless, Style};
 use iced_test::core::widget::operation::{self, Operation, Outcome};
 use iced_test::renderer::Renderer;
 use iced_test::runtime::user_interface::{self, UserInterface};
-use iced_test::selector::Selector;
+use iced_test::selector::{Candidate, Selector};
 
 use iced::time::Instant;
 
@@ -97,19 +97,25 @@ impl Harness {
         output
     }
 
-    /// Dispatches a single event, as a frame of its own.
-    pub fn dispatch(&mut self, event: Event) {
-        let _ = self.with_interface(|interface, context| {
-            let _ = interface.update(
+    /// Dispatches a single event, as a frame of its own, returning whether
+    /// a widget captured it.
+    pub fn dispatch(&mut self, event: Event) -> bool {
+        let captured = self.with_interface(|interface, context| {
+            let (_state, statuses) = interface.update(
                 &[event],
                 context.cursor,
                 context.renderer,
                 context.clipboard,
                 context.messages,
             );
+
+            statuses
+                .iter()
+                .any(|status| *status == iced::event::Status::Captured)
         });
 
         self.redraw();
+        captured
     }
 
     fn redraw(&mut self) {
@@ -127,26 +133,41 @@ impl Harness {
     }
 
     /// Finds the visible center of the `nth` text with the given content.
-    pub fn locate_text(&mut self, text: &str, nth: usize) -> Option<Point> {
-        self.visible_texts(text)
+    pub fn locate_text(&mut self, text: &str, nth: usize, exact: bool) -> Option<Point> {
+        self.visible_texts(text, exact)
             .into_iter()
             .nth(nth)
             .map(|bounds| bounds.center())
     }
 
-    /// Returns the visible bounds of every text with the given content.
-    pub fn visible_texts(&mut self, text: &str) -> Vec<iced::Rectangle> {
+    /// Returns the visible bounds of every text with the given content, or
+    /// containing it when not `exact`.
+    pub fn visible_texts(&mut self, text: &str, exact: bool) -> Vec<iced::Rectangle> {
         let text = text.to_owned();
 
         self.with_interface(|interface, context| {
-            let mut operation = text.as_str().find_all();
+            let mut operation = (move |candidate: Candidate<'_>| {
+                let content = match &candidate {
+                    Candidate::Text { content, .. } => *content,
+                    Candidate::TextInput { state, .. } => state.text(),
+                    _ => return None,
+                };
+
+                let matches = if exact {
+                    content == text
+                } else {
+                    content.contains(text.as_str())
+                };
+
+                matches.then(|| candidate.visible_bounds()).flatten()
+            })
+            .find_all();
 
             interface.operate(context.renderer, &mut operation::black_box(&mut operation));
 
             match operation.finish() {
-                Outcome::Some(targets) => targets
+                Outcome::Some(bounds) => bounds
                     .into_iter()
-                    .filter_map(|target| target.visible_bounds())
                     .filter(|bounds| bounds.width > 0.0 && bounds.height > 0.0)
                     .collect(),
                 _ => Vec::new(),
@@ -159,22 +180,49 @@ impl Harness {
         self.dispatch(Event::Mouse(mouse::Event::CursorMoved { position }));
     }
 
+    /// Moves the pointer in `steps` moves from its current position, like
+    /// Playwright's `mouse.move(x, y, { steps })`.
+    pub fn move_in_steps(&mut self, position: Point, steps: u32) {
+        let from = match self.cursor {
+            mouse::Cursor::Available(from) => from,
+            _ => position,
+        };
+
+        for i in 1..=steps.max(1) {
+            let t = i as f32 / steps.max(1) as f32;
+            self.move_to(Point::new(
+                from.x + (position.x - from.x) * t,
+                from.y + (position.y - from.y) * t,
+            ));
+        }
+    }
+
     pub fn press(&mut self) {
-        self.dispatch(Event::Mouse(mouse::Event::ButtonPressed(
-            mouse::Button::Left,
-        )));
+        self.press_button(mouse::Button::Left);
     }
 
     pub fn release(&mut self) {
-        self.dispatch(Event::Mouse(mouse::Event::ButtonReleased(
-            mouse::Button::Left,
-        )));
+        self.release_button(mouse::Button::Left);
+    }
+
+    fn press_button(&mut self, button: mouse::Button) {
+        self.dispatch(Event::Mouse(mouse::Event::ButtonPressed(button)));
+    }
+
+    fn release_button(&mut self, button: mouse::Button) {
+        self.dispatch(Event::Mouse(mouse::Event::ButtonReleased(button)));
     }
 
     pub fn click(&mut self, position: Point) {
         self.move_to(position);
         self.press();
         self.release();
+    }
+
+    pub fn right_click(&mut self, position: Point) {
+        self.move_to(position);
+        self.press_button(mouse::Button::Right);
+        self.release_button(mouse::Button::Right);
     }
 
     pub fn drag(&mut self, from: Point, to: Point) {
@@ -216,7 +264,25 @@ impl Harness {
         let (key, text) = parse_key(name)?;
 
         self.set_modifiers(modifiers);
-        self.key(key, text);
+        let captured = self.key(key.clone(), text);
+
+        // Like iced applications do (there is no built-in focus traversal),
+        // Tab moves the focus when no widget handles it.
+        if key == Key::Named(Named::Tab) && !captured {
+            let backwards = modifiers.shift();
+
+            self.with_interface(|interface, context| {
+                if backwards {
+                    let mut operation = operation::focusable::focus_previous::<()>();
+                    interface.operate(context.renderer, &mut operation);
+                } else {
+                    let mut operation = operation::focusable::focus_next::<()>();
+                    interface.operate(context.renderer, &mut operation);
+                }
+            });
+            self.redraw();
+        }
+
         self.set_modifiers(Modifiers::default());
 
         Ok(())
@@ -225,12 +291,13 @@ impl Harness {
     pub fn type_text(&mut self, text: &str) {
         for c in text.chars() {
             let text = c.to_string();
-            self.key(Key::Character(text.as_str().into()), Some(text));
+            let _ = self.key(Key::Character(text.as_str().into()), Some(text));
         }
     }
 
-    fn key(&mut self, key: Key, text: Option<String>) {
-        self.dispatch(Event::Keyboard(keyboard::Event::KeyPressed {
+    /// Taps a key, returning whether a widget captured its press.
+    fn key(&mut self, key: Key, text: Option<String>) -> bool {
+        let captured = self.dispatch(Event::Keyboard(keyboard::Event::KeyPressed {
             key: key.clone(),
             modified_key: key.clone(),
             physical_key: keyboard::key::Physical::Unidentified(
@@ -251,6 +318,8 @@ impl Harness {
             location: keyboard::Location::Standard,
             modifiers: self.modifiers,
         }));
+
+        captured
     }
 
     fn set_modifiers(&mut self, modifiers: Modifiers) {
@@ -287,7 +356,9 @@ impl Harness {
             // A freshly built interface only draws its overlays once they
             // have been laid out, by an update.
             let _ = interface.update(
-                &[Event::Window(window::Event::RedrawRequested(Instant::now()))],
+                &[Event::Window(
+                    window::Event::RedrawRequested(Instant::now()),
+                )],
                 context.cursor,
                 context.renderer,
                 context.clipboard,
