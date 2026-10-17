@@ -1,157 +1,229 @@
-# Development
+# Development Guide
 
-This guide covers building, testing, running the component gallery, generating visual snapshots, and working on the documentation website.
+This guide covers everything needed to build, test, inspect, and contribute to `shadcn-iced`.
+
+---
 
 ## Prerequisites
 
-- **Rust**: 1.88 or newer (Edition 2024)
-- **Node.js & pnpm** (only required when working on `site/`): Node.js 22+ and `pnpm`
+| Tool | Requirement | Used For |
+| :--- | :--- | :--- |
+| **Rust** | `1.88+` (`2024` edition) | Building all workspace crates, CLI, gallery, and conformance runner |
+| **Node.js & `pnpm`** | Node `20+`, `pnpm 10+` | Running the documentation site (`site/`) and conformance suite (`conformance/`) |
+| **`wasm-pack`** | Latest (`wasm32-unknown-unknown` target) | Compiling interactive WebAssembly previews (`examples/gallery-web`) |
+| **Python 3 / `uv`** | Optional | Running theme/icon/font generation and snapshot montage scripts in `scripts/` |
 
-## Building and Testing
+---
 
-Run the standard Cargo checks across the workspace:
+## Everyday Commands
+
+Run these from the repository root before submitting a pull request:
 
 ```sh
-# Check formatting
+# Format check
 cargo fmt --all --check
 
-# Run Clippy across all workspace members and targets
+# Lint all workspace crates and targets
 cargo clippy --workspace --all-targets -- -D warnings
 
-# Run unit and integration tests
+# Run unit tests and component doc-tests
 cargo test --workspace
+
+# Verify copy-and-own isolation (copies all 66 components into a fresh temp crate and checks compilation)
+bash scripts/check-copy.sh
 ```
 
-### Verifying Copy-and-Paste Isolation
+---
 
-Every component in `crates/shadcn_iced/src/components/` must compile when copied into a standalone project that only depends on `iced` and `shadcn_iced_core`.
+## Running the Desktop Gallery
 
-To verify this locally (also run in CI):
-
-```sh
-./scripts/check-copy.sh
-```
-
-This script builds `cargo-shadcn-iced`, initializes a temporary Cargo project, runs `cargo shadcn-iced add --all`, and checks the resulting crate with `RUSTFLAGS="-D warnings"`.
-
-## Running the Examples
-
-Run the desktop component gallery (which includes all 66 components and an interactive theme customizer) or the minimal `hello` example:
+The `gallery` package (`examples/gallery`) showcases all **65** component pages and **4** chart pages with an interactive theme customizer.
 
 ```sh
+# Launch the desktop gallery (opens on the "button" page by default)
 cargo run -p gallery
-cargo run -p hello
+
+# Open directly to a specific page ID
+GALLERY_PAGE=calendar cargo run -p gallery
+GALLERY_PAGE=charts-area cargo run -p gallery
+
+# Start with Inter instead of Geist as the body font
+GALLERY_FONT=inter cargo run -p gallery
 ```
 
-To open the gallery directly on a specific component page, set the `GALLERY_PAGE` environment variable to the component ID:
+---
+
+## Headless Snapshot Tool (`snapshot`)
+
+You can render any gallery page to PNG files without opening a window using the `snapshot` binary (`examples/gallery/src/bin/snapshot.rs`) powered by `iced_test::Simulator` and `tiny-skia`.
 
 ```sh
-GALLERY_PAGE=sonner cargo run -p gallery
-```
+# Render both light and dark snapshots of specific pages to target/snapshots/
+ICED_TEST_BACKEND=tiny-skia cargo run -p gallery --bin snapshot -- button card:dark dialog:light
 
-## Headless Visual QA (`snapshot`)
-
-The `gallery` package includes a `snapshot` binary that renders component pages headlessly using `iced_test::Simulator` and saves PNG images to `target/snapshots/`.
-
-### Rendering All Pages
-
-Use the `tiny-skia` software backend for deterministic rendering without a display server:
-
-```sh
+# Render every gallery page in both light and dark modes
 ICED_TEST_BACKEND=tiny-skia cargo run -p gallery --bin snapshot
 ```
 
-### Rendering Specific Pages and Interactions
+### Interaction & Theme Flags
 
-Pass one or more `page[:mode]` targets along with interaction and theme flags:
+Actions placed **before** `--live` dispatch messages through `Gallery::update` and rebuild the view. Actions placed **after** `--live` run directly on the final widget tree right before taking the screenshot (preserving internal widget state such as focus rings, hover tooltips, and self-managed overlays like `DropdownMenu` or `Select`).
 
 ```sh
-# Click a trigger and hover a submenu item
-cargo run -p gallery --bin snapshot -- dropdown-menu:dark --live --click "Open" --hover 700,538
-
-# Open a dialog in light mode
-cargo run -p gallery --bin snapshot -- dialog:light --click "Edit Profile"
-
-# Customize theme and chart colors
-cargo run -p gallery --bin snapshot -- chart:light --accent blue --chart rose
-
-# Test inverted menu styling
-cargo run -p gallery --bin snapshot -- dropdown-menu:light --menu-color inverted --live --click "Open"
-
-# Capture an in-progress animation frame (animations are disabled by default)
-cargo run -p gallery --bin snapshot -- dropdown-menu:light --animations --live --click "Open" --wait 70
+# Open a dropdown menu and hover a submenu item before capturing
+ICED_TEST_BACKEND=tiny-skia cargo run -p gallery --bin snapshot -- \
+  dropdown-menu:dark --live --click "Open" --hover 450,310
 ```
 
-Available flags for `snapshot`:
+| Flag | Description |
+| :--- | :--- |
+| `<page-id>[:light\|:dark]` | Page ID (e.g. `button`, `dialog:light`, `charts-bar:dark`). Omit `:mode` to render both. |
+| `--size <WxH>` | Viewport size in logical pixels (default: `1100x820`). |
+| `--suffix <STR>` | Appends `<STR>` to the output filename (`target/snapshots/<id><suffix>-<mode>-tiny-skia.png`). |
+| `--base <NAME>` | Base palette: `neutral`, `stone`, `zinc`, `mauve`, `olive`, `mist`, `taupe`. |
+| `--accent <NAME>` | Accent color: `amber`, `blue`, `cyan`, `emerald`, `fuchsia`, `green`, `indigo`, `lime`, `orange`, `pink`, `purple`, `red`, `rose`, `sky`, `teal`, `violet`, `yellow`. |
+| `--chart <NAME>` | Chart palette preset (any base or accent color name). |
+| `--radius <SIZE>` | Corner radius preset: `none`, `small`, `medium`, `large`, `default`. |
+| `--menu-color <MODE>` | Menu surface style: `default`, `inverted`, `translucent`, `inverted-translucent`. |
+| `--menu-accent <MODE>` | Menu highlight style: `subtle` (default) or `bold`. |
+| `--heading <FONT>` | Heading font family: `geist`, `inter`, or `inherit`. |
+| `--customize` | Opens the theme customizer popover in the gallery header. |
+| `--animations` | Enables animations (disabled by default for deterministic screenshots). |
+| `--live` | Switches subsequent action flags to operate on the live final widget tree. |
+| `--click "<LABEL>"` | Clicks the visible text widget matching `<LABEL>`. |
+| `--at <X,Y>` | Moves the cursor to `(X, Y)` and clicks. |
+| `--hover <X,Y>` | Moves the cursor to `(X, Y)` without clicking. |
+| `--type "<TEXT>"` | Types `<TEXT>` into the currently focused widget. |
+| `--key <KEY>` | Taps a key (`escape`, `enter`, `tab`, `down`, `up`, `space`, or a character). |
+| `--wait <MS>` | Renders a frame, sleeps `<MS>` milliseconds, and requests a redraw. |
 
-- **Targets**: `<page-id>` or `<page-id>:light` / `<page-id>:dark`
-- **Actions**:
-  - `--click "<label>"`: Click the text widget matching `<label>`
-  - `--at <x>,<y>`: Click at a logical coordinate
-  - `--hover <x>,<y>`: Move the cursor to a logical coordinate
-  - `--type "<text>"`: Type text into the focused widget
-  - `--key <escape|enter|tab|down|up|space>`: Press a key
-  - `--wait <ms>`: Advance time (useful for hover delays and animations)
-  - `--live`: Perform subsequent actions on the final view without rebuilding, preserving transient widget state (hover, focus, self-managed overlays)
-- **Theme Options**:
-  - `--base <name>`, `--accent <name>`, `--chart <name>`
-  - `--radius <none|small|medium|large>`
-  - `--menu-color <inverted|translucent|inverted-translucent>`
-  - `--menu-accent bold`
-  - `--heading <geist|inter>`
-  - `--customize`: Open the theme customizer sheet
-  - `--animations`: Enable animations during the run
+---
 
-## Conformance with `shadcn/ui`
+## Working with the CLI (`cargo-shadcn-iced`)
 
-[`conformance/`](../conformance/README.md) runs the same scenarios (pointer and keyboard interactions, expected texts, snapshots) against the latest `shadcn/ui`, in Chromium, and against `shadcn_iced`, headlessly, then compares them. It needs Node.js 24+ and pnpm:
+Test CLI commands directly via `cargo run -p cargo-shadcn-iced --`:
+
+```sh
+# List all 66 available components and their descriptions
+cargo run -p cargo-shadcn-iced -- list
+
+# Inspect a component's embedded source code
+cargo run -p cargo-shadcn-iced -- view button
+
+# Copy components (plus any transitive sibling dependencies) into a target directory
+cargo run -p cargo-shadcn-iced -- add dialog dropdown-menu --dir /tmp/test-ui
+
+# Compare local files against the embedded upstream templates
+cargo run -p cargo-shadcn-iced -- diff --dir /tmp/test-ui
+```
+
+### CLI Options Reference
+
+| Command / Flag | Description |
+| :--- | :--- |
+| `list` | Prints all available components and their one-line doc summaries. |
+| `add <NAME>...` | Copies `<NAME>` and its transitive sibling dependencies into `--dir` and updates `mod.rs`. Accepts both `kebab-case` and `snake_case`. |
+| `add --all` | Copies all 66 components into `--dir`. |
+| `diff [<NAME>...]` | Shows a unified diff between local files in `--dir` and the embedded templates. |
+| `view <NAME>` | Prints the embedded Rust source of `<NAME>` to stdout. |
+| `--dir <PATH>` | Target module directory (default: `src/ui`). |
+| `--overwrite` | Overwrites existing `<name>.rs` files when running `add`. |
+
+---
+
+## Adding or Modifying a Component
+
+When creating or updating a component, follow these conventions to keep the library, CLI, gallery, conformance suite, and docs site in sync:
+
+1. **Implement the component in `crates/shadcn_iced/src/components/<name>.rs`**:
+   - **Portability rule**: Import only from `iced`, `shadcn_iced_core::*`, and sibling components (`use super::<sibling>::*;`). **Never** use `crate::*`, or `cargo shadcn-iced add` will fail in user projects.
+   - Include a module-level `//!` doc comment at the top of the file:
+     - First paragraph: concise summary (used by `cargo shadcn-iced list` and the documentation site).
+     - `//! # Example` section with a ` ```no_run ` Rust code block (`cargo shadcn-iced add` automatically rewrites `no_run` to `ignore` when copying into user crates).
+2. **Export the component**:
+   - Add `pub mod <name>;` to `crates/shadcn_iced/src/components/mod.rs`.
+   - Re-export primary entrypoints in `crates/shadcn_iced/src/lib.rs` (and `prelude` if appropriate).
+3. **Add a Gallery Page**:
+   - Add a `Page` definition under `examples/gallery/src/pages/` and register it in `PAGES` in `examples/gallery/src/pages/mod.rs`.
+   - Note: `extract_docs` uses `#[track_caller]` on `gallery::example(title, content)` to extract the exact Rust source code for every preview on the documentation website.
+4. **Add Conformance Fixtures (if applicable)**:
+   - Add the iced fixture in `conformance/iced/src/fixtures/` and the matching React fixture in `conformance/react/app/` (see [`conformance/README.md`](../conformance/README.md)).
+5. **Verify Copy Isolation & Tests**:
+   - Run `bash scripts/check-copy.sh` and `cargo test --workspace`.
+
+---
+
+## Conformance Testing (`conformance/`)
+
+The `conformance/` directory runs pixel-diff comparisons between `shadcn-iced` and an official Next.js + React `shadcn/ui` application at `2x` device scale factor. See [`conformance/README.md`](../conformance/README.md) for architectural details.
 
 ```sh
 cd conformance
 pnpm install
-pnpm exec playwright install chromium
-pnpm qa        # render with iced, run shadcn/ui, compare, write out/report/index.html
+
+# Full QA pipeline: renders iced snapshots, runs Playwright pixel diffs, and builds report.html
+pnpm qa
+
+# Render only specific iced fixtures (substring filter)
+pnpm iced button dialog
+
+# Run Playwright comparison for matching fixtures
+pnpm test -g "button|dialog"
+
+# Regenerate reference React PNG baselines via Playwright
+pnpm baseline button
 ```
 
-A run fails when a snapshot differs from `shadcn/ui` more than its accepted score in `conformance/baseline.json`, or when an expectation fails that is not listed there as known. After improving a component, record its new scores with `pnpm baseline <component>/` and commit them with the fix. `pnpm shadcn:update` updates the reference to the latest `shadcn/ui`; the `Conformance` workflow does it every week to catch upstream changes.
+---
 
 ## Documentation Website (`site/`)
 
-The website in `site/` is built with TanStack Start, Solid, Vite, and Tailwind CSS. It displays each gallery example alongside its extracted Rust source code and a live WebAssembly preview.
-
-### How Site Assets Are Generated
-
-1. **`pnpm data`** (`site/scripts/gen-data.mjs`): Runs `cargo run -p gallery --bin site_data` to locate every `example(...)` call in the gallery, extracts the corresponding Rust source snippets (including referenced imports and helpers) and component source files, and writes `site/src/data/components.json`.
-2. **`pnpm wasm`** (`site/scripts/build-wasm.mjs`): Compiles `examples/gallery-web` for `wasm32-unknown-unknown` using the `wasm` Cargo profile, generates bindings with `wasm-bindgen`, and optimizes the binary with `wasm-opt` into `site/public/wasm/`. Build-machine paths are remapped before compilation, and the final binary is checked for unremapped prefixes before it can be deployed.
-
-### Local Development Setup
-
-Install the WebAssembly target and matching `wasm-bindgen-cli` version:
-
-```sh
-rustup target add wasm32-unknown-unknown
-cargo install wasm-bindgen-cli --version <version-in-Cargo.lock> --locked
-```
-
-Then install dependencies, generate the gallery data and WASM bundle, and start the dev server:
+The documentation website (`site/`) is built with Astro, Starlight, and Tailwind CSS v4. It embeds live WebAssembly previews compiled from `examples/gallery-web`.
 
 ```sh
 cd site
 pnpm install
-pnpm data && pnpm wasm   # Re-run after modifying examples or components
+
+# 1. Extract component docstrings and gallery example sources to site/src/data/components.json
+pnpm data
+
+# 2. Compile examples/gallery-web to site/public/wasm/ via wasm-pack
+pnpm wasm
+
+# 3. Start the Astro dev server (automatically runs `pnpm data` first)
 pnpm dev
+
+# Type-check, lint, and format checks
+pnpm check
+pnpm lint
+pnpm fmt:check
+
+# Build static production site into site/dist/
+pnpm build
+
+# Run Playwright E2E tests against the built site
+pnpm test:e2e
 ```
 
-### Linting and Building the Site
+---
 
-```sh
-cd site
-pnpm lint        # Lint with oxlint
-pnpm fmt:check   # Check formatting with oxfmt
-pnpm check       # Run TypeScript type checking
-pnpm build       # Prerender static pages to site/dist/client
-```
+## Asset & Code Generation Scripts (`scripts/`)
 
-### Deployment
+| Script | Usage | Purpose |
+| :--- | :--- | :--- |
+| `scripts/check-copy.sh` | `bash scripts/check-copy.sh` | Verifies `cargo shadcn-iced add --all` compiles cleanly with `-D warnings` in an isolated crate. |
+| `scripts/gen_themes.py` | `python3 scripts/gen_themes.py <path-to-shadcn-ui>` | Reads `apps/v4/registry/themes.ts` from a `shadcn-ui` checkout, converts OKLCH tokens to sRGB, and writes `crates/shadcn_iced_core/src/theme/presets.rs`. |
+| `scripts/gen_icons.py` | `python3 scripts/gen_icons.py <path-to-lucide-static>` | Reads `font/codepoints.json` from `lucide-static` and generates `crates/shadcn_iced_core/src/icon/lucide.rs`. |
+| `scripts/gen_fonts.py` | `uv run --with fonttools scripts/gen_fonts.py` | Builds `ShadcnIcedSymbols-Regular.ttf` (subsetting keyboard/math glyphs from Noto Sans Symbols) and `conformance/fonts/NotoEmoji-Regular.ttf`. |
+| `scripts/grid.py` | `uv run --with pillow scripts/grid.py <pngs...>` | Tiles PNG snapshots into `3×3` contact sheets (`/tmp/grid-*.png`) for visual inspection. |
+| `scripts/montage.py` | `uv run --with pillow scripts/montage.py` | Combines light/dark snapshots in `target/snapshots/` into `2×2` contact sheets under `target/montage/`. |
 
-The `Site` GitHub Actions workflow (`.github/workflows/site.yml`) builds the site and deploys `site/dist/client` to Cloudflare Workers static assets (`site/wrangler.jsonc`) on pushes to `main`. Deployment requires the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets configured in the repository's `production` environment.
+---
+
+## CI/CD Workflows (`.github/workflows/`)
+
+- **`ci.yml`** (runs on every push to `main` and pull request):
+  - **Rust Job**: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `bash scripts/check-copy.sh`.
+  - **Site Job**: `pnpm fmt:check`, `pnpm lint`, `pnpm data`, `pnpm check`, builds a stub WASM bundle for fast verification, and runs `pnpm build`.
+- **`deploy-docs.yml`** (runs on push to `main` or manual dispatch):
+  - Installs Rust + `wasm-pack`, runs `pnpm data`, `pnpm wasm`, and `pnpm build` inside `site/`, and deploys `site/dist` to Cloudflare Pages (`shadcn-iced`).
