@@ -40,16 +40,19 @@
     },
     {
       "id": "keyboard",
-      "viewport": [440, 240],
+      "viewport": [440, 272],
       "steps": [
+        { "expect": { "visible": ["Sidebar: 25%"] } },
         { "press": "Tab" },
         { "snapshot": "focused" },
         { "press": "ArrowRight" },
         { "press": "ArrowRight" },
+        { "expect": { "visible": ["Sidebar: 35%"] } },
         { "snapshot": "resized-right" },
         { "press": "ArrowLeft" },
         { "press": "ArrowLeft" },
         { "press": "ArrowLeft" },
+        { "expect": { "visible": ["Sidebar: 20%"] } },
         { "snapshot": "resized-left" }
       ]
     }

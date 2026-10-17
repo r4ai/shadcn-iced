@@ -1,11 +1,12 @@
 use super::Fixture;
-use crate::store::Msg;
+use crate::store::{Msg, set};
 
 use shadcn_iced::resizable::{Axis, resizable};
 use shadcn_iced::style::border;
+use shadcn_iced::style::text::leading;
 use shadcn_iced::{font, tokens};
 
-use iced::widget::{container, text};
+use iced::widget::{column, container, text};
 use iced::{Element, Fill, Theme};
 
 pub fn get(id: &str) -> Option<Fixture> {
@@ -28,12 +29,35 @@ pub fn get(id: &str) -> Option<Fixture> {
                     .default_ratio(0.25),
             )
         }),
-        "handle" | "keyboard" => Fixture::new(|_| {
+        "handle" => Fixture::new(|_| {
             panels(
                 resizable(panel("Sidebar"), panel("Content"))
                     .default_ratio(0.25)
                     .grip(true),
             )
+        }),
+        "keyboard" => Fixture::new(|store| {
+            let size = store.num("size");
+
+            column![
+                panels(
+                    resizable(panel("Sidebar"), panel("Content"))
+                        .ratio(size / 100.0)
+                        .on_resize(|ratio| set("size")(ratio * 100.0))
+                        .grip(true),
+                ),
+                text(format!("Sidebar: {}%", size.round()))
+                    .size(14)
+                    .line_height(leading(14.0))
+                    .style(|theme: &Theme| text::Style {
+                        color: Some(tokens(theme).palette.muted_foreground),
+                    }),
+            ]
+            .spacing(12)
+            .into()
+        })
+        .init(|store| {
+            store.set("size", 25.0f32);
         }),
         _ => return None,
     })
@@ -57,10 +81,15 @@ fn panels<'a>(content: impl Into<Element<'a, Msg>>) -> Element<'a, Msg> {
         .into()
 }
 
-/// `flex items-center justify-center p-6`, `font-semibold`
+/// `flex items-center justify-center p-6`, `font-semibold`.
+///
+/// The panels are sized by their group, not by their content, and CSS
+/// centers a label that overflows the padding of a small panel (e.g. a
+/// 50px tall one), whereas iced would shrink it and align it to the start
+/// of the padding: the padding is left out, which centers the label the
+/// same way in every panel.
 fn panel(label: &'static str) -> Element<'static, Msg> {
     container(text(label).font(font::semibold()))
         .center(Fill)
-        .padding(24)
         .into()
 }

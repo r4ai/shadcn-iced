@@ -1,3 +1,5 @@
+import { useState } from "react"
+
 import type { Fixtures } from "@/fixtures"
 import {
   ResizableHandle,
@@ -5,12 +7,19 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 
-const handle = () => (
+const handle = ({
+  onResize,
+}: {
+  onResize?: (percentage: number) => void
+} = {}) => (
   <ResizablePanelGroup
     orientation="horizontal"
     className="max-w-sm rounded-lg border"
   >
-    <ResizablePanel defaultSize="25%">
+    <ResizablePanel
+      defaultSize="25%"
+      onResize={(size) => onResize?.(size.asPercentage)}
+    >
       <div className="flex h-[200px] items-center justify-center p-6">
         <span className="font-semibold">Sidebar</span>
       </div>
@@ -23,6 +32,19 @@ const handle = () => (
     </ResizablePanel>
   </ResizablePanelGroup>
 )
+
+function Keyboard() {
+  const [size, setSize] = useState(25)
+
+  return (
+    <div className="flex flex-col gap-3">
+      {handle({ onResize: setSize })}
+      <p className="text-sm text-muted-foreground">
+        Sidebar: {Math.round(size)}%
+      </p>
+    </div>
+  )
+}
 
 export default {
   default: () => (
@@ -71,6 +93,6 @@ export default {
       </ResizablePanel>
     </ResizablePanelGroup>
   ),
-  handle,
-  keyboard: handle,
+  handle: () => handle(),
+  keyboard: () => <Keyboard />,
 } satisfies Fixtures
