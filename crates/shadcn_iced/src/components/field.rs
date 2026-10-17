@@ -13,7 +13,7 @@
 //!     .into()
 //! # }
 //! ```
-use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::{Labelled, Pressable};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -198,7 +198,7 @@ impl<'a, Message: 'a> From<Field<'a, Message>> for Element<'a, Message> {
         };
 
         // `gap-2`
-        match field.orientation {
+        let field: Element<'a, Message> = match field.orientation {
             Orientation::Vertical => Column::new()
                 .push(label)
                 .push(field.control)
@@ -219,7 +219,10 @@ impl<'a, Message: 'a> From<Field<'a, Message>> for Element<'a, Message> {
                 .spacing(8)
                 .align_y(align)
                 .into(),
-        }
+        };
+
+        // The label focuses (or toggles) the control (`htmlFor`).
+        Labelled::new(field).into()
     }
 }
 

@@ -10,7 +10,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::animation::{self, Transition};
-use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::{Labelled, Pressable};
 use shadcn_iced_core::theme::{alpha, mix};
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -96,10 +96,11 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
             Size::Sm => (24.0, 14.0, 12.0),
         };
 
+        let invalid = switch.invalid;
         let track = Track {
             checked,
             disabled,
-            invalid: switch.invalid,
+            invalid,
             size: iced::Size::new(width, height),
             thumb,
         };
@@ -121,24 +122,36 @@ impl<'a, Message: Clone + 'a> From<Switch<'a, Message>> for Element<'a, Message>
                 })
         });
 
-        let on_press = switch.on_toggle.map(|f| f(!checked));
+        let on_press = switch.on_toggle.filter(|_| !disabled).map(|f| f(!checked));
 
-        Pressable::new(
+        // The track is the focusable control; its text color is the color
+        // of its border (`border-transparent focus-visible:border-ring`).
+        let control = Pressable::new(track)
+            .on_press_maybe(on_press)
+            .disabled(disabled)
+            .focusable(true)
+            .focus_style(|theme, _status, focused| iced::widget::button::Style {
+                text_color: if focused {
+                    tokens(theme).palette.ring
+                } else {
+                    Color::TRANSPARENT
+                },
+                ..iced::widget::button::Style::default()
+            })
+            // `focus-visible:ring-3 focus-visible:ring-ring/50`
+            .ring(move |theme, _status, focused| {
+                (focused && !invalid).then(|| style::ring(&tokens(theme), height / 2.0))
+            });
+
+        // The label toggles the switch (`htmlFor`).
+        Labelled::new(
             Row::new()
-                .push(track)
+                .push(control)
                 .push(label)
                 .spacing(8)
                 .align_y(Alignment::Center),
         )
-        .on_press_maybe(if disabled { None } else { on_press })
-        .disabled(disabled)
         .width(Length::Shrink)
-        .interaction(if disabled {
-            mouse::Interaction::NotAllowed
-        } else {
-            mouse::Interaction::Pointer
-        })
-        .style(|_, _| iced::widget::button::Style::default())
         .into()
     }
 }
@@ -275,7 +288,7 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Track {
         tree: &Tree,
         renderer: &mut iced::Renderer,
         theme: &Theme,
-        _style: &renderer::Style,
+        style: &renderer::Style,
         layout: Layout<'_>,
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
@@ -324,7 +337,8 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Track {
         renderer.fill_quad(
             renderer::Quad {
                 bounds,
-                // `border border-transparent`, or
+                // `border border-transparent` (the color inherited from the
+                // control, `focus-visible:border-ring`), or
                 // `aria-invalid:border-destructive dark:aria-invalid:border-destructive/50`
                 border: iced::Border {
                     color: if self.invalid {
@@ -333,7 +347,7 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Track {
                             opacity * if t.is_dark() { 0.5 } else { 1.0 },
                         )
                     } else {
-                        Color::TRANSPARENT
+                        style.text_color
                     },
                     width: 1.0,
                     radius: border::radius(f32::MAX),

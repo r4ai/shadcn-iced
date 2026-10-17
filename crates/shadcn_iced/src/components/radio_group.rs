@@ -14,13 +14,14 @@
 //!     .into()
 //! # }
 //! ```
-use shadcn_iced_core::primitive::Pressable;
 use shadcn_iced_core::primitive::focus::{self, FocusWithin};
+use shadcn_iced_core::primitive::roving::Keys;
+use shadcn_iced_core::primitive::{Labelled, Pressable, Roving};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::widget::{Column, Row, container, space, text};
-use iced::{Alignment, Background, Color, Font, Padding, Theme, border, mouse};
+use iced::{Alignment, Background, Color, Font, Padding, Theme, border};
 
 /// The direction in which options are laid out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -124,6 +125,7 @@ pub fn radio_item<'a, Message: Clone + 'a>(
         on_select,
         false,
         font::medium(),
+        true,
     )
 }
 
@@ -134,6 +136,7 @@ fn item<'a, Message: Clone + 'a>(
     on_select: Option<Message>,
     invalid: bool,
     font: Font,
+    tab_stop: bool,
 ) -> Element<'a, Message> {
     let disabled = on_select.is_none();
     let has_description = description.is_some();
@@ -144,16 +147,16 @@ fn item<'a, Message: Clone + 'a>(
     };
 
     // `has-[>[data-slot=field-content]]:[&>[role=radio]]:mt-px`
-    let indicator = container(indicator(selected, disabled, invalid)).padding(Padding {
+    let indicator = container(control(selected, invalid, on_select, tab_stop)).padding(Padding {
         top: if has_description { 1.0 } else { 0.0 },
         ..Padding::ZERO
     });
 
+    // `FieldLabel`: `text-sm leading-snug`
     let label = text(label)
         .size(style::text::SM)
         .font(font)
-        // `Label`: `leading-none`; `FieldLabel`: `leading-snug`
-        .line_height(if has_description { 1.375 } else { 1.0 })
+        .line_height(1.375)
         .style(move |theme: &Theme| {
             let p = tokens(theme).palette;
 
@@ -178,27 +181,19 @@ fn item<'a, Message: Clone + 'a>(
         }))
         .spacing(2);
 
-    // `flex items-center gap-3` around a `Label`, or a horizontal `Field`
-    // (`gap-2 items-start`) with a description.
-    Pressable::new(
+    // A horizontal `Field` (`gap-2 items-center`, `items-start` with a
+    // description), whose label selects the radio (`htmlFor`).
+    Labelled::new(
         Row::new()
             .push(indicator)
             .push(labels)
-            .spacing(if has_description { 8 } else { 12 })
+            .spacing(8)
             .align_y(if has_description {
                 Alignment::Start
             } else {
                 Alignment::Center
             }),
     )
-    .on_press_maybe(on_select)
-    .disabled(disabled)
-    .interaction(if disabled {
-        mouse::Interaction::NotAllowed
-    } else {
-        mouse::Interaction::Pointer
-    })
-    .style(|_, _| iced::widget::button::Style::default())
     .into()
 }
 
@@ -208,12 +203,26 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<RadioGroup<'a, T, M
     fn from(group: RadioGroup<'a, T, Message>) -> Self {
         let invalid = group.invalid;
         let font = group.font;
+        let enabled = |disabled: bool| !disabled && !group.disabled;
 
-        let items = group
+        // Roving focus: only the selected radio, or else the first enabled
+        // one, is in the tab order.
+        let tab_stop = group
             .options
-            .into_iter()
-            .map(|(value, label, description, disabled)| {
-                let on_select = (!disabled && !group.disabled).then(|| (group.on_select)(value));
+            .iter()
+            .position(|(value, _, _, disabled)| {
+                enabled(*disabled) && group.selected == Some(*value)
+            })
+            .or_else(|| {
+                group
+                    .options
+                    .iter()
+                    .position(|(_, _, _, disabled)| enabled(*disabled))
+            });
+
+        let items = group.options.into_iter().enumerate().map(
+            |(index, (value, label, description, disabled))| {
+                let on_select = enabled(disabled).then(|| (group.on_select)(value));
 
                 item(
                     group.selected == Some(value),
@@ -222,14 +231,21 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<RadioGroup<'a, T, M
                     on_select,
                     invalid,
                     font,
+                    tab_stop == Some(index),
                 )
-            });
+            },
+        );
 
-        // `grid gap-2`
-        match group.orientation {
+        // `grid gap-2`; the arrow keys move the focus and select.
+        let items: Element<'a, Message> = match group.orientation {
             Orientation::Vertical => Column::with_children(items).spacing(8).into(),
             Orientation::Horizontal => Row::with_children(items).spacing(16).into(),
-        }
+        };
+
+        Roving::new(items)
+            .keys(Keys::Both)
+            .activate_on_focus(true)
+            .into()
     }
 }
 
@@ -240,13 +256,21 @@ pub fn indicator<'a, Message: 'a>(
     disabled: bool,
     invalid: bool,
 ) -> Element<'a, Message> {
+    FocusWithin::new(dot(selected, disabled), move |theme, _status| {
+        self::style(theme, selected, disabled, invalid)
+    })
+    .into()
+}
+
+/// The `size-4` content of the circle: its dot when selected
+/// (`bg-primary-foreground size-2 rounded-full`).
+fn dot<'a, Message: 'a>(selected: bool, disabled: bool) -> Element<'a, Message> {
     let opacity = if disabled {
         style::DISABLED_OPACITY
     } else {
         1.0
     };
 
-    // `bg-primary-foreground size-2 rounded-full`
     let dot = selected.then(|| {
         container(space().width(8).height(8)).style(move |theme: &Theme| container::Style {
             background: Some(Background::Color(alpha(
@@ -258,10 +282,70 @@ pub fn indicator<'a, Message: 'a>(
         })
     });
 
-    FocusWithin::new(container(dot).center(16), move |theme, _status| {
-        self::style(theme, selected, disabled, invalid)
-    })
-    .into()
+    container(dot).center(16).into()
+}
+
+/// The radio circle as a control: focusable, selected by a click or
+/// <kbd>Space</kbd>, with the `focus-visible:ring-3` of shadcn/ui. It
+/// produces `on_select`; without it, the control is disabled. A `tab_stop`
+/// control is reached with <kbd>Tab</kbd>; in a group, only one is.
+pub fn control<'a, Message: Clone + 'a>(
+    selected: bool,
+    invalid: bool,
+    on_select: Option<Message>,
+    tab_stop: bool,
+) -> Element<'a, Message> {
+    let disabled = on_select.is_none();
+
+    Pressable::new(dot(selected, disabled))
+        .on_press_maybe(on_select)
+        .disabled(disabled)
+        .focusable(true)
+        .tab_stop(tab_stop)
+        .activate_on_enter(false)
+        .focus_style(move |theme, _status, focused| {
+            let style = focused_style(theme, selected, disabled, invalid, focused);
+
+            iced::widget::button::Style {
+                background: style.background,
+                border: style.border,
+                ..iced::widget::button::Style::default()
+            }
+        })
+        .ring(move |theme, _status, focused| {
+            focused_style(theme, selected, disabled, invalid, focused).ring
+        })
+        .into()
+}
+
+/// The style of the circle of a radio item, when its keyboard focus is
+/// visible or not.
+pub fn focused_style(
+    theme: &Theme,
+    selected: bool,
+    disabled: bool,
+    invalid: bool,
+    focused: bool,
+) -> focus::Style {
+    let mut style = self::style(theme, selected, disabled, invalid);
+
+    if focused {
+        let t = tokens(theme);
+
+        // `focus-visible:border-ring`, below `data-checked:border-primary`
+        // and `aria-invalid:border-destructive`.
+        if !selected && !invalid {
+            style.border.color = t.palette.ring;
+        }
+
+        // `focus-visible:ring-3 focus-visible:ring-ring/50`, below
+        // `aria-invalid:ring-destructive/20`.
+        if style.ring.is_none() {
+            style.ring = Some(style::ring(&t, 8.0));
+        }
+    }
+
+    style
 }
 
 /// The style of the circle of a radio item.
