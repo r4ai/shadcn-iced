@@ -7,7 +7,7 @@ use shadcn_iced::table::{Cell, table};
 
 use iced::alignment::Horizontal;
 use iced::widget::text;
-use iced::{Element, Fill, Length};
+use iced::{Element, Length};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
@@ -38,8 +38,13 @@ pub fn get(id: &str) -> Option<Fixture> {
                 // `colSpan={3}`
                 .footer(["Total", "", "", "$2,500.00"])
                 .caption("A list of your recent invoices.")
-                // `w-25`
-                .widths([Length::Fixed(100.0), Fill, Fill, Fill])
+                // `w-25`, the other columns sized to their content
+                .widths([
+                    Length::Fixed(100.0),
+                    Length::Shrink,
+                    Length::Shrink,
+                    Length::Shrink,
+                ])
                 .align(3, Horizontal::Right)
                 .into()
         }),
