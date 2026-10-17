@@ -30,11 +30,15 @@ import {
 
 const baseline = readBaseline()
 
-const icedResults: Record<string, IcedOutcome> = existsSync(
-  join(out, "iced/results.json")
-)
-  ? JSON.parse(readFileSync(join(out, "iced/results.json"), "utf8"))
-  : {}
+/** The outcome of the iced runner for a run, if any. */
+function icedOutcome(
+  component: string,
+  scenario: string,
+  theme: string
+): IcedOutcome | undefined {
+  const path = join(out, "iced/runs", `${component}--${scenario}--${theme}.json`)
+  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined
+}
 
 interface IcedOutcome {
   status: "ok" | "missing" | "error"
@@ -71,7 +75,7 @@ for (const file of readScenarios()) {
       for (const theme of scenario.themes ?? THEMES) {
         test(`${scenario.id} [${theme}]`, async ({ page }) => {
           const [width, height] = scenario.viewport ?? DEFAULT_VIEWPORT
-          const iced = icedResults[`${file.component}/${scenario.id}/${theme}`]
+          const iced = icedOutcome(file.component, scenario.id, theme)
 
           const record: RunRecord = {
             component: file.component,

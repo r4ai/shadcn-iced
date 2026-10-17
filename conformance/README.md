@@ -25,7 +25,7 @@ pnpm qa          # = pnpm iced && pnpm test; pnpm report
 
 | Command | What it does |
 | :--- | :--- |
-| `pnpm iced [FILTER...]` | Renders the scenarios with `shadcn_iced` into `out/iced` (and `out/iced/results.json`). Filters match `component/scenario` keys. |
+| `pnpm iced [FILTER...]` | Renders the scenarios with `shadcn_iced` into `out/iced` (and their outcomes into `out/iced/runs`). Filters match `component/scenario` keys. |
 | `pnpm test [-g FILTER]` | Runs the scenarios against shadcn/ui into `out/reference`, compares them with `out/iced`, and writes `out/diff` and `out/runs`. |
 | `pnpm report` | Writes `out/report/index.html`, every snapshot pair with its diff, worst first. Serve `out/` (e.g. `pnpm exec vite out`) to browse it. |
 | `pnpm baseline [FILTER...]` | Records the scores of the last run in `baseline.json`. |

@@ -8,7 +8,7 @@
 //! (`component/scenario`) contains one of the filters is run in each of its
 //! themes. Snapshots are written to `DIR/<component>/<scenario>/<snapshot>-<theme>.png`
 //! (`conformance/out/iced` by default) and the outcome of every run, including
-//! its expectations, to `DIR/results.json`. The Playwright runner compares them
+//! its expectations, to `DIR/runs/<component>--<scenario>--<theme>.json`. The Playwright runner compares them
 //! with shadcn/ui.
 mod fixtures;
 mod harness;
@@ -22,7 +22,6 @@ use serde::Serialize;
 use shadcn_iced::Mode;
 use shadcn_iced::theme::{BaseColor, Config};
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, Serialize)]
@@ -70,14 +69,6 @@ fn main() {
         std::process::exit(1);
     });
 
-    let results_path = out.join("results.json");
-    // Merge with previous results, so that a filtered run keeps the others.
-    let mut results: BTreeMap<String, Outcome> = BTreeMap::new();
-    let previous: BTreeMap<String, serde_json::Value> = std::fs::read_to_string(&results_path)
-        .ok()
-        .and_then(|content| serde_json::from_str(&content).ok())
-        .unwrap_or_default();
-
     let mut ran = 0;
     let mut failed = 0;
 
@@ -98,23 +89,21 @@ fn main() {
                     eprintln!("{key} [{}]: {}", theme.name(), describe(&outcome));
                 }
 
-                let _ = results.insert(format!("{key}/{}", theme.name()), outcome);
+                let path = out.join("runs").join(format!(
+                    "{}--{}--{}.json",
+                    file.component,
+                    scenario.id,
+                    theme.name()
+                ));
+                std::fs::create_dir_all(path.parent().expect("parent")).expect("create directory");
+                std::fs::write(
+                    &path,
+                    serde_json::to_string_pretty(&outcome).expect("serialize"),
+                )
+                .expect("write outcome");
             }
         }
     }
-
-    std::fs::create_dir_all(&out).expect("create output directory");
-
-    let mut merged: BTreeMap<String, serde_json::Value> = previous;
-    for (key, outcome) in results {
-        let _ = merged.insert(key, serde_json::to_value(outcome).expect("serialize"));
-    }
-
-    std::fs::write(
-        &results_path,
-        serde_json::to_string_pretty(&merged).expect("serialize"),
-    )
-    .expect("write results");
 
     println!("{ran} runs, {failed} with problems -> {}", out.display());
 }
