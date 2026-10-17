@@ -19,6 +19,7 @@ use super::button::{self, Variant, icon_button};
 
 use shadcn_iced_core::Element;
 use shadcn_iced_core::icon::lucide;
+use shadcn_iced_core::primitive::track;
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -150,59 +151,44 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
         let previous_message = previous.map(|target| (carousel.on_change)(target));
         let next_message = next.map(|target| (carousel.on_change)(target));
 
-        let content: Element<'a, Message> = if horizontal {
-            let visible = carousel
+        let (before, after) = if horizontal {
+            (lucide::CHEVRON_LEFT, lucide::CHEVRON_RIGHT)
+        } else {
+            (lucide::CHEVRON_UP, lucide::CHEVRON_DOWN)
+        };
+        let before = round(nav(before, previous));
+        let after = round(nav(after, next));
+
+        // All the items, sliding to the current one (and draggable).
+        let on_change = carousel.on_change;
+        let slides = track(
+            carousel
                 .items
                 .into_iter()
-                .skip(index)
-                .take(carousel.per_view)
-                .map(|item| container(item).width(Length::Fill).into());
+                .map(|item| container(item).width(Length::Fill).into()),
+            index,
+        )
+        .per_view(carousel.per_view)
+        .spacing(carousel.spacing)
+        .vertical(!horizontal)
+        .height(carousel.height)
+        .on_change(on_change);
 
+        let content: Element<'a, Message> = if horizontal {
             Row::new()
-                .push(round(nav(lucide::CHEVRON_LEFT, previous)))
-                .push(
-                    Row::with_children(visible)
-                        .spacing(carousel.spacing)
-                        .width(Length::Fill),
-                )
-                .push(round(nav(lucide::CHEVRON_RIGHT, next)))
+                .push(before)
+                .push(slides)
+                .push(after)
                 // `-left-12` / `-right-12`: 48px from the slides, minus
                 // the 28px button.
                 .spacing(20)
                 .align_y(Alignment::Center)
                 .into()
         } else {
-            let viewport: Element<'a, Message> = match carousel.height {
-                // The overflowing items are clipped (`overflow-hidden`).
-                Some(height) => container(
-                    Column::with_children(
-                        carousel
-                            .items
-                            .into_iter()
-                            .skip(index)
-                            .map(|item| container(item).width(Length::Fill).into()),
-                    )
-                    .spacing(carousel.spacing),
-                )
-                .height(height)
-                .clip(true)
-                .into(),
-                None => Column::with_children(
-                    carousel
-                        .items
-                        .into_iter()
-                        .skip(index)
-                        .take(carousel.per_view)
-                        .map(|item| container(item).width(Length::Fill).into()),
-                )
-                .spacing(carousel.spacing)
-                .into(),
-            };
-
             Column::new()
-                .push(round(nav(lucide::CHEVRON_UP, previous)))
-                .push(viewport)
-                .push(round(nav(lucide::CHEVRON_DOWN, next)))
+                .push(before)
+                .push(slides)
+                .push(after)
                 // `-top-12` / `-bottom-12`
                 .spacing(20)
                 .align_x(Alignment::Center)

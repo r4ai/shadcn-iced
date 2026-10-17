@@ -13,6 +13,12 @@ declare module "*?highlight" {
   export default snippet;
 }
 
+declare module "virtual:site/charts" {
+  import type { ChartPage } from "~/lib/components";
+
+  export const charts: ChartPage[];
+}
+
 declare module "virtual:site/components" {
   import type { ComponentDetail, ComponentSummary } from "~/lib/components";
 

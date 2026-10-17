@@ -19,7 +19,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::{Pressable, Side};
+use shadcn_iced_core::primitive::{Pressable, Side, animated_width};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -539,29 +539,31 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
             (_, false) => sidebar.width - 16.0,
         };
 
-        let panel =
-            container(body)
-                .width(width)
-                .height(Length::Fill)
-                .style(move |theme: &Theme| {
-                    let t = tokens(theme);
-                    let p = &t.palette;
+        let panel = container(body)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(move |theme: &Theme| {
+                let t = tokens(theme);
+                let p = &t.palette;
 
-                    container::Style {
-                        background: Some(Background::Color(p.sidebar)),
-                        text_color: Some(p.sidebar_foreground),
-                        border: match variant {
-                            Variant::Floating => style::border(p.sidebar_border, t.radius_lg()),
-                            _ => border::rounded(0),
-                        },
-                        shadow: if variant == Variant::Floating {
-                            style::shadow_sm()
-                        } else {
-                            iced::Shadow::default()
-                        },
-                        ..container::Style::default()
-                    }
-                });
+                container::Style {
+                    background: Some(Background::Color(p.sidebar)),
+                    text_color: Some(p.sidebar_foreground),
+                    border: match variant {
+                        Variant::Floating => style::border(p.sidebar_border, t.radius_lg()),
+                        _ => border::rounded(0),
+                    },
+                    shadow: if variant == Variant::Floating {
+                        style::shadow_sm()
+                    } else {
+                        iced::Shadow::default()
+                    },
+                    ..container::Style::default()
+                }
+            });
+
+        // `transition-[width] duration-200`
+        let panel = animated_width(width, panel).height(Length::Fill);
 
         match variant {
             Variant::Sidebar => {

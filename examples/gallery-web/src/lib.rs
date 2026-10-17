@@ -21,7 +21,7 @@
 mod natural;
 mod wheel;
 
-use gallery::{Gallery, PAGES};
+use gallery::{Gallery, Page};
 use shadcn_iced::theme::{Accent, BaseColor, Radius};
 use shadcn_iced::{ApplicationExt, Mode};
 
@@ -31,6 +31,9 @@ use iced::{Element, Fill, Size, Subscription, Task, Theme, event, window};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
+
+/// Monochrome emoji, the fallback of the conformance suite too.
+const EMOJI: &[u8] = include_bytes!("../../../conformance/fonts/NotoEmoji-Regular.ttf");
 
 /// The padding around an example (`p-10` of the preview of shadcn/ui).
 const PADDING: f32 = 40.0;
@@ -49,7 +52,7 @@ extern "C" {
 enum Request {
     Mount {
         target: String,
-        page: usize,
+        page: &'static Page,
         example: usize,
     },
     Unmount {
@@ -135,6 +138,9 @@ pub fn start() {
         .theme(Previews::theme)
         .subscription(Previews::subscription)
         .shadcn_iced()
+        // A browser has no fonts for iced: the emoji of the examples (the
+        // reactions of Bubble, ...) would be tofu.
+        .font(EMOJI)
         .run();
 
     if let Err(error) = result {
@@ -148,7 +154,7 @@ pub fn start() {
 /// Returns `false` when there is no such page.
 #[wasm_bindgen]
 pub fn mount(target: String, page: &str, example: usize) -> bool {
-    let Some(page) = PAGES.iter().position(|p| p.id == page) else {
+    let Some(page) = gallery::pages::find(page) else {
         return false;
     };
 
@@ -199,7 +205,7 @@ struct Previews {
 /// The preview of an example.
 struct Preview {
     target: String,
-    page: usize,
+    page: &'static Page,
     example: usize,
     height: f32,
 }
@@ -293,7 +299,15 @@ impl Previews {
             return space().into();
         };
 
-        let example = gallery::view_example(&self.gallery, preview.page, preview.example);
+        // Centered, like the previews of shadcn/ui (the toasters and the
+        // sensor would leave an example that fills a part of the width on
+        // the left).
+        let example = container(gallery::view_example(
+            &self.gallery,
+            preview.page,
+            preview.example,
+        ))
+        .center_x(Fill);
 
         // The toasts show in the preview that was clicked last.
         let example = self.gallery.toasters(example, self.active == Some(id));
@@ -301,12 +315,13 @@ impl Previews {
         let example = sensor(natural::natural(example.map(Message::Gallery)))
             .on_resize(move |size| Message::Measured(id, size));
 
-        wheel::wheel(
-            container(example).padding(PADDING).center(Fill),
-            |captured| {
-                let _ = preview_wheel(captured);
-            },
-        )
+        // Smooth wheel scrolling, horizontal with `Shift`.
+        let example =
+            shadcn_iced::primitive::wheel(container(example).padding(PADDING).center(Fill));
+
+        wheel::wheel(example, |captured| {
+            let _ = preview_wheel(captured);
+        })
         .into()
     }
 

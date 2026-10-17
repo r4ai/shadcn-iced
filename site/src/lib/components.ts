@@ -33,6 +33,15 @@ export interface ComponentDetail {
 
 export { components };
 
+/** A page of the chart showcase (`/charts/<kind>`): examples of a kind of chart. */
+export interface ChartPage {
+  /** The id of the page in the gallery (`charts-area`). */
+  id: string;
+  title: string;
+  description: string;
+  examples: Example[];
+}
+
 /** Loads a component with its highlighted code, or `undefined`. */
 export async function loadComponent(id: string): Promise<ComponentDetail | undefined> {
   return (await loaders[id]?.())?.default;

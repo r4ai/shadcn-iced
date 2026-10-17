@@ -413,6 +413,10 @@ where
         let state = tree.state.downcast_mut::<State>();
 
         match event {
+            // The pointer moving to an open submenu leaves its trigger
+            // highlighted.
+            Event::Mouse(mouse::Event::CursorMoved { position })
+                if super::anchored::is_in_pointer_grace(*position) => {}
             Event::Mouse(mouse::Event::CursorMoved { .. })
             | Event::Touch(touch::Event::FingerMoved { .. }) => {
                 let next = match hovered {

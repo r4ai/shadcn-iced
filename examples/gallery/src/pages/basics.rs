@@ -677,7 +677,7 @@ pub const PROGRESS: Page = Page {
                 column![
                     progress(value),
                     slider(0.0..=100.0, value, move |v: f32| demo(
-                        DemoMessage::Progress(v.round() - value)
+                        DemoMessage::Progress(v.round())
                     )),
                 ]
                 .spacing(16)

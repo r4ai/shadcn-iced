@@ -2,6 +2,7 @@
 pub mod agent;
 mod basics;
 mod button;
+pub mod charts;
 pub mod chat;
 pub mod extra;
 pub mod interactive;
@@ -12,11 +13,21 @@ use crate::{Gallery, Message};
 use iced::{Element, Task};
 
 /// A page of the gallery.
+#[derive(Debug)]
 pub struct Page {
     pub id: &'static str,
     pub title: &'static str,
     pub description: &'static str,
     pub view: fn(&Gallery) -> Element<'_, Message>,
+}
+
+/// The pages of the chart showcase of the website (`/charts`), which are
+/// not components.
+pub const CHARTS: &[Page] = &[charts::AREA, charts::BAR, charts::LINE, charts::PIE];
+
+/// Finds a page of [`PAGES`] or [`CHARTS`].
+pub fn find(id: &str) -> Option<&'static Page> {
+    PAGES.iter().chain(CHARTS).find(|page| page.id == id)
 }
 
 pub const PAGES: &[Page] = &[
@@ -102,6 +113,9 @@ pub struct Demo {
     pub airplane: bool,
     pub density: u8,
     pub volume: f32,
+    /// The values of the other sliders of the Slider page, by [`slider`]
+    /// slot.
+    pub sliders: Vec<Vec<f32>>,
     pub formats: Vec<interactive::Format>,
     pub tab: interactive::Tab,
     pub accordion: Option<usize>,
@@ -110,12 +124,17 @@ pub struct Demo {
     pub url: String,
     pub chat: String,
     pub card: String,
+    pub card_month: Option<&'static str>,
+    pub card_year: Option<&'static str>,
+    pub cvv: String,
     pub fruit: Option<&'static str>,
     pub otp: String,
     pub dialog: bool,
     pub alert_dialog: bool,
     pub small_alert_dialog: bool,
     pub sheet: Option<shadcn_iced::sheet::Side>,
+    /// The side of the last sheet opened, which it keeps while it closes.
+    pub sheet_side: shadcn_iced::sheet::Side,
     pub default_sheet: bool,
     pub drawer: bool,
     pub goal: i32,
@@ -133,6 +152,10 @@ pub struct Demo {
     ),
     pub slide: usize,
     pub sidebar_collapsed: bool,
+    /// The items of the Sidebar page whose sub-items are shown.
+    pub sidebar_open: Vec<&'static str>,
+    /// The item of the Sidebar page that was pressed last.
+    pub sidebar_active: &'static str,
     pub scroller_at_end: bool,
     pub dob: Option<shadcn_iced::calendar::Date>,
     pub dob_open: bool,
@@ -161,6 +184,13 @@ impl Default for Demo {
             airplane: false,
             density: 1,
             volume: 50.0,
+            sliders: vec![
+                vec![25.0, 50.0],
+                vec![10.0, 20.0, 70.0],
+                vec![50.0],
+                vec![25.0],
+                vec![0.3, 0.7],
+            ],
             formats: vec![interactive::Format::Bold],
             tab: interactive::Tab::Account,
             accordion: Some(0),
@@ -169,12 +199,16 @@ impl Default for Demo {
             url: String::new(),
             chat: String::new(),
             card: String::new(),
+            card_month: None,
+            card_year: None,
+            cvv: String::new(),
             fruit: None,
             otp: String::new(),
             dialog: false,
             alert_dialog: false,
             small_alert_dialog: false,
             sheet: None,
+            sheet_side: shadcn_iced::sheet::Side::default(),
             default_sheet: false,
             drawer: false,
             goal: 350,
@@ -195,6 +229,8 @@ impl Default for Demo {
             ),
             slide: 0,
             sidebar_collapsed: false,
+            sidebar_open: vec!["Playground"],
+            sidebar_active: "History",
             scroller_at_end: true,
             dob: None,
             dob_open: false,
@@ -216,6 +252,9 @@ pub enum DemoMessage {
     Search(String),
     Edit(shadcn_iced::textarea::Action),
     Progress(f32),
+    /// A thumb of a slider of the Slider page moved: its slot, the thumb
+    /// and the value.
+    Slider(usize, usize, f32),
     Page(usize),
     Terms(bool),
     Notifications(bool),
@@ -230,6 +269,11 @@ pub enum DemoMessage {
     Url(String),
     Chat(String),
     Card(String),
+    CardMonth(&'static str),
+    CardYear(&'static str),
+    Cvv(String),
+    /// Clears the payment form of the Field page.
+    ResetPayment,
     Fruit(&'static str),
     Otp(String),
     Dialog(bool),
@@ -250,6 +294,10 @@ pub enum DemoMessage {
     Range(shadcn_iced::calendar::Date),
     Slide(usize),
     SidebarCollapsed(bool),
+    /// Shows or hides the sub-items of an item of the Sidebar page.
+    SidebarToggle(&'static str),
+    /// Presses an item of the Sidebar page.
+    SidebarActive(&'static str),
     ScrollerAtEnd(bool),
     ScrollToEnd,
     Preset(i64),
@@ -271,15 +319,22 @@ impl Demo {
             DemoMessage::Password(value) => self.password = value,
             DemoMessage::Search(value) => self.search = value,
             DemoMessage::Edit(action) => self.message.perform(action),
-            DemoMessage::Progress(delta) => {
-                self.progress = (self.progress + delta).clamp(0.0, 100.0)
-            }
+            DemoMessage::Progress(value) => self.progress = value.clamp(0.0, 100.0),
             DemoMessage::Page(page) => self.page = page,
             DemoMessage::Terms(value) => self.terms = value,
             DemoMessage::Notifications(value) => self.notifications = value,
             DemoMessage::Airplane(value) => self.airplane = value,
             DemoMessage::Density(value) => self.density = value,
             DemoMessage::Volume(value) => self.volume = value,
+            DemoMessage::Slider(slot, thumb, value) => {
+                if let Some(value_of) = self
+                    .sliders
+                    .get_mut(slot)
+                    .and_then(|values| values.get_mut(thumb))
+                {
+                    *value_of = value;
+                }
+            }
             DemoMessage::Format(format) => {
                 if let Some(index) = self.formats.iter().position(|f| *f == format) {
                     self.formats.remove(index);
@@ -294,12 +349,29 @@ impl Demo {
             DemoMessage::Url(value) => self.url = value,
             DemoMessage::Chat(value) => self.chat = value,
             DemoMessage::Card(value) => self.card = value,
+            DemoMessage::CardMonth(value) => self.card_month = Some(value),
+            DemoMessage::CardYear(value) => self.card_year = Some(value),
+            DemoMessage::Cvv(value) => {
+                self.cvv = value.chars().filter(char::is_ascii_digit).take(4).collect();
+            }
+            DemoMessage::ResetPayment => {
+                self.name.clear();
+                self.card.clear();
+                self.card_month = None;
+                self.card_year = None;
+                self.cvv.clear();
+            }
             DemoMessage::Fruit(value) => self.fruit = Some(value),
             DemoMessage::Otp(value) => self.otp = value,
             DemoMessage::Dialog(open) => self.dialog = open,
             DemoMessage::AlertDialog(open) => self.alert_dialog = open,
             DemoMessage::SmallAlertDialog(open) => self.small_alert_dialog = open,
-            DemoMessage::Sheet(side) => self.sheet = side,
+            DemoMessage::Sheet(side) => {
+                self.sheet = side;
+                if let Some(side) = side {
+                    self.sheet_side = side;
+                }
+            }
             DemoMessage::DefaultSheet(open) => self.default_sheet = open,
             DemoMessage::Drawer(open) => self.drawer = open,
             DemoMessage::Goal(delta) => self.goal = (self.goal + delta).clamp(200, 400),
@@ -340,6 +412,14 @@ impl Demo {
             }
             DemoMessage::Slide(index) => self.slide = index,
             DemoMessage::SidebarCollapsed(collapsed) => self.sidebar_collapsed = collapsed,
+            DemoMessage::SidebarToggle(item) => {
+                if let Some(index) = self.sidebar_open.iter().position(|open| *open == item) {
+                    let _ = self.sidebar_open.remove(index);
+                } else {
+                    self.sidebar_open.push(item);
+                }
+            }
+            DemoMessage::SidebarActive(item) => self.sidebar_active = item,
             DemoMessage::ScrollerAtEnd(at_end) => self.scroller_at_end = at_end,
             DemoMessage::Preset(days) => {
                 let date = shadcn_iced::calendar::Date::today().add_days(days);

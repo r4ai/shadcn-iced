@@ -5,7 +5,7 @@
 //! ```sh
 //! cargo run -p gallery --bin site_data > site/src/data/gallery.json
 //! ```
-use gallery::{Gallery, PAGES};
+use gallery::{CHARTS, Gallery, PAGES, Page};
 use shadcn_iced::Mode;
 
 fn string(value: &str) -> String {
@@ -25,14 +25,11 @@ fn string(value: &str) -> String {
     out
 }
 
-fn main() {
-    let gallery = Gallery::new(0, Mode::Light);
-
-    let pages: Vec<String> = PAGES
+fn pages(gallery: &Gallery, pages: &[Page]) -> String {
+    let pages: Vec<String> = pages
         .iter()
-        .enumerate()
-        .map(|(index, page)| {
-            let examples: Vec<String> = gallery::examples(&gallery, index)
+        .map(|page| {
+            let examples: Vec<String> = gallery::examples(gallery, page)
                 .iter()
                 .map(|example| {
                     format!(
@@ -55,5 +52,15 @@ fn main() {
         })
         .collect();
 
-    println!("{{\"pages\":[\n{}\n]}}", pages.join(",\n"));
+    pages.join(",\n")
+}
+
+fn main() {
+    let gallery = Gallery::new(0, Mode::Light);
+
+    println!(
+        "{{\"pages\":[\n{}\n],\"charts\":[\n{}\n]}}",
+        pages(&gallery, PAGES),
+        pages(&gallery, CHARTS),
+    );
 }

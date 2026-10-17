@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './pages/__root'
 import { Route as IndexRouteImport } from './pages/index'
 import { Route as R404RouteImport } from './pages/404'
 import { Route as DocsRouteRouteImport } from './pages/docs/route'
+import { Route as ChartsIndexRouteImport } from './pages/charts/index'
+import { Route as ChartsKindRouteImport } from './pages/charts/$kind'
 import { Route as DocsIndexRouteImport } from './pages/docs/index'
 import { Route as DocsComponentsIndexRouteImport } from './pages/docs/components/index'
 import { Route as DocsInstallationIndexRouteImport } from './pages/docs/installation/index'
@@ -31,6 +33,16 @@ const R404Route = R404RouteImport.update({
 const DocsRouteRoute = DocsRouteRouteImport.update({
   id: '/docs',
   path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChartsIndexRoute = ChartsIndexRouteImport.update({
+  id: '/charts/',
+  path: '/charts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChartsKindRoute = ChartsKindRouteImport.update({
+  id: '/charts/$kind',
+  path: '/charts/$kind',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
@@ -63,6 +75,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/docs': typeof DocsRouteRouteWithChildren
   '/404': typeof R404Route
+  '/charts/$kind': typeof ChartsKindRoute
+  '/charts/': typeof ChartsIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/docs/components/': typeof DocsComponentsIndexRoute
   '/docs/installation/': typeof DocsInstallationIndexRoute
@@ -72,6 +86,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/charts/$kind': typeof ChartsKindRoute
+  '/charts': typeof ChartsIndexRoute
   '/docs': typeof DocsIndexRoute
   '/docs/components': typeof DocsComponentsIndexRoute
   '/docs/installation': typeof DocsInstallationIndexRoute
@@ -83,6 +99,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/docs': typeof DocsRouteRouteWithChildren
   '/404': typeof R404Route
+  '/charts/$kind': typeof ChartsKindRoute
+  '/charts/': typeof ChartsIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/docs/components/': typeof DocsComponentsIndexRoute
   '/docs/installation/': typeof DocsInstallationIndexRoute
@@ -95,6 +113,8 @@ export interface FileRouteTypes {
     | '/'
     | '/docs'
     | '/404'
+    | '/charts/$kind'
+    | '/charts/'
     | '/docs/'
     | '/docs/components/'
     | '/docs/installation/'
@@ -104,6 +124,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/404'
+    | '/charts/$kind'
+    | '/charts'
     | '/docs'
     | '/docs/components'
     | '/docs/installation'
@@ -114,6 +136,8 @@ export interface FileRouteTypes {
     | '/'
     | '/docs'
     | '/404'
+    | '/charts/$kind'
+    | '/charts/'
     | '/docs/'
     | '/docs/components/'
     | '/docs/installation/'
@@ -125,6 +149,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
   R404Route: typeof R404Route
+  ChartsKindRoute: typeof ChartsKindRoute
+  ChartsIndexRoute: typeof ChartsIndexRoute
 }
 
 declare module '@tanstack/solid-router' {
@@ -148,6 +174,20 @@ declare module '@tanstack/solid-router' {
       path: '/docs'
       fullPath: '/docs'
       preLoaderRoute: typeof DocsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/charts/': {
+      id: '/charts/'
+      path: '/charts'
+      fullPath: '/charts/'
+      preLoaderRoute: typeof ChartsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/charts/$kind': {
+      id: '/charts/$kind'
+      path: '/charts/$kind'
+      fullPath: '/charts/$kind'
+      preLoaderRoute: typeof ChartsKindRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/': {
@@ -212,6 +252,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DocsRouteRoute: DocsRouteRouteWithChildren,
   R404Route: R404Route,
+  ChartsKindRoute: ChartsKindRoute,
+  ChartsIndexRoute: ChartsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

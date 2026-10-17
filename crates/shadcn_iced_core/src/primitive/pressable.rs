@@ -260,7 +260,25 @@ impl<'a, Message, Theme, Renderer> Pressable<'a, Message, Theme, Renderer> {
 
 /// Linearly interpolates two button styles, for `transition-colors`.
 pub fn mix_styles(from: &Style, to: &Style, t: f32) -> Style {
-    let color = |a: Color, b: Color| crate::theme::mix(a, b, t);
+    // Mixed with premultiplied alpha, like CSS transitions: a translucent
+    // white turning into a translucent gray must not go through a lighter
+    // gray on the way.
+    let color = |a: Color, b: Color| {
+        let alpha = a.a + (b.a - a.a) * t;
+
+        if alpha <= f32::EPSILON {
+            return Color { a: 0.0, ..b };
+        }
+
+        let channel = |x: f32, y: f32| (x * a.a + (y * b.a - x * a.a) * t) / alpha;
+
+        Color {
+            r: channel(a.r, b.r),
+            g: channel(a.g, b.g),
+            b: channel(a.b, b.b),
+            a: alpha,
+        }
+    };
     let background = |background: Option<Background>| match background {
         Some(Background::Color(color)) => Some(color),
         _ => None,

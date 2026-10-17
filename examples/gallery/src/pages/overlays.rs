@@ -180,7 +180,7 @@ pub const SHEET: Page = Page {
                     ]
                     .spacing(8),
                     d.sheet.is_some(),
-                    d.sheet.unwrap_or_default(),
+                    d.sheet_side,
                     demo(DemoMessage::Sheet(None)),
                 )
             ),

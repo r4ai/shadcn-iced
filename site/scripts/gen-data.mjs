@@ -18,7 +18,7 @@ const json = execFileSync("cargo", ["run", "--quiet", "-p", "gallery", "--bin", 
   stdio: ["ignore", "pipe", "inherit"],
 });
 
-const { pages } = JSON.parse(json);
+const { pages, charts: chartPages } = JSON.parse(json);
 const sources = new Map();
 const read = (file) => {
   if (!sources.has(file)) {
@@ -48,9 +48,23 @@ const components = pages.map((page) => {
   };
 });
 
+// The chart showcase (`/charts`): pages of examples, not components.
+const charts = chartPages.map((page) => ({
+  id: page.id,
+  title: page.title,
+  description: page.description,
+  examples: page.examples.map((example, index) => ({
+    index,
+    title: example.title,
+    file: example.file,
+    line: example.line,
+    code: exampleSource(read(example.file), example.line, example.column).code,
+  })),
+}));
+
 const out = join(site, "src/data/components.json");
 mkdirSync(dirname(out), { recursive: true });
-writeFileSync(out, JSON.stringify({ components }, null, 2) + "\n");
+writeFileSync(out, JSON.stringify({ components, charts }, null, 2) + "\n");
 
 const count = components.reduce((n, c) => n + c.examples.length, 0);
 console.log(`${components.length} components, ${count} examples → ${out}`);
