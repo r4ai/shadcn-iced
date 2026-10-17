@@ -34,6 +34,7 @@ pub struct Roving<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
     keys: Keys,
     activate: bool,
+    home_end: bool,
 }
 
 impl<'a, Message, Theme, Renderer> Roving<'a, Message, Theme, Renderer>
@@ -46,12 +47,21 @@ where
             content: content.into(),
             keys: Keys::Horizontal,
             activate: false,
+            home_end: true,
         }
     }
 
     /// Sets the arrow keys that move the focus.
     pub fn keys(mut self, keys: Keys) -> Self {
         self.keys = keys;
+        self
+    }
+
+    /// Sets whether <kbd>Home</kbd> and <kbd>End</kbd> move the focus to
+    /// the first and last controls. Defaults to `true`; Base UI radio
+    /// groups ignore them.
+    pub fn home_end(mut self, home_end: bool) -> Self {
+        self.home_end = home_end;
         self
     }
 
@@ -81,8 +91,8 @@ where
             Named::ArrowRight if horizontal => Some(Ok(1)),
             Named::ArrowUp if vertical => Some(Ok(-1)),
             Named::ArrowDown if vertical => Some(Ok(1)),
-            Named::Home => Some(Err(false)),
-            Named::End => Some(Err(true)),
+            Named::Home if self.home_end => Some(Err(false)),
+            Named::End if self.home_end => Some(Err(true)),
             _ => None,
         }
     }

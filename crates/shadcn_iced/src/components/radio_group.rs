@@ -244,6 +244,7 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<RadioGroup<'a, T, M
 
         Roving::new(items)
             .keys(Keys::Both)
+            .home_end(false)
             .activate_on_focus(true)
             .into()
     }
