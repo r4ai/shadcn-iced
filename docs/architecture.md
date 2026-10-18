@@ -68,7 +68,7 @@ flowchart LR
 | `examples/hello` | `hello` | Minimal single-file app (`cargo run -p hello`)<br/>demonstrating the `README.md` quick start. |
 | `examples/dashboard` | `dashboard` | The `dashboard-01` block of `shadcn/ui` (sidebar, metrics, chart,<br/>data table) as a library (state, `update`, `view`) and a `main.rs`. |
 | `examples/settings` | `settings` | An app's settings (profile, account, appearance, notifications,<br/>display), structured like `dashboard`. |
-| `examples/gallery` | `gallery` | Desktop showcase of 65 component pages, plus 4 chart pages and<br/>the 2 example apps for the website, `snapshot` (PNG renderer),<br/>and `site_data` (site JSON). |
+| `examples/gallery` | `gallery` | Desktop showcase of 65 component pages, plus 7 chart pages and<br/>the 2 example apps for the website, `snapshot` (PNG renderer),<br/>and `site_data` (site JSON). |
 | `examples/gallery-web` | `gallery-web` | WebAssembly entrypoint (`wasm32-unknown-unknown`) driving<br/>all website component previews in a single `iced::daemon`. |
 | `conformance/` | `conformance` (`conformance/iced`)<br/>+ Vite + React app | Runs the same scenarios against `shadcn-iced` (headless)<br/>and the latest `shadcn/ui` (Playwright), and compares them. |
 | `site/` | TanStack Start + Solid + Vite | Documentation website (`https://shadcn-iced.r4ai.dev`)<br/>consuming `site_data` JSON and the `gallery-web` WASM bundle. |
@@ -177,7 +177,7 @@ flowchart TD
 | `labelled` | HTML `<label>` behavior that focuses and activates<br/>the first interactive child control when clicked. | `Field`, `Label`, `Checkbox`,<br/>`RadioGroup`, `Switch` |
 | `layer` | Content on top of the whole window (centered, against an edge, or in a corner),<br/>with an optional backdrop (`bg-black/10` by default) that blocks the rest of the interface. | `AlertDialog`, `Dialog`, `Sheet`,<br/>`Drawer`, `Sonner`, `Toast` |
 | `listbox` | Vertical list with a highlighted item that follows the mouse and<br/>the keys (`ArrowUp`, `ArrowDown`, `Home`, `End`); `Enter` or a click selects it. | `Select`, `Combobox`, `Command`, menus |
-| `plot` | Chart geometry (not a widget): category and linear scales, nice ticks,<br/>stacked baselines, natural curves, pie arcs, and pointer hit-testing. | `Chart` (`Area`, `Bar`, `Line`, `Pie`) |
+| `plot` | Chart geometry (not a widget): category and linear scales (vertical or horizontal),<br/>nice ticks, stacking (with expand and sign offsets), natural, monotone, linear and step curves,<br/>polar coordinates, sectors with rounded corners, pies, and pointer hit-testing. | `Chart` (`Area`, `Bar`, `Line`, `Pie`,<br/>`Radar`, `Radial`) |
 | `pressable` | Clickable surface exposing hover, press, and focus status without button chrome;<br/>reacts to hover without `on_press` and can take the keyboard focus. | `Button`, `Toggle`, `Checkbox`, `Switch`,<br/>`Accordion`, `Tabs`, `Select`, `Calendar`,<br/>`Pagination`, `Sidebar`, `Badge`, `Breadcrumb`,<br/>`Item`, `Trace`, and others |
 | `roving` | Roving focus: arrow keys, `Home`, and `End` move the focus<br/>between the items of a group, which is a single `Tab` stop. | `RadioGroup`, `ToggleGroup`, `Tabs` |
 | `split` | Two panes separated by a divider that can be dragged or moved with the keys,<br/>self-managed unless controlled with `ratio` and `on_resize`. | `Resizable` |
