@@ -2,8 +2,8 @@
 //!
 //! Port of <https://ui.shadcn.com/docs/components/skeleton>. Pulses like
 //! Tailwind's `animate-pulse`.
-use shadcn_iced_core::Element;
 use shadcn_iced_core::theme::{alpha, tokens};
+use shadcn_iced_core::{Element, animation};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -64,14 +64,19 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Skeleton {
         &mut self,
         _tree: &mut Tree,
         event: &Event,
-        _layout: Layout<'_>,
+        layout: Layout<'_>,
         _cursor: mouse::Cursor,
         _renderer: &iced::Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
-        _viewport: &Rectangle,
+        viewport: &Rectangle,
     ) {
-        if let Event::Window(window::Event::RedrawRequested(now)) = event {
+        // Pulses only while animations are enabled and the skeleton is
+        // visible: the redraw of a scroll brings it back into view.
+        if let Event::Window(window::Event::RedrawRequested(now)) = event
+            && animation::enabled()
+            && layout.bounds().intersects(viewport)
+        {
             shell.request_redraw_at(*now + std::time::Duration::from_millis(33));
         }
     }
@@ -90,9 +95,14 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Skeleton {
 
         let t = tokens(theme);
 
-        // animate-pulse: opacity 1 -> 0.5 -> 1 over 2s, cubic-bezier(0.4, 0, 0.6, 1)
-        let phase = (START.elapsed().as_secs_f32() % 2.0) / 2.0;
-        let opacity = 0.75 + 0.25 * (phase * std::f32::consts::TAU).cos();
+        // animate-pulse: opacity 1 -> 0.5 -> 1 over 2s, cubic-bezier(0.4, 0, 0.6, 1),
+        // at rest (opaque) when animations are disabled.
+        let opacity = if animation::enabled() {
+            let phase = (START.elapsed().as_secs_f32() % 2.0) / 2.0;
+            0.75 + 0.25 * (phase * std::f32::consts::TAU).cos()
+        } else {
+            1.0
+        };
 
         renderer.fill_quad(
             renderer::Quad {
