@@ -24,6 +24,7 @@
 //! These are the motions of sonner, the defaults; a [`Motion`] changes how
 //! the toasts enter and leave and how the collapsed stack is drawn, which is
 //! how the toasts of Base UI are made from the same stack.
+use super::box_shadow;
 use crate::animation::{self, Easing, Fade, Transition};
 
 use iced::advanced::layout::{self, Layout};
@@ -221,6 +222,7 @@ pub struct Toaster<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> 
     expand: bool,
     motion: Motion,
     surface: Box<dyn Fn(&Theme) -> container::Style + 'a>,
+    shadows: &'a [box_shadow::Layer],
 }
 
 impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
@@ -240,6 +242,7 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
             expand: false,
             motion: Motion::default(),
             surface: Box::new(|_| container::Style::default()),
+            shadows: &[],
         }
     }
 
@@ -283,6 +286,14 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
     /// Sets the background, border, shadow and text color of the toasts.
     pub fn surface(mut self, surface: impl Fn(&Theme) -> container::Style + 'a) -> Self {
         self.surface = Box::new(surface);
+        self
+    }
+
+    /// Draws layered shadows behind the toasts, like
+    /// [`box_shadow`](super::box_shadow), in addition to the shadow of the
+    /// [surface](Self::surface).
+    pub fn shadows(mut self, shadows: &'a [box_shadow::Layer]) -> Self {
+        self.shadows = shadows;
         self
     }
 
@@ -1281,6 +1292,15 @@ where
                             a: 0.0,
                         },
                     );
+                }
+
+                for quad in box_shadow::quads(
+                    self.shadows,
+                    placement.bounds,
+                    surface.border.radius.top_left,
+                    opacity,
+                ) {
+                    renderer.fill_quad(quad, Color::TRANSPARENT);
                 }
 
                 renderer.fill_quad(

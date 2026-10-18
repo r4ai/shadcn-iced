@@ -11,7 +11,7 @@
 //! popover(button("Open popover").variant(Variant::Outline), iced::widget::text("Content")).into()
 //! # }
 //! ```
-use shadcn_iced_core::primitive::{Align, Anchored, Side};
+use shadcn_iced_core::primitive::{Align, Anchored, Side, box_shadow};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::widget::{Column, container, text};
@@ -64,14 +64,15 @@ pub fn panel<'a, Message: 'a>(
     content: impl Into<Element<'a, Message>>,
     width: Length,
 ) -> Element<'a, Message> {
-    container(content)
-        .padding(1.0 + 10.0)
-        .width(match width {
-            Length::Fixed(width) => Length::Fixed(width + 2.0),
-            width => width,
-        })
-        .style(style)
-        .into()
+    shadow(
+        container(content)
+            .padding(1.0 + 10.0)
+            .width(match width {
+                Length::Fixed(width) => Length::Fixed(width + 2.0),
+                width => width,
+            })
+            .style(style),
+    )
 }
 
 /// A title and a description (`PopoverHeader`: `flex flex-col gap-0.5
@@ -108,7 +109,15 @@ pub fn style(theme: &Theme) -> container::Style {
         background: Some(Background::Color(t.palette.popover)),
         text_color: Some(t.palette.popover_foreground),
         border: style::ring_border(&t, t.radius_lg()),
-        shadow: style::shadow_md(),
         ..container::Style::default()
     }
+}
+
+/// Draws the shadow of a popover panel (`shadow-md`) behind it, which a
+/// container style cannot (see [`box_shadow`]).
+pub fn shadow<'a, Message: 'a>(panel: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+    box_shadow(panel, style::SHADOW_MD, |theme| tokens(theme).radius_lg())
+        // The `ring-1` is outside of the box that casts the shadow.
+        .inset(1.0)
+        .into()
 }

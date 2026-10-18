@@ -1,4 +1,5 @@
 //! Shared style values mirroring Tailwind CSS defaults, as used by shadcn/ui.
+use crate::primitive::box_shadow::Layer;
 use crate::theme::{Tokens, alpha};
 
 use iced::{Border, Color, Shadow, Vector, border};
@@ -110,7 +111,10 @@ pub fn shadow_sm() -> Shadow {
     }
 }
 
-/// `shadow-md`
+/// `shadow-md` as a single shadow, for the styles that take one (such as
+/// the menus of iced). Prefer [`SHADOW_MD`] with
+/// [`box_shadow`](crate::primitive::box_shadow), which can draw the layers
+/// and their spreads.
 pub fn shadow_md() -> Shadow {
     Shadow {
         color: Color::from_rgba(0.0, 0.0, 0.0, 0.1),
@@ -119,7 +123,8 @@ pub fn shadow_md() -> Shadow {
     }
 }
 
-/// `shadow-lg`
+/// `shadow-lg` as a single shadow. Prefer [`SHADOW_LG`], like
+/// [`shadow_md`].
 pub fn shadow_lg() -> Shadow {
     Shadow {
         color: Color::from_rgba(0.0, 0.0, 0.0, 0.1),
@@ -127,6 +132,44 @@ pub fn shadow_lg() -> Shadow {
         blur_radius: 15.0,
     }
 }
+
+/// `shadow-md`: `0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)`,
+/// for [`box_shadow`](crate::primitive::box_shadow).
+///
+/// iced fades shadows out differently from CSS, so the layers are fitted to
+/// the opacity of Tailwind's composited layers outside each edge (within a
+/// gray level) rather than copied.
+pub const SHADOW_MD: &[Layer] = &[
+    Layer {
+        color: Color::from_rgba(0.0, 0.0, 0.0, 0.115),
+        offset: Vector::new(0.0, 3.75),
+        blur_radius: 6.75,
+        spread: -1.25,
+    },
+    Layer {
+        color: Color::from_rgba(0.0, 0.0, 0.0, 0.135),
+        offset: Vector::new(0.0, 2.25),
+        blur_radius: 3.0,
+        spread: -1.75,
+    },
+];
+
+/// `shadow-lg`: `0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`,
+/// fitted like [`SHADOW_MD`].
+pub const SHADOW_LG: &[Layer] = &[
+    Layer {
+        color: Color::from_rgba(0.0, 0.0, 0.0, 0.12),
+        offset: Vector::new(0.0, 10.0),
+        blur_radius: 18.5,
+        spread: -5.25,
+    },
+    Layer {
+        color: Color::from_rgba(0.0, 0.0, 0.0, 0.13),
+        offset: Vector::new(0.0, 4.25),
+        blur_radius: 5.75,
+        spread: -3.75,
+    },
+];
 
 /// The focus ring of shadcn/ui (`focus-visible:ring-[3px] ring-ring/50`),
 /// approximated with a soft shadow since iced has no outline.

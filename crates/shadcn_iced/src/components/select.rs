@@ -312,17 +312,20 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
 
         // `w-(--anchor-width) min-w-36 rounded-lg shadow-md ring-1`, `p-1`
         // groups.
-        let content = container(
-            scrollable(list.padding(4).width(Length::Fill))
-                .width(Length::Fill)
-                .direction(scrollable::Direction::Vertical(
-                    super::scroll_area::scrollbar(),
-                ))
-                .style(super::scroll_area::style),
-        )
-        .padding(1)
-        .max_height(600)
-        .style(menu::panel);
+        let content = menu::shadow(
+            container(
+                scrollable(list.padding(4).width(Length::Fill))
+                    .width(Length::Fill)
+                    .direction(scrollable::Direction::Vertical(
+                        super::scroll_area::scrollbar(),
+                    ))
+                    .style(super::scroll_area::style),
+            )
+            .padding(1)
+            .max_height(600)
+            .style(menu::panel),
+            false,
+        );
 
         let anchored = Anchored::new(trigger, content)
             .align(Align::Start)
