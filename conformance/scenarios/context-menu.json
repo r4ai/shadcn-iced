@@ -66,7 +66,11 @@
         { "snapshot": "destructive-hover" },
         { "click": "Developer Tools" },
         { "expect": { "hidden": ["Save Page...", "⌘["] } },
-        { "snapshot": "closed-after-select" }
+        { "snapshot": "closed-after-select" },
+        { "rightClick": { "at": [48, 40] } },
+        { "hover": "More Tools" },
+        { "wait": 300 },
+        { "expect": { "visible": ["Save Page..."] } }
       ]
     },
     {
