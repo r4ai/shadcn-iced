@@ -8,12 +8,13 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["lucide", "inter", "geist", "symbols"]
+default = ["lucide", "geist", "symbols"]
 # Bundles the Lucide icon font (~900 KB).
 lucide = []
 # Bundles the Geist and Geist Mono fonts (the defaults of shadcn/ui's Nova).
 geist = []
-# Bundles the Inter font.
+# Bundles the Inter font (~710 KB), an alternative to Geist: off by default,
+# since every bundled font is also copied into memory when it is loaded.
 inter = []
 # Bundles the keyboard symbols and arrows that Geist lacks (⌘ ⌥ ⌃ ⏎ ...), from
 # Noto Sans Symbols 2, Noto Sans Symbols and Noto Sans Math (~55 KB).

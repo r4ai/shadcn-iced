@@ -2,8 +2,9 @@
 //!
 //! shadcn/ui's default preset (Nova) uses [Geist](https://vercel.com/font)
 //! and [Geist Mono](https://vercel.com/font) (feature `geist`).
-//! [Inter](https://rsms.me/inter/) (feature `inter`) and the
-//! [Lucide](https://lucide.dev) icon font (feature `lucide`) are bundled too.
+//! The [Lucide](https://lucide.dev) icon font (feature `lucide`) is bundled
+//! too, and [Inter](https://rsms.me/inter/) with the feature `inter` (off by
+//! default).
 //! The keyboard symbols and arrows that Geist lacks (⌘ ⌥ ⌃ ⏎ ⌫ ...), used by
 //! shortcuts, are bundled too (feature `symbols`), so that they do not depend
 //! on the fonts of the system: see [`SYMBOLS`].

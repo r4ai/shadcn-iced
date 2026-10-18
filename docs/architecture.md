@@ -196,13 +196,13 @@ flowchart TD
 
 ## Fonts, Icons & Cargo Features
 
-`shadcn_iced_core` embeds fonts and icons into the binary for consistent rendering across desktop and WebAssembly.
+`shadcn_iced_core` embeds fonts and icons into the binary for consistent rendering across desktop and WebAssembly. iced copies every loaded font into memory, so each enabled font costs its size twice: turn off the ones an app does not use. `shadcn-iced` forwards the same features (`default-features = false, features = [...]`).
 
 | Feature | Default | Bundled Asset | Size | Purpose |
 | :--- | :---: | :--- | :---: | :--- |
 | `lucide` | Yes | `fonts/lucide.ttf` | ~900 KB | 2,179 [Lucide](https://lucide.dev) icons exposed in `shadcn_iced::icon::lucide`<br/>(also `shadcn_iced::prelude::lucide`). |
 | `geist` | Yes | `Geist-*.ttf`,<br/>`GeistMono-*.ttf` | ~810 KB | Default sans-serif (`Geist`: `Regular`, `Medium`, `SemiBold`, `Bold`)<br/>and monospace (`Geist Mono`: `Regular`, `Medium`) typefaces. |
-| `inter` | Yes | `Inter-*.ttf` | ~710 KB | Alternative sans-serif typeface (`Inter`), selectable<br/>at runtime via `font::set_sans(font::INTER)`. |
+| `inter` | No | `Inter-*.ttf` | ~710 KB | Alternative sans-serif typeface (`Inter`), selectable<br/>at runtime via `font::set_sans(font::INTER)`. |
 | `symbols` | Yes | `ShadcnIcedSymbols-Regular.ttf` | ~55 KB | Subset of Noto Sans Symbols, Symbols 2, and Math covering<br/>keyboard shortcut glyphs (`⌘ ⌥ ⌃ ⇧ ⏎ ⌫ ⎋ ⇥ ␣`) and arrows. |
 
 - Call `.shadcn_iced()` on `iced::application` or `iced::daemon` to register all enabled fonts and set the default font
