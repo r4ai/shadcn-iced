@@ -32,4 +32,4 @@ pub use split::Split;
 pub use track::{Track, track};
 pub use tracked::{Tracked, tracked};
 pub use underline::{Underline, underline};
-pub use wheel::{Wheel, wheel};
+pub use wheel::{Wheel, smooth_scroll, wheel};

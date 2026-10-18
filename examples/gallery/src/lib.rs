@@ -256,8 +256,9 @@ impl Gallery {
         .content(scrollable(customizer::view(self)).height(Fill))
         .on_close(Message::Customize(false));
 
-        // Smooth wheel scrolling, horizontal with `Shift`.
+        // Smooth wheel scrolling (opted in), horizontal with `Shift`.
         shadcn_iced::primitive::wheel(self.toasters(shadcn_iced::sidebar::layout(nav, main), true))
+            .smooth(true)
             .into()
     }
 
