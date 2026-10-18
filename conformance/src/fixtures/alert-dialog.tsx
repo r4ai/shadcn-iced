@@ -70,6 +70,7 @@ function SmallDialog() {
 
 export default {
   default: confirm,
+  cancel: confirm,
   "outside-click": confirm,
   "small-media": () => <SmallDialog />,
   narrow: confirm,

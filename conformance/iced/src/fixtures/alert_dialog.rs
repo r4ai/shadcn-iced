@@ -9,7 +9,7 @@ use iced::Element;
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
-        "default" | "outside-click" | "narrow" => Fixture::new(confirm),
+        "default" | "cancel" | "outside-click" | "narrow" => Fixture::new(confirm),
         "small-media" => Fixture::new(small),
         _ => return None,
     })
