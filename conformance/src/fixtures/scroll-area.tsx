@@ -10,8 +10,8 @@ const tags = Array.from({ length: 50 }).map(
 
 const works = ["Ornella Binni", "Tom Byrom", "Vladimir Malyavko"]
 
-export default {
-  default: () => (
+function Tags() {
+  return (
     <ScrollArea className="h-72 w-48 rounded-md border">
       <div className="p-4">
         <h4 className="mb-4 text-sm leading-none font-medium">Tags</h4>
@@ -23,7 +23,12 @@ export default {
         ))}
       </div>
     </ScrollArea>
-  ),
+  )
+}
+
+export default {
+  default: Tags,
+  wheel: Tags,
   horizontal: () => (
     <ScrollArea className="w-96 rounded-md border whitespace-nowrap">
       <div className="flex w-max space-x-4 p-4">

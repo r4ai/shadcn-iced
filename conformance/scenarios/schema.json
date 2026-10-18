@@ -110,6 +110,19 @@
               "maxItems": 2
             }
           }
+        },
+        {
+          "type": "object",
+          "required": [
+            "label"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "The accessible name of a control without text: its `aria-label` on the web, its widget id in iced."
+            }
+          }
         }
       ]
     },
@@ -191,6 +204,102 @@
                   "$ref": "#/$defs/locator"
                 }
               }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "scroll"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "scroll": {
+              "description": "Scrolls the wheel at a locator (usually `at`), like `mouse.wheel(dx, dy)`.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "text",
+                    "delta"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "nth": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "0-based, in document order."
+                    },
+                    "exact": {
+                      "type": "boolean",
+                      "description": "Matches texts containing `text` when false (the smallest element on the web). Defaults to true."
+                    },
+                    "delta": {
+                      "description": "The logical pixels to scroll by, [dx, dy]; a positive dy scrolls down.",
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "at",
+                    "delta"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "at": {
+                      "description": "A logical position in the page, [x, y].",
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "delta": {
+                      "description": "The logical pixels to scroll by, [dx, dy]; a positive dy scrolls down.",
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "label",
+                    "delta"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "description": "The accessible name of a control without text: its `aria-label` on the web, its widget id in iced."
+                    },
+                    "delta": {
+                      "description": "The logical pixels to scroll by, [dx, dy]; a positive dy scrolls down.",
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  }
+                }
+              ]
             }
           }
         },

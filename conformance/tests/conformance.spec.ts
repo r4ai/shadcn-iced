@@ -11,7 +11,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
-import { expect, test, type CDPSession, type Page } from "@playwright/test"
+import {
+  expect,
+  test,
+  type CDPSession,
+  type Locator as PwLocator,
+  type Page,
+} from "@playwright/test"
 
 import { compare } from "./compare.ts"
 import {
@@ -122,29 +128,112 @@ async function systemFonts(cdp: CDPSession) {
   return [...fonts]
 }
 
+/** A rectangle in logical pixels of the page. */
+interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * The visible part of every element of a locator: its bounding box clipped
+ * by the viewport and by every ancestor that clips its overflow, like the
+ * iced runner does (`visible_bounds`). Playwright alone counts content that
+ * is scrolled out of a scroll area, or clipped by `overflow`, as visible.
+ */
+async function visibleRects(locator: PwLocator): Promise<Rect[]> {
+  const rects = await locator.evaluateAll((elements) =>
+    elements.map((element) => {
+      const box = element.getBoundingClientRect()
+      let left = Math.max(box.left, 0)
+      let top = Math.max(box.top, 0)
+      let right = Math.min(box.right, window.innerWidth)
+      let bottom = Math.min(box.bottom, window.innerHeight)
+
+      for (
+        let ancestor = element.parentElement;
+        ancestor && ancestor !== document.body;
+        ancestor = ancestor.parentElement
+      ) {
+        const style = getComputedStyle(ancestor)
+        if (style.position === "fixed") break
+
+        const clips = (overflow: string) => overflow !== "visible"
+        if (clips(style.overflowX) || clips(style.overflowY)) {
+          const clip = ancestor.getBoundingClientRect()
+          if (clips(style.overflowX)) {
+            left = Math.max(left, clip.left)
+            right = Math.min(right, clip.right)
+          }
+          if (clips(style.overflowY)) {
+            top = Math.max(top, clip.top)
+            bottom = Math.min(bottom, clip.bottom)
+          }
+        }
+      }
+
+      return { x: left, y: top, width: right - left, height: bottom - top }
+    })
+  )
+
+  return rects.filter((rect) => rect.width > 0 && rect.height > 0)
+}
+
+/** The visible elements with this text (see {@link visibleRects}). */
+function textLocator(page: Page, text: string, exact = true) {
+  return page.getByText(text, { exact }).filter({ visible: true })
+}
+
+/** The elements whose accessible name is `label` (`aria-label`). */
+function labelLocator(page: Page, label: string) {
+  return page.locator(`[aria-label="${label.replaceAll('"', '\\"')}"]`)
+}
+
+/** Waits up to 2 seconds for the number of visible elements to satisfy `ok`. */
+async function waitForVisible(
+  locator: PwLocator,
+  ok: (count: number) => boolean
+) {
+  const deadline = Date.now() + 2000
+  for (;;) {
+    const count = (await visibleRects(locator)).length
+    if (ok(count) || Date.now() > deadline) return ok(count)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
+
 async function locate(page: Page, locator: Locator) {
   if (typeof locator === "object" && "at" in locator) {
     return { x: locator.at[0], y: locator.at[1] }
   }
 
-  const {
-    text,
-    nth = 0,
-    exact = true,
-  } = typeof locator === "string" ? { text: locator } : locator
+  let elements: PwLocator
+  let nth = 0
+  let description: string
 
-  const element = page
-    .getByText(text, { exact })
-    .filter({ visible: true })
-    .nth(nth)
-
-  const box = await element.boundingBox({ timeout: 2000 }).catch(() => null)
-
-  if (!box) {
-    throw new Error(`text ${JSON.stringify(text)} (#${nth}) not found`)
+  if (typeof locator === "object" && "label" in locator) {
+    elements = labelLocator(page, locator.label)
+    description = `control labeled ${JSON.stringify(locator.label)}`
+  } else {
+    const {
+      text,
+      exact = true,
+      ...rest
+    } = typeof locator === "string" ? { text: locator } : locator
+    nth = "nth" in rest ? (rest.nth ?? 0) : 0
+    elements = textLocator(page, text, exact)
+    description = `text ${JSON.stringify(text)} (#${nth})`
   }
 
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  await waitForVisible(elements, (count) => count > nth)
+  const rect = (await visibleRects(elements))[nth]
+
+  if (!rect) {
+    throw new Error(`${description} not found`)
+  }
+
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
 }
 
 for (const file of readScenarios()) {
@@ -263,6 +352,13 @@ for (const file of readScenarios()) {
                 await page.mouse.down()
                 await page.mouse.move(to.x, to.y, { steps: 5 })
                 await page.mouse.up()
+              } else if ("scroll" in step) {
+                const { x, y } = await locate(page, step.scroll)
+                await page.mouse.move(x, y)
+                await page.mouse.wheel(
+                  step.scroll.delta[0],
+                  step.scroll.delta[1]
+                )
               } else if ("press" in step) {
                 await page.keyboard.press(step.press)
               } else if ("type" in step) {
@@ -271,29 +367,29 @@ for (const file of readScenarios()) {
                 await page.waitForTimeout(step.wait)
               } else if ("expect" in step) {
                 for (const text of step.expect.visible ?? []) {
-                  const visible = page
-                    .getByText(text, { exact: true })
-                    .filter({ visible: true })
-                  await expect(visible.first())
-                    .toBeVisible({ timeout: 2000 })
-                    .catch(() =>
-                      record.reference.failures.push(
-                        `step ${index}: ${JSON.stringify(text)} should be visible`
-                      )
+                  if (
+                    !(await waitForVisible(
+                      textLocator(page, text),
+                      (count) => count > 0
+                    ))
+                  ) {
+                    record.reference.failures.push(
+                      `step ${index}: ${JSON.stringify(text)} should be visible`
                     )
+                  }
                 }
 
                 for (const text of step.expect.hidden ?? []) {
-                  const visible = page
-                    .getByText(text, { exact: true })
-                    .filter({ visible: true })
-                  await expect(visible)
-                    .toHaveCount(0, { timeout: 2000 })
-                    .catch(() =>
-                      record.reference.failures.push(
-                        `step ${index}: ${JSON.stringify(text)} should be hidden`
-                      )
+                  if (
+                    !(await waitForVisible(
+                      textLocator(page, text),
+                      (count) => count === 0
+                    ))
+                  ) {
+                    record.reference.failures.push(
+                      `step ${index}: ${JSON.stringify(text)} should be hidden`
                     )
+                  }
                 }
               }
             }
