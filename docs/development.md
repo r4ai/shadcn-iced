@@ -268,9 +268,10 @@ The Python dependencies are locked in `scripts/uv.lock` (`scripts/pyproject.toml
 | `site.yml` (**Site**) | Lint, Data, Live previews, Build (+ e2e) | `site/`, `crates/` or `examples/` change |
 | `conformance.yml` (**Conformance**) | Type check, Compare | `crates/` or `conformance/` change;<br/>weekly with the latest shadcn/ui |
 | `lint.yml` (**Lint**) | Workflows (actionlint, zizmor, pinact),<br/>Python (`uv.lock`, compile) | `.github/` or `scripts/` change |
+| `preview.yml` (**Preview**) | Delete site preview | A pull request closes |
 | `release.yml` (**Release**) | Release PR, Check, Publish, Binaries | Every push to `main` (see [Releasing](#releasing)) |
 
-`ci.yml` itself deploys the site built by **Site**, since a called workflow does not get the secrets of an environment: **Deploy site** publishes it from `main` (`production` environment), and **Preview site** uploads the site of a pull request as a version of the Worker on a preview URL (`pr-<number>` alias, `preview` environment), linked from the pull request as a deployment. Both environments need the `CLOUDFLARE_API_TOKEN` (Edit Cloudflare Workers) and `CLOUDFLARE_ACCOUNT_ID` secrets; pull requests from forks have no preview.
+`ci.yml` itself deploys the site built by **Site**, since a called workflow does not get the secrets of an environment: **Deploy site** publishes it from `main` (`production` environment), and **Preview site** publishes the site of a pull request as a [Worker Preview](https://developers.cloudflare.com/workers/previews/) on `pr-<number>.shadcn-iced.r4ai.dev` (`preview` environment), linked from the pull request as a deployment. `preview.yml` (**Preview**) deletes the preview when the pull request closes. Both environments need the `CLOUDFLARE_API_TOKEN` (Edit Cloudflare Workers) and `CLOUDFLARE_ACCOUNT_ID` secrets, and the custom domain `shadcn-iced.r4ai.dev` is enabled for "Production and Preview" in the dashboard. Pull requests from forks get no secrets, and have no preview.
 
 ### Supply-chain policies
 

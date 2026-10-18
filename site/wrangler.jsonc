@@ -10,9 +10,13 @@
   // the zone, so it is set up once in the dashboard (Domains & Routes), and
   // deploys only need Editor on the Worker.
   "workers_dev": false,
-  // The previews of pull requests (`Preview site` of `ci.yml`): versions
-  // uploaded without deploying them, on <alias>-shadcn-iced.<subdomain>.workers.dev.
-  "preview_urls": true,
+  "preview_urls": false,
+  // Worker Previews of pull requests (`wrangler preview`, `Preview site` of
+  // `ci.yml`), served on pr-<number>.shadcn-iced.r4ai.dev: the custom domain
+  // is enabled for "Production and Preview" in the dashboard, where it is
+  // managed, and Cloudflare issues the wildcard DNS record and certificate.
+  // Assets-only, the previews override nothing.
+  "previews": {},
   "assets": {
     "directory": "./dist/client",
     "not_found_handling": "404-page",
