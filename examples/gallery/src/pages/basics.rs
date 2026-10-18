@@ -634,12 +634,15 @@ pub const KBD: Page = Page {
                 button::Button::new(
                     row![
                         text("Accept").size(14).font(shadcn_iced::font::medium()),
-                        container(kbd("⏎")).padding(iced::Padding::ZERO.left(2)),
+                        // `translate-x-0.5` moves the key without resizing
+                        // the button.
+                        iced::widget::float(kbd("⏎")).translate(|_, _| iced::Vector::new(2.0, 0.0)),
                     ]
                     .spacing(6)
                     .align_y(Center)
                 )
                 .variant(button::Variant::Outline)
+                .inline_end(true)
                 .on_press(Message::Noop),
             ),
         ]

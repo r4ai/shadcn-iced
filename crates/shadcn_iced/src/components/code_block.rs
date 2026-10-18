@@ -17,10 +17,9 @@
 //!     .into()
 //! # }
 //! ```
-use super::button::{self, Size as ButtonSize, Variant as ButtonVariant, icon_button};
+use super::button::{Size as ButtonSize, Variant as ButtonVariant, icon_button};
 
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::Pressable;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -254,33 +253,12 @@ fn destructive_action<'a, Message: Clone + 'a>(
     icon: Icon,
     on_press: Message,
 ) -> Element<'a, Message> {
-    let size = ButtonSize::IconXs;
-
-    Pressable::new(
-        container(icon.sized(size.icon_size()))
-            .center_x(Length::Fill)
-            .center_y(Length::Fill),
-    )
-    .on_press(on_press)
-    .width(size.height())
-    .height(size.height())
-    .press_offset(1.0)
-    .clip_background(true)
-    .style(move |theme, status| {
-        let t = tokens(theme);
-        let mut style = button::style(theme, status, ButtonVariant::Ghost);
-
-        if !matches!(
-            status,
-            iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed
-        ) {
-            style.text_color = t.palette.destructive;
-        }
-
-        style.border.radius = size.radius(&t).into();
-        style
-    })
-    .into()
+    icon_button(icon)
+        .variant(ButtonVariant::Ghost)
+        .size(ButtonSize::IconXs)
+        .text_color(|theme| tokens(theme).palette.destructive)
+        .on_press(on_press)
+        .into()
 }
 
 /// A ghost `icon-xs` button for the actions of a code block.
