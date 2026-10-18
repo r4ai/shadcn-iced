@@ -1027,6 +1027,10 @@ where
                 self.state.hover = Hover::Idle;
                 // Until the pointer leaves, or it would reopen right away.
                 self.state.suppressed = true;
+                // The content is gone and stops tracking the pointer: left
+                // hovered, it would keep the anchor suppressed for good
+                // (an item selected in a submenu closing the whole menu).
+                self.state.content_hovered = false;
                 shell.invalidate_layout();
                 shell.request_redraw();
             }
