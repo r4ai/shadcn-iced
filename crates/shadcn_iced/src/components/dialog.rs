@@ -184,6 +184,15 @@ pub fn title_text<'a>(title: String) -> text::Text<'a> {
         })
 }
 
+/// The description of an alert dialog or a drawer (`text-sm text-balance
+/// text-muted-foreground`): a [`description_text`] with balanced lines.
+pub fn balanced_description<'a, Message: 'a>(
+    description: String,
+    centered: bool,
+) -> Element<'a, Message> {
+    super::typography::balance(description_text(description, centered)).into()
+}
+
 /// The description of a dialog, sheet or drawer (`text-sm
 /// text-muted-foreground`).
 pub fn description_text<'a>(description: String, centered: bool) -> text::Text<'a> {
