@@ -14,8 +14,8 @@
 //!     .into()
 //! # }
 //! ```
-use shadcn_iced_core::primitive::Layer;
 use shadcn_iced_core::primitive::layer::{Animation, Edge};
+use shadcn_iced_core::primitive::{Layer, box_shadow};
 use shadcn_iced_core::{Element, style, tokens};
 
 use iced::widget::{Column, Row, Stack, container, space};
@@ -226,14 +226,15 @@ impl<'a, Message: Clone + 'a> From<Sheet<'a, Message>> for Element<'a, Message> 
             .style(move |theme: &Theme| {
                 let t = tokens(theme);
 
-                // `bg-popover text-popover-foreground shadow-lg`
+                // `bg-popover text-popover-foreground`
                 container::Style {
                     background: Some(Background::Color(t.palette.popover)),
                     text_color: Some(t.palette.popover_foreground),
-                    shadow: style::shadow_lg(),
                     ..container::Style::default()
                 }
             });
+        // `shadow-lg`
+        let panel = box_shadow(panel, style::SHADOW_LG, |_| 0.0);
 
         let (align_x, align_y) = match side {
             Side::Top => (

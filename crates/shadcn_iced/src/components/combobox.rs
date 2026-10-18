@@ -242,11 +242,14 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
         // its border and the addon (`pr-2 mr-[-0.3rem]` and a `size-6`
         // button).
         let anchor_width = combobox.width - 2.0 - (8.0 - 4.8 + 24.0);
-        let popup = container(body)
-            .padding(1)
-            .width(anchor_width + 28.0 + 2.0)
-            .max_height(288)
-            .style(menu::panel);
+        let popup = menu::shadow(
+            container(body)
+                .padding(1)
+                .width(anchor_width + 28.0 + 2.0)
+                .max_height(288)
+                .style(menu::panel),
+            false,
+        );
 
         if disabled {
             return field.into();

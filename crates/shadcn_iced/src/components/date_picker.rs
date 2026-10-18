@@ -240,7 +240,7 @@ impl<'a, Message: Clone + 'a> From<DatePicker<'a, Message>> for Element<'a, Mess
         }
 
         // `PopoverContent className="w-auto p-0"`
-        let content = container(calendar).style(super::popover::style);
+        let content = super::popover::shadow(container(calendar).style(super::popover::style));
 
         let anchored = Anchored::new(trigger, content)
             .side(Side::Bottom)

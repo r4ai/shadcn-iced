@@ -16,7 +16,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::{Align, Anchored, Side, listbox, tracked};
+use shadcn_iced_core::primitive::{Align, Anchored, Side, box_shadow, listbox, tracked};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, Tokens, font, style, tokens};
 
@@ -472,17 +472,34 @@ pub fn panel(theme: &Theme) -> container::Style {
         background: Some(Background::Color(background)),
         text_color: Some(t.palette.popover_foreground),
         border: style::ring_border(&t, t.radius_lg()),
-        shadow: style::shadow_md(),
         ..container::Style::default()
     }
 }
 
-/// The style of a submenu panel (`shadow-lg`).
+/// Draws the shadow of a menu panel (`shadow-md`, `shadow-lg` for
+/// submenus) behind it, which a container style cannot (see
+/// [`box_shadow`]).
+pub fn shadow<'a, Message: 'a>(
+    panel: impl Into<Element<'a, Message>>,
+    sub: bool,
+) -> Element<'a, Message> {
+    box_shadow(
+        panel,
+        if sub {
+            style::SHADOW_LG
+        } else {
+            style::SHADOW_MD
+        },
+        |theme| menu_tokens(theme).radius_lg(),
+    )
+    // The `ring-1` is outside of the box that casts the shadow.
+    .inset(1.0)
+    .into()
+}
+
+/// The style of a submenu panel, whose shadow is drawn by [`shadow`].
 pub fn sub_panel(theme: &Theme) -> container::Style {
-    container::Style {
-        shadow: style::shadow_lg(),
-        ..panel(theme)
-    }
+    panel(theme)
 }
 
 /// The style of a context submenu panel (`border shadow-lg`).
@@ -499,7 +516,7 @@ fn context_sub_panel(theme: &Theme) -> container::Style {
 pub fn panel_with<'a, Message: Clone + 'a>(
     list: listbox::Listbox<'a, Message>,
 ) -> Element<'a, Message> {
-    container(list.padding(4)).padding(1).style(panel).into()
+    shadow(container(list.padding(4)).padding(1).style(panel), false)
 }
 
 /// A menu separator (`-mx-1 my-1 h-px bg-border`), for a listbox with `p-1`.
@@ -704,12 +721,13 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
         // `p-1` inside a 1px ring, outside of the width.
         let list = list.padding(4).min_width(min_width - 8.0);
 
-        match width {
+        let panel = match width {
             Some(width) => container(list.width(Length::Fill)).width(width + 2.0),
             None => container(list),
         }
         .padding(1)
-        .style(style)
-        .into()
+        .style(style);
+
+        shadow(panel, menu.sub)
     }
 }

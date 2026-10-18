@@ -27,7 +27,7 @@ use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::time::Duration;
 use iced::widget::{Column, Row, container, text};
-use iced::{Alignment, Background, Length, Theme, Vector};
+use iced::{Alignment, Background, Length, Theme};
 
 /// The type of a [`Toast`], which decides its icon (`type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -241,12 +241,7 @@ pub fn style(theme: &Theme) -> container::Style {
         background: Some(Background::Color(t.palette.popover)),
         text_color: Some(t.palette.popover_foreground),
         border: style::border(t.palette.border, t.radius_2xl()),
-        // `shadow-lg`, whose layers shrink by their negative spread.
-        shadow: iced::Shadow {
-            color: iced::Color::from_rgba(0.0, 0.0, 0.0, 0.1),
-            offset: Vector::new(0.0, 6.0),
-            blur_radius: 10.0,
-        },
+        // `shadow-lg` is drawn by the stack (`style::SHADOW_LG`).
         ..container::Style::default()
     }
 }
@@ -300,7 +295,8 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
             .visible(toaster.limit)
             .swipe_directions([Direction::Down, Direction::Right])
             .motion(motion())
-            .surface(self::style);
+            .surface(self::style)
+            .shadows(style::SHADOW_LG);
 
         // `fixed bottom-4 right-4 max-w-sm w-full`
         Layer::new(toaster.base, container(stack).max_width(384), open)
