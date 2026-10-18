@@ -825,13 +825,19 @@ impl From<Config> for Theme {
 static REGISTRY: LazyLock<RwLock<HashMap<String, Tokens>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// The number of themes whose tokens [`tokens`] remembers: a fading
+/// widget switches between its theme and a faded copy on every frame.
+const RECENT: usize = 4;
+
 thread_local! {
-    static LAST: std::cell::RefCell<Option<(Arc<iced::theme::Custom>, Tokens)>> =
-        const { std::cell::RefCell::new(None) };
+    /// The themes [`tokens`] looked up last, the most recent first.
+    static LAST: std::cell::RefCell<Vec<(Arc<iced::theme::Custom>, Tokens)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 thread_local! {
-    static FADED: std::cell::RefCell<HashMap<(String, u32), Theme>> =
+    /// The faded copies of each theme, by name and opacity level.
+    static FADED: std::cell::RefCell<HashMap<String, HashMap<u32, Theme>>> =
         std::cell::RefCell::new(HashMap::new());
 }
 
@@ -849,10 +855,14 @@ pub fn faded(theme: &Theme, opacity: f32) -> Option<Theme> {
         return None;
     }
 
-    let name = iced::theme::Base::name(theme).to_owned();
-    let key = (name.clone(), step);
+    let name = iced::theme::Base::name(theme);
 
-    if let Some(theme) = FADED.with_borrow(|cache| cache.get(&key).cloned()) {
+    if let Some(theme) = FADED.with_borrow(|cache| {
+        cache
+            .get(name)
+            .and_then(|levels| levels.get(&step))
+            .cloned()
+    }) {
         return Some(theme);
     }
 
@@ -864,11 +874,14 @@ pub fn faded(theme: &Theme, opacity: f32) -> Option<Theme> {
 
     FADED.with_borrow_mut(|cache| {
         // Themes are rebuilt when customized; keep the cache bounded.
-        if cache.len() > 512 {
+        if cache.values().map(HashMap::len).sum::<usize>() > 512 {
             cache.clear();
         }
 
-        cache.insert(key, faded.clone());
+        cache
+            .entry(name.to_owned())
+            .or_default()
+            .insert(step, faded.clone());
     });
 
     Some(faded)
@@ -881,8 +894,8 @@ pub fn faded(theme: &Theme, opacity: f32) -> Option<Theme> {
 pub fn tokens(theme: &Theme) -> Tokens {
     if let Theme::Custom(custom) = theme {
         let cached = LAST.with_borrow(|last| {
-            last.as_ref()
-                .and_then(|(theme, tokens)| Arc::ptr_eq(theme, custom).then_some(*tokens))
+            last.iter()
+                .find_map(|(theme, tokens)| Arc::ptr_eq(theme, custom).then_some(*tokens))
         });
 
         if let Some(tokens) = cached {
@@ -896,7 +909,8 @@ pub fn tokens(theme: &Theme) -> Tokens {
 
         if let Some(tokens) = registered {
             LAST.with_borrow_mut(|last| {
-                *last = Some((custom.clone(), tokens));
+                last.truncate(RECENT - 1);
+                last.insert(0, (custom.clone(), tokens));
             });
 
             return tokens;
