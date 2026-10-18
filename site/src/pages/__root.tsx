@@ -1,7 +1,10 @@
+import geist from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url";
+import geistMono from "@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2?url";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/solid-router";
 import { onMount, type JSX } from "solid-js";
 import { HydrationScript } from "solid-js/web";
 
+import { PREVIEW_HEIGHT_STYLES } from "~/components/preview-frame";
 import { SiteFooter } from "~/components/site-footer";
 import { SiteHeader } from "~/components/site-header";
 import { META_THEME_COLORS, MODE_KEY, ThemeProvider } from "~/components/theme-provider";
@@ -34,13 +37,11 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: css },
       { rel: "stylesheet", href: typesetCss },
       { rel: "icon", href: `${base}/favicon.svg`, type: "image/svg+xml" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400&family=Geist:wght@100..900&display=swap",
-      },
+      // The Latin fonts come with the styles, before the first paint.
+      { rel: "preload", href: geist, as: "font", type: "font/woff2", crossOrigin: "anonymous" },
+      { rel: "preload", href: geistMono, as: "font", type: "font/woff2", crossOrigin: "anonymous" },
     ],
+    styles: [{ children: PREVIEW_HEIGHT_STYLES }],
     scripts: [{ children: MODE_SCRIPT }, { children: DOCS_SIDEBAR_SCROLL_RESTORE_SCRIPT }],
   }),
   shellComponent: RootDocument,

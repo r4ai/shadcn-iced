@@ -1,12 +1,19 @@
 // The components of the gallery (see `plugins/site-data.ts`).
-import { components, loaders } from "virtual:site/components";
+import { components, loaders, widths } from "virtual:site/components";
 
 export interface ComponentSummary {
   id: string;
   title: string;
   description: string;
-  examples: { index: number; title: string }[];
+  examples: { index: number; title: string; heights: PreviewHeights }[];
 }
+
+/**
+ * The heights of the preview of an example (its frame) at each width of
+ * `previewWidths`, measured by `site_data` as the preview lays it out:
+ * `null` for an example that fills its height.
+ */
+export type PreviewHeights = (number | null)[];
 
 export interface Example {
   index: number;
@@ -19,6 +26,7 @@ export interface Example {
   lang: string;
   /** The highlighted first lines of the code. */
   preview: string;
+  heights: PreviewHeights;
 }
 
 export interface ComponentDetail {
@@ -32,6 +40,9 @@ export interface ComponentDetail {
 }
 
 export { components };
+
+/** The widths of a preview that the heights of the examples are measured at. */
+export const previewWidths: number[] = widths;
 
 /** A page of the chart showcase (`/charts/<kind>`): examples of a kind of chart. */
 export interface ChartPage {
@@ -69,7 +80,7 @@ export function githubUrl(file: string, line?: number) {
 export const moduleName = (id: string) => id.replaceAll("-", "_");
 
 /**
- * The height a preview starts from (it grows to fit its example): overlays
+ * The smallest height of a preview (it grows to fit its example): overlays
  * need room to open inside their canvas.
  */
 export function minHeight(id: string) {
