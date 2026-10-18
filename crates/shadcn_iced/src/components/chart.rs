@@ -2620,25 +2620,28 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
         let cursor = state.cursor;
         let shown = self.shown_target(state);
 
+        // Only the shown tooltip is laid out (and drawn): the layout is
+        // invalidated whenever the hovered category changes.
         for (index, (tooltip, tree)) in self.tooltips.iter_mut().zip(trees).enumerate() {
+            if shown != Some(index) {
+                nodes.push(layout::Node::default());
+                continue;
+            }
+
             let node = tooltip.as_widget_mut().layout(
                 tree,
                 renderer,
                 &layout::Limits::new(Size::ZERO, Size::INFINITE),
             );
 
-            let position = if shown == Some(index) {
-                let target = if self.chart.kind == Kind::Pie {
-                    index
-                } else {
-                    index % self.chart.count().max(1)
-                };
-
-                self.chart
-                    .tooltip_position(plot, target, cursor, node.size())
+            let target = if self.chart.kind == Kind::Pie {
+                index
             } else {
-                Point::ORIGIN
+                index % self.chart.count().max(1)
             };
+            let position = self
+                .chart
+                .tooltip_position(plot, target, cursor, node.size());
 
             nodes.push(node.move_to(position));
         }
