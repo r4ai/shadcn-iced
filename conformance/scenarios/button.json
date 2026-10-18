@@ -35,6 +35,21 @@
     { "id": "sizes", "viewport": [360, 72] },
     { "id": "icon-sizes", "viewport": [200, 72] },
     { "id": "with-icon", "viewport": [280, 64] },
-    { "id": "disabled", "viewport": [280, 64] }
+    { "id": "disabled", "viewport": [280, 64] },
+    {
+      "id": "keyboard",
+      "description": "Tab focuses each button with a ring; a click focuses one without it.",
+      "viewport": [360, 64],
+      "steps": [
+        { "press": "Tab" },
+        { "snapshot": "default-focused" },
+        { "press": "Tab" },
+        { "snapshot": "outline-focused" },
+        { "press": "Tab" },
+        { "snapshot": "destructive-focused" },
+        { "click": "Outline" },
+        { "snapshot": "clicked" }
+      ]
+    }
   ]
 }
