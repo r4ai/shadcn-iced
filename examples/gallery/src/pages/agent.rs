@@ -114,6 +114,7 @@ pub const CODE_BLOCK: Page = Page {
                 "Demo",
                 container(
                     code_block(ROUTE)
+                        .language("ts")
                         .title("app/api/chat/route.ts")
                         .title_icon(lucide::FILE_CODE)
                         .action(code_block::action(
@@ -132,10 +133,11 @@ pub const CODE_BLOCK: Page = Page {
                 )
                 .max_width(512)
             ),
-            example("Basic", md(code_block(BUILD))),
+            example("Basic", md(code_block(BUILD).language("bash"))),
             example(
                 "Header",
                 md(code_block(INSTALL)
+                    .language("bash")
                     .title("Terminal")
                     .title_icon(lucide::TERMINAL)
                     .copy_button(copy("pnpm add ai @ai-sdk/react zod"), copied("pnpm add ai @ai-sdk/react zod")))
@@ -143,13 +145,18 @@ pub const CODE_BLOCK: Page = Page {
             example(
                 "Floating Actions",
                 md(code_block(INSTALL)
+                    .language("bash")
                     .copy_button(copy(INSTALL), copied(INSTALL))
                     .floating_actions(true))
             ),
-            example("Line Numbers", md(code_block(PACKAGE).line_numbers(true))),
+            example(
+                "Line Numbers",
+                md(code_block(PACKAGE).language("json").line_numbers(true))
+            ),
             example(
                 "Start Line",
                 md(code_block("  \"scripts\": {\n    \"dev\": \"next dev\",\n    \"build\": \"next build\"\n  }")
+                    .language("json")
                     .line_numbers(true)
                     .start_line(4))
             ),
@@ -160,6 +167,7 @@ pub const CODE_BLOCK: Page = Page {
             example(
                 "Highlighted Lines",
                 md(code_block(CONFIG)
+                    .language("ts")
                     .line_numbers(true)
                     .line(2, Line::Highlighted)
                     .line(3, Line::Highlighted))
@@ -168,6 +176,7 @@ pub const CODE_BLOCK: Page = Page {
                 "Diff",
                 md(code_block(PATCH)
                     .diff()
+                    .language("tsx")
                     .title("components/greeting.tsx")
                     .copy_button(copy(PATCH), copied(PATCH)))
             ),
