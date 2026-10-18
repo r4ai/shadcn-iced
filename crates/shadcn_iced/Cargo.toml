@@ -7,9 +7,17 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["lucide", "geist", "symbols"]
+# The fonts bundled by `shadcn_iced_core`: see its features.
+lucide = ["shadcn_iced_core/lucide"]
+geist = ["shadcn_iced_core/geist"]
+inter = ["shadcn_iced_core/inter"]
+symbols = ["shadcn_iced_core/symbols"]
+
 [dependencies]
 iced.workspace = true
-shadcn_iced_core = { path = "../shadcn_iced_core", version = "0.1.0" }
+shadcn_iced_core = { path = "../shadcn_iced_core", version = "0.1.0", default-features = false }
 
 [lints]
 workspace = true
