@@ -11,21 +11,19 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::{Pressable, dashed};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
-use iced::advanced::graphics::geometry::Renderer as _;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer::{self, Renderer as _};
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::widget::button::Status;
-use iced::widget::canvas::{self, Frame, Path, Stroke};
 use iced::widget::{Column, Row, Stack, container, image, text};
 use iced::{
-    Alignment, Background, Border, Color, Event, Length, Padding, Point, Rectangle, Size as Bounds,
-    Theme, Vector, border, mouse,
+    Alignment, Background, Border, Color, Event, Length, Padding, Rectangle, Size as Bounds, Theme,
+    Vector, border, mouse,
 };
 
 /// The state of an [`Attachment`].
@@ -527,29 +525,7 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Outline<'_, Message> {
             return;
         }
 
-        renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
-            let mut frame = Frame::new(renderer, bounds.size());
-
-            // Centered on the 1px border.
-            frame.stroke(
-                &Path::rounded_rectangle(
-                    Point::new(0.5, 0.5),
-                    Bounds::new(bounds.width - 1.0, bounds.height - 1.0),
-                    (radius - 0.5).into(),
-                ),
-                Stroke {
-                    line_dash: canvas::LineDash {
-                        segments: &[3.0, 2.0],
-                        offset: 0,
-                    },
-                    ..Stroke::default()
-                        .with_color(t.palette.border)
-                        .with_width(1.0)
-                },
-            );
-
-            renderer.draw_geometry(frame.into_geometry());
-        });
+        dashed::draw(renderer, bounds, t.palette.border, radius);
     }
 
     fn mouse_interaction(

@@ -15,12 +15,12 @@
 use super::typography::balance;
 
 use shadcn_iced_core::icon::Icon;
+use shadcn_iced_core::primitive::dashed_border;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
-use iced::widget::canvas::{self, Frame, Path, Stroke};
-use iced::widget::{Column, Stack, container, text};
-use iced::{Alignment, Background, Length, Padding, Point, Rectangle, Size, Theme, border, mouse};
+use iced::widget::{Column, container, text};
+use iced::{Alignment, Background, Length, Padding, Theme, border};
 
 /// An empty state. See the [module documentation](self).
 pub struct Empty<'a, Message> {
@@ -174,56 +174,14 @@ impl<'a, Message: 'a> From<Empty<'a, Message>> for Element<'a, Message> {
         });
 
         if bordered {
-            Stack::new()
-                .push(content)
-                .push(
-                    canvas::Canvas::new(DashedBorder)
-                        .width(Length::Fill)
-                        .height(Length::Fill),
-                )
-                .into()
+            // `border border-dashed rounded-xl`
+            dashed_border(content, |theme| {
+                let t = tokens(theme);
+                (t.palette.border, t.radius_xl())
+            })
+            .into()
         } else {
             content.into()
         }
-    }
-}
-
-/// A dashed border (`border border-dashed rounded-xl`): dashes of 3px with
-/// gaps of 2px, like browsers draw 1px dashed borders.
-struct DashedBorder;
-
-impl<Message> canvas::Program<Message> for DashedBorder {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &(),
-        renderer: &iced::Renderer,
-        theme: &Theme,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry> {
-        let t = tokens(theme);
-        let mut frame = Frame::new(renderer, bounds.size());
-
-        // The middle of the 1px border, inside the bounds.
-        frame.stroke(
-            &Path::rounded_rectangle(
-                Point::new(0.5, 0.5),
-                Size::new(bounds.width - 1.0, bounds.height - 1.0),
-                (t.radius_xl() - 0.5).into(),
-            ),
-            Stroke {
-                line_dash: canvas::LineDash {
-                    segments: &[3.0, 2.0],
-                    offset: 0,
-                },
-                ..Stroke::default()
-                    .with_color(t.palette.border)
-                    .with_width(1.0)
-            },
-        );
-
-        vec![frame.into_geometry()]
     }
 }
