@@ -2621,7 +2621,8 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
         let shown = self.shown_target(state);
 
         // Only the shown tooltip is laid out (and drawn): the layout is
-        // invalidated whenever the hovered category changes.
+        // invalidated whenever the hovered category changes. When only the
+        // pointer moves, `draw` moves the tooltip after it.
         for (index, (tooltip, tree)) in self.tooltips.iter_mut().zip(trees).enumerate() {
             if shown != Some(index) {
                 nodes.push(layout::Node::default());
@@ -2706,11 +2707,17 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
         let hovered = position.and_then(|point| self.chart.hovered(plot, point));
         let position = position.filter(|_| hovered.is_some());
 
-        if hovered != state.hovered || position != state.cursor {
+        // A new category shows another tooltip, which needs a layout; the
+        // pointer alone only moves it, which `draw` does.
+        if hovered != state.hovered {
             state.hovered = hovered;
             state.cursor = position;
 
             shell.invalidate_layout();
+            shell.request_redraw();
+        } else if position != state.cursor {
+            state.cursor = position;
+
             shell.request_redraw();
         }
     }
@@ -2760,7 +2767,28 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
         }
 
         if let Some(index) = self.tooltip_index(state) {
-            let tooltip = &self.tooltips[index - usize::from(self.legend.is_some())];
+            let target = index - usize::from(self.legend.is_some());
+            let tooltip = &self.tooltips[target];
+            let laid = children[index].bounds();
+
+            // The tooltip was laid out for the pointer of the last layout:
+            // follow the pointer since.
+            let category = if self.chart.kind == Kind::Pie {
+                target
+            } else {
+                target % self.chart.count().max(1)
+            };
+            let position = self.chart.tooltip_position(
+                self.chart.plot(bounds.size(), state.legend),
+                category,
+                state.cursor,
+                laid.size(),
+            );
+            let offset = Vector::new(
+                bounds.x + position.x - laid.x,
+                bounds.y + position.y - laid.y,
+            );
+
             let layer = Rectangle {
                 x: bounds.x - 32.0,
                 y: bounds.y - 32.0,
@@ -2769,15 +2797,17 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
             };
 
             renderer.with_layer(layer, |renderer| {
-                tooltip.as_widget().draw(
-                    &tree.children[index],
-                    renderer,
-                    theme,
-                    style,
-                    children[index],
-                    cursor,
-                    viewport,
-                );
+                renderer.with_translation(offset, |renderer| {
+                    tooltip.as_widget().draw(
+                        &tree.children[index],
+                        renderer,
+                        theme,
+                        style,
+                        children[index],
+                        cursor,
+                        viewport,
+                    );
+                });
             });
         }
     }
