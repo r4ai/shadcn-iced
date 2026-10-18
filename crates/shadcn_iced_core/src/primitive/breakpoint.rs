@@ -147,7 +147,10 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let wide = limits.max().width + self.inset >= self.breakpoint.min_width;
+        let window = limits.max().width + self.inset;
+        WINDOW_WIDTH.set(Some(window));
+
+        let wide = window >= self.breakpoint.min_width;
         self.breakpoint.wide.set(wide);
 
         let max_width = if wide {
@@ -418,5 +421,239 @@ where
 {
     fn from(either: Either<'a, Message, Theme, Renderer>) -> Self {
         Element::new(either)
+    }
+}
+
+thread_local! {
+    /// The width of the window, as last seen by a widget of shadcn_iced.
+    static WINDOW_WIDTH: Cell<Option<f32>> = const { Cell::new(None) };
+}
+
+/// The width of the window, as last seen by a widget of shadcn_iced: in a
+/// window event (`Opened`, `Resized`) or by a [`Breakpoint::measure`].
+/// `None` until then.
+pub fn window_width() -> Option<f32> {
+    WINDOW_WIDTH.get()
+}
+
+/// Records the width of the window from a window event, returning whether
+/// it changed.
+fn observe(event: &Event) -> bool {
+    let width = match event {
+        Event::Window(
+            iced::window::Event::Opened { size, .. } | iced::window::Event::Resized(size),
+        ) => size.width,
+        _ => return false,
+    };
+
+    WINDOW_WIDTH.replace(Some(width)) != Some(width)
+}
+
+/// Whether the window is at least `min_width` wide, as far as it is known
+/// (see [`window_width`]). An unknown window counts as wide.
+pub fn is_window_wide(min_width: f32) -> bool {
+    window_width().is_none_or(|width| width >= min_width)
+}
+
+/// A widget adapted to the width of the window, e.g. `text-base md:text-sm`
+/// for an input. See [`adaptive`].
+pub struct Adaptive<W> {
+    widget: Option<W>,
+    min_width: f32,
+    adapt: fn(W, bool) -> W,
+    /// Whether the widget was adapted to a wide window, once adapted.
+    wide: Option<bool>,
+}
+
+/// Adapts `widget` to the width of the window before every layout, with
+/// `adapt(widget, wide)`, where `wide` is whether the window is at least
+/// `min_width` wide (see [`is_window_wide`]).
+///
+/// Unlike [`Breakpoint::measure`], it works anywhere: the window is known
+/// from the window events that iced sends to every widget (`Opened`, then
+/// `Resized`), and a resize lays the interface out again when it crosses
+/// the breakpoint.
+///
+/// ```no_run
+/// # use shadcn_iced_core::primitive::breakpoint::{self, adaptive};
+/// # use iced::widget::text_input;
+/// # fn view<'a>() -> iced::Element<'a, String> {
+/// // `text-base md:text-sm`
+/// adaptive(text_input("Email", ""), breakpoint::MD, |input, wide| {
+///     input.size(if wide { 14 } else { 16 })
+/// })
+/// .into()
+/// # }
+/// ```
+pub fn adaptive<W>(widget: W, min_width: f32, adapt: fn(W, bool) -> W) -> Adaptive<W> {
+    Adaptive {
+        widget: Some(widget),
+        min_width,
+        adapt,
+        wide: None,
+    }
+}
+
+impl<W> Adaptive<W> {
+    fn widget(&self) -> &W {
+        self.widget.as_ref().expect("adaptive widget")
+    }
+
+    fn widget_mut(&mut self) -> &mut W {
+        self.widget.as_mut().expect("adaptive widget")
+    }
+}
+
+impl<W, Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Adaptive<W>
+where
+    W: Widget<Message, Theme, Renderer>,
+    Renderer: iced::advanced::Renderer,
+{
+    fn tag(&self) -> iced::advanced::widget::tree::Tag {
+        self.widget().tag()
+    }
+
+    fn state(&self) -> iced::advanced::widget::tree::State {
+        self.widget().state()
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        self.widget().children()
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        self.widget().diff(tree);
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.widget().size()
+    }
+
+    fn size_hint(&self) -> Size<Length> {
+        self.widget().size_hint()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let wide = is_window_wide(self.min_width);
+
+        if self.wide != Some(wide) {
+            let widget = self.widget.take().expect("adaptive widget");
+            self.widget = Some((self.adapt)(widget, wide));
+            self.wide = Some(wide);
+        }
+
+        self.widget_mut().layout(tree, renderer, limits)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.widget_mut().operate(tree, layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        observe(event);
+
+        if self
+            .wide
+            .is_some_and(|wide| wide != is_window_wide(self.min_width))
+        {
+            shell.invalidate_layout();
+            shell.request_redraw();
+        }
+
+        self.widget_mut().update(
+            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.widget()
+            .draw(tree, renderer, theme, style, layout, cursor, viewport);
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        self.widget()
+            .mouse_interaction(tree, layout, cursor, viewport, renderer)
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        self.widget_mut()
+            .overlay(tree, layout, renderer, viewport, translation)
+    }
+}
+
+impl<'a, W, Message, Theme, Renderer> From<Adaptive<W>> for Element<'a, Message, Theme, Renderer>
+where
+    W: Widget<Message, Theme, Renderer> + 'a,
+    Message: 'a,
+    Theme: 'a,
+    Renderer: iced::advanced::Renderer + 'a,
+{
+    fn from(adaptive: Adaptive<W>) -> Self {
+        Element::new(adaptive)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn window_events_tell_the_width_of_the_window() {
+        let resized = |width| Event::Window(iced::window::Event::Resized(Size::new(width, 600.0)));
+
+        assert!(observe(&Event::Window(iced::window::Event::Opened {
+            position: None,
+            size: Size::new(500.0, 600.0),
+        })));
+        assert_eq!(window_width(), Some(500.0));
+        assert!(!is_window_wide(MD));
+
+        assert!(!observe(&resized(500.0)));
+        assert!(observe(&resized(800.0)));
+        assert!(is_window_wide(MD));
     }
 }

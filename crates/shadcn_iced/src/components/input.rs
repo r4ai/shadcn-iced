@@ -11,6 +11,7 @@
 //! ```
 use shadcn_iced_core::icon::Icon;
 use shadcn_iced_core::primitive::FocusWithin;
+use shadcn_iced_core::primitive::breakpoint::{self, adaptive};
 use shadcn_iced_core::primitive::focus;
 use shadcn_iced_core::theme::{alpha, tokens};
 use shadcn_iced_core::{Element, font, style};
@@ -25,6 +26,8 @@ pub struct Input<'a, Message: Clone> {
     invalid: bool,
     icon: Option<Icon>,
     chromeless: bool,
+    /// Whether the font size was set, rather than following the window.
+    fixed_size: bool,
 }
 
 /// Creates an [`Input`] with a placeholder and a value.
@@ -41,6 +44,7 @@ pub fn input<'a, Message: Clone + 'a>(placeholder: &str, value: &str) -> Input<'
         invalid: false,
         icon: None,
         chromeless: false,
+        fixed_size: false,
     }
 }
 
@@ -88,13 +92,15 @@ impl<'a, Message: Clone + 'a> Input<'a, Message> {
         self
     }
 
-    /// Sets the font size. Inputs are `text-base md:text-sm`: they use
-    /// `text-sm` (14px) by default, the size from the `md` breakpoint
-    /// (768px) on; set `text-base` (16px) for windows narrower than that.
+    /// Sets the font size. By default, inputs are `text-base md:text-sm`:
+    /// they use `text-base` (16px) in windows narrower than the `md`
+    /// breakpoint (768px), and `text-sm` (14px) from it on (see
+    /// [`adaptive`]).
     ///
     /// The line height stays at 20px, which keeps the `h-8` height.
     pub fn text_size(mut self, size: impl Into<Pixels>) -> Self {
         self.raw = self.raw.size(size);
+        self.fixed_size = true;
         self
     }
 
@@ -122,7 +128,27 @@ impl<'a, Message: Clone + 'a> Input<'a, Message> {
         self
     }
 
-    /// Returns the underlying iced [`TextInput`], styled.
+    /// Returns the underlying iced [`TextInput`], styled, adapted to the
+    /// width of the window (`text-base md:text-sm`) unless its font size
+    /// was set.
+    pub fn into_adaptive(self) -> Element<'a, Message> {
+        if self.fixed_size {
+            return self.into_text_input().into();
+        }
+
+        adaptive(self.into_text_input(), breakpoint::MD, |input, wide| {
+            input.size(if wide {
+                style::text::SM
+            } else {
+                style::text::BASE
+            })
+        })
+        .into()
+    }
+
+    /// Returns the underlying iced [`TextInput`], styled, with the font
+    /// size of wide windows (`md:text-sm`) unless set. Prefer
+    /// [`Input::into_adaptive`], which follows the window.
     pub fn into_text_input(self) -> TextInput<'a, Message> {
         let invalid = self.invalid;
         let chromeless = self.chromeless;
@@ -158,10 +184,10 @@ impl<'a, Message: Clone + 'a> From<Input<'a, Message>> for Element<'a, Message> 
         let invalid = input.invalid;
 
         if input.chromeless {
-            return input.into_text_input().into();
+            return input.into_adaptive();
         }
 
-        FocusWithin::new(input.into_text_input(), move |theme, status| {
+        FocusWithin::new(input.into_adaptive(), move |theme, status| {
             ring(theme, status, invalid)
         })
         .into()

@@ -11,6 +11,7 @@
 //! textarea(content).placeholder("Type your message here.").on_action(Message::Edit).into()
 //! # }
 //! ```
+use shadcn_iced_core::primitive::breakpoint::{self, adaptive};
 use shadcn_iced_core::{Element, font, style};
 
 use iced::widget::text_editor::{self, Status, Style};
@@ -24,6 +25,8 @@ pub struct Textarea<'a, Message> {
     raw: TextEditor<'a, iced::advanced::text::highlighter::PlainText, Message>,
     invalid: bool,
     disabled: bool,
+    /// Whether the font size was set, rather than following the window.
+    fixed_size: bool,
 }
 
 /// Creates a [`Textarea`] editing the given [`Content`].
@@ -39,6 +42,7 @@ pub fn textarea<'a, Message: Clone + 'a>(content: &'a Content) -> Textarea<'a, M
             .min_height(64 - 18),
         invalid: false,
         disabled: true,
+        fixed_size: false,
     }
 }
 
@@ -57,12 +61,13 @@ impl<'a, Message: Clone + 'a> Textarea<'a, Message> {
         self
     }
 
-    /// Sets the font size, with its Tailwind line height. Textareas are
-    /// `text-base md:text-sm`: they use `text-sm` (14px) by default, the
-    /// size from the `md` breakpoint (768px) on; set `text-base` (16px)
-    /// for windows narrower than that.
+    /// Sets the font size, with its Tailwind line height. By default,
+    /// textareas are `text-base md:text-sm`: they use `text-base` (16px) in
+    /// windows narrower than the `md` breakpoint (768px), and `text-sm`
+    /// (14px) from it on (see [`adaptive`]).
     pub fn text_size(mut self, size: f32) -> Self {
         self.raw = self.raw.size(size).line_height(style::text::leading(size));
+        self.fixed_size = true;
         self
     }
 
@@ -90,15 +95,31 @@ impl<'a, Message: Clone + 'a> From<Textarea<'a, Message>> for Element<'a, Messag
         let invalid = textarea.invalid;
         let disabled = textarea.disabled;
 
-        shadcn_iced_core::primitive::FocusWithin::new(
-            textarea.raw.style(move |theme, status| {
-                // iced only reports the disabled status after a redraw.
-                let status = if disabled { Status::Disabled } else { status };
+        let raw = textarea.raw.style(move |theme, status| {
+            // iced only reports the disabled status after a redraw.
+            let status = if disabled { Status::Disabled } else { status };
 
-                style(theme, status, invalid)
-            }),
-            move |theme, status| super::input::ring(theme, status, invalid),
-        )
+            style(theme, status, invalid)
+        });
+
+        let raw: Element<'a, Message> = if textarea.fixed_size {
+            raw.into()
+        } else {
+            adaptive(raw, breakpoint::MD, |raw, wide| {
+                let size = if wide {
+                    style::text::SM
+                } else {
+                    style::text::BASE
+                };
+
+                raw.size(size).line_height(style::text::leading(size))
+            })
+            .into()
+        };
+
+        shadcn_iced_core::primitive::FocusWithin::new(raw, move |theme, status| {
+            super::input::ring(theme, status, invalid)
+        })
         .into()
     }
 }
