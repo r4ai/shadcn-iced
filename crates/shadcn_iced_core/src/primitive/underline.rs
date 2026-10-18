@@ -69,6 +69,13 @@ impl<'a, Message, Renderer> Underline<'a, Message, Renderer> {
     }
 }
 
+/// The state of an [`Underline`].
+#[derive(Debug, Default)]
+struct State {
+    /// Whether the cursor was over the hover area at the last move.
+    hovered: bool,
+}
+
 /// The distance between the vertical center of a line of Geist text and its
 /// baseline, relative to the font size.
 const BASELINE: f32 = 0.357;
@@ -78,19 +85,19 @@ where
     Renderer: iced::advanced::Renderer,
 {
     fn tag(&self) -> tree::Tag {
-        self.content.as_widget().tag()
+        tree::Tag::of::<State>()
     }
 
     fn state(&self) -> tree::State {
-        self.content.as_widget().state()
+        tree::State::new(State::default())
     }
 
     fn children(&self) -> Vec<Tree> {
-        self.content.as_widget().children()
+        vec![Tree::new(&self.content)]
     }
 
     fn diff(&self, tree: &mut Tree) {
-        self.content.as_widget().diff(tree);
+        tree.diff_children(std::slice::from_ref(&self.content));
     }
 
     fn size(&self) -> Size<Length> {
@@ -107,7 +114,9 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        self.content.as_widget_mut().layout(tree, renderer, limits)
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
     }
 
     fn operate(
@@ -119,7 +128,7 @@ where
     ) {
         self.content
             .as_widget_mut()
-            .operate(tree, layout, renderer, operation);
+            .operate(&mut tree.children[0], layout, renderer, operation);
     }
 
     fn update(
@@ -133,13 +142,29 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        // The underline depends on the position of the cursor only.
-        if let Event::Mouse(mouse::Event::CursorMoved { .. }) = event {
-            shell.request_redraw();
+        // The underline depends on the position of the cursor only: redraw
+        // when it enters or leaves the hover area.
+        if !self.always
+            && let Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft) = event
+        {
+            let state = tree.state.downcast_mut::<State>();
+            let hovered = cursor.is_over(expand(layout.bounds(), self.hover_area));
+
+            if hovered != state.hovered {
+                state.hovered = hovered;
+                shell.request_redraw();
+            }
         }
 
         self.content.as_widget_mut().update(
-            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
         );
     }
 
@@ -153,9 +178,15 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        self.content
-            .as_widget()
-            .draw(tree, renderer, theme, style, layout, cursor, viewport);
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
 
         let bounds = layout.bounds();
 
@@ -190,9 +221,13 @@ where
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        self.content
-            .as_widget()
-            .mouse_interaction(tree, layout, cursor, viewport, renderer)
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
     }
 
     fn overlay<'b>(
@@ -203,9 +238,13 @@ where
         viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        self.content
-            .as_widget_mut()
-            .overlay(tree, layout, renderer, viewport, translation)
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
     }
 }
 
