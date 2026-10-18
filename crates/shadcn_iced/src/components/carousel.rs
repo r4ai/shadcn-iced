@@ -19,15 +19,11 @@ use super::button::{self, Variant, icon_button};
 
 use shadcn_iced_core::Element;
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::track;
+use shadcn_iced_core::primitive::{keys, track};
 
-use iced::advanced::layout::{self, Layout};
-use iced::advanced::renderer;
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
-use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
 use iced::widget::{Column, Row, container};
-use iced::{Alignment, Event, Length, Rectangle, Size, Theme, Vector, mouse};
+use iced::{Alignment, Length};
 
 /// The scrolling direction of a [`Carousel`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -195,181 +191,14 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
                 .into()
         };
 
-        Element::new(Keys {
-            content,
-            previous: previous_message,
-            next: next_message,
+        // `onKeyDownCapture` on the carousel region: ArrowLeft and
+        // ArrowRight go to the previous and next items.
+        keys(content, move |key, _| match key {
+            keyboard::Key::Named(key::Named::ArrowLeft) => previous_message.clone(),
+            keyboard::Key::Named(key::Named::ArrowRight) => next_message.clone(),
+            _ => None,
         })
-    }
-}
-
-/// Goes to the previous or next item with <kbd>ArrowLeft</kbd> and
-/// <kbd>ArrowRight</kbd> (`onKeyDownCapture` on the carousel region), once
-/// the carousel was clicked. iced has no focus within a region: a click
-/// inside of it stands for the focus of its buttons, and a click outside of
-/// it for their blur.
-struct Keys<'a, Message> {
-    content: Element<'a, Message>,
-    previous: Option<Message>,
-    next: Option<Message>,
-}
-
-#[derive(Debug, Default)]
-struct KeysState {
-    active: bool,
-}
-
-impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Keys<'_, Message> {
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<KeysState>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(KeysState::default())
-    }
-
-    fn children(&self) -> Vec<Tree> {
-        vec![Tree::new(&self.content)]
-    }
-
-    fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(std::slice::from_ref(&self.content));
-    }
-
-    fn size(&self) -> Size<Length> {
-        self.content.as_widget().size()
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &iced::Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        let child = self
-            .content
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, limits);
-
-        layout::Node::with_children(child.size(), vec![child])
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &iced::Renderer,
-        operation: &mut dyn Operation,
-    ) {
-        self.content.as_widget_mut().operate(
-            &mut tree.children[0],
-            layout.children().next().unwrap(),
-            renderer,
-            operation,
-        );
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &iced::Renderer,
-        clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) {
-        let state = tree.state.downcast_mut::<KeysState>();
-
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(_)) => {
-                state.active = cursor.is_over(layout.bounds());
-            }
-            Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) if state.active => {
-                let message = match key.as_ref() {
-                    keyboard::Key::Named(key::Named::ArrowLeft) => Some(&self.previous),
-                    keyboard::Key::Named(key::Named::ArrowRight) => Some(&self.next),
-                    _ => None,
-                };
-
-                if let Some(message) = message {
-                    if let Some(message) = message {
-                        shell.publish(message.clone());
-                    }
-
-                    shell.capture_event();
-                    return;
-                }
-            }
-            _ => {}
-        }
-
-        self.content.as_widget_mut().update(
-            &mut tree.children[0],
-            event,
-            layout.children().next().unwrap(),
-            cursor,
-            renderer,
-            clipboard,
-            shell,
-            viewport,
-        );
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut iced::Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        self.content.as_widget().draw(
-            &tree.children[0],
-            renderer,
-            theme,
-            style,
-            layout.children().next().unwrap(),
-            cursor,
-            viewport,
-        );
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-        renderer: &iced::Renderer,
-    ) -> mouse::Interaction {
-        self.content.as_widget().mouse_interaction(
-            &tree.children[0],
-            layout.children().next().unwrap(),
-            cursor,
-            viewport,
-            renderer,
-        )
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &iced::Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
-        self.content.as_widget_mut().overlay(
-            &mut tree.children[0],
-            layout.children().next().unwrap(),
-            renderer,
-            viewport,
-            translation,
-        )
+        .into()
     }
 }
 

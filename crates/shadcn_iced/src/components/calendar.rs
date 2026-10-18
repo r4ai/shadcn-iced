@@ -15,19 +15,18 @@
 //! ```
 use shadcn_iced_core::icon::lucide;
 use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::focus::Ring;
+use shadcn_iced_core::primitive::focus_grid::{Cell, focus_grid};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::advanced::layout::{self, Layout};
-use iced::advanced::renderer::{self, Renderer as _};
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
-use iced::advanced::{Clipboard, Shell, overlay};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Operation, Tree, Widget};
 use iced::widget::button::{Status, Style};
 use iced::widget::text::LineHeight;
 use iced::widget::{Column, Row, container, pick_list, stack, text};
-use iced::{
-    Background, Border, Color, Event, Length, Point, Rectangle, Size, Theme, Vector, border, mouse,
-};
+use iced::{Background, Border, Color, Length, Point, Rectangle, Size, Theme, border, mouse};
 
 use std::fmt;
 use std::rc::Rc;
@@ -832,7 +831,7 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
         let transparent = calendar.transparent;
         // The border of CSS surrounds the padding.
         let inset = calendar.padding + if bordered { 1.0 } else { 0.0 };
-        let grid = calendar.focus_grid(inset);
+        let (days, target) = calendar.days(inset);
 
         let content = container(months)
             .padding(inset)
@@ -849,17 +848,31 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
                 }
             });
 
-        Element::new(Focus {
-            content: content.into(),
-            grid,
-        })
+        // Tracks the focused day like react-day-picker: a pressed day gets
+        // the focus, which moves to another day when the months change, and
+        // shows a ring (`group-data-[focused=true]/day:ring-[3px]
+        // ring-ring/50`).
+        focus_grid(content, days)
+            .fallback(target)
+            .ring(|theme| {
+                let t = tokens(theme);
+
+                Ring {
+                    color: alpha(t.palette.ring, 0.5),
+                    width: 3.0,
+                    radius: t.radius_md(),
+                }
+            })
+            .into()
     }
 }
 
 impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
     /// Where the days are, and which one gets the focus when the focused
-    /// day is not displayed.
-    fn focus_grid(&self, inset: f32) -> Grid {
+    /// day is not displayed. A day is identified by its date and the month
+    /// displaying it, which differs for outside days.
+    #[allow(clippy::type_complexity)]
+    fn days(&self, inset: f32) -> (Vec<Cell<(Date, Month)>>, Option<(Date, Month)>) {
         let cell = self.cell;
         let grid_width = cell * if self.week_numbers { 8.0 } else { 7.0 };
         let mut days = Vec::new();
@@ -889,19 +902,20 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
 
                     let disabled = self.disabled.as_ref().is_some_and(|f| f(date));
 
-                    days.push(GridDay {
-                        date,
-                        month,
-                        bounds: Rectangle::new(
-                            Point::new(
-                                x + weekday as f32 * cell,
-                                y + week as f32 * (cell + WEEK_GAP),
+                    days.push((
+                        Cell {
+                            key: (date, month),
+                            bounds: Rectangle::new(
+                                Point::new(
+                                    x + weekday as f32 * cell,
+                                    y + week as f32 * (cell + WEEK_GAP),
+                                ),
+                                Size::new(cell, cell),
                             ),
-                            Size::new(cell, cell),
-                        ),
-                        focusable: !outside && !disabled,
-                        interactive: !disabled && self.on_select.is_some(),
-                    });
+                            pressable: !disabled && self.on_select.is_some(),
+                        },
+                        !outside && !disabled,
+                    ));
                 }
             }
 
@@ -915,235 +929,17 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
             Selection::Range(start, _) => start,
             Selection::None => None,
         };
-        let focusable = || days.iter().filter(|day| day.focusable);
+        let focusable = || {
+            days.iter()
+                .filter(|(_, focusable)| *focusable)
+                .map(|(day, _)| day.key)
+        };
         let target = focusable()
-            .find(|day| Some(day.date) == selected)
-            .or_else(|| focusable().find(|day| Some(day.date) == self.today))
-            .or_else(|| focusable().next())
-            .map(|day| (day.date, day.month));
+            .find(|(date, _)| Some(*date) == selected)
+            .or_else(|| focusable().find(|(date, _)| Some(*date) == self.today))
+            .or_else(|| focusable().next());
 
-        Grid { days, target }
-    }
-}
-
-/// A day of the displayed months.
-struct GridDay {
-    date: Date,
-    /// The month displaying it, which differs for outside days.
-    month: Month,
-    bounds: Rectangle,
-    focusable: bool,
-    interactive: bool,
-}
-
-struct Grid {
-    days: Vec<GridDay>,
-    target: Option<(Date, Month)>,
-}
-
-/// Tracks the focused day like react-day-picker: a pressed day gets the
-/// focus, which moves to another day when the months change, and shows a
-/// ring (`group-data-[focused=true]/day:ring-[3px] ring-ring/50`).
-struct Focus<'a, Message> {
-    content: Element<'a, Message>,
-    grid: Grid,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct FocusState {
-    focused: Option<(Date, Month)>,
-}
-
-impl<Message> Focus<'_, Message> {
-    /// The focused day, moved to the focus target when it is not displayed.
-    fn focused(&self, state: &FocusState) -> Option<&GridDay> {
-        let focused = state.focused?;
-        let displayed = |(date, month): (Date, Month)| {
-            self.grid
-                .days
-                .iter()
-                .find(|day| day.date == date && day.month == month)
-        };
-
-        displayed(focused).or_else(|| displayed(self.grid.target?))
-    }
-}
-
-impl<Message> Widget<Message, Theme, iced::Renderer> for Focus<'_, Message> {
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<FocusState>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(FocusState::default())
-    }
-
-    fn children(&self) -> Vec<Tree> {
-        vec![Tree::new(&self.content)]
-    }
-
-    fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(std::slice::from_ref(&self.content));
-    }
-
-    fn size(&self) -> Size<Length> {
-        self.content.as_widget().size()
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &iced::Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        let child = self
-            .content
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, limits);
-
-        layout::Node::with_children(child.size(), vec![child])
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &iced::Renderer,
-        operation: &mut dyn Operation,
-    ) {
-        self.content.as_widget_mut().operate(
-            &mut tree.children[0],
-            layout.children().next().unwrap(),
-            renderer,
-            operation,
-        );
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &iced::Renderer,
-        clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) {
-        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event {
-            let bounds = layout.bounds();
-            let state = tree.state.downcast_mut::<FocusState>();
-            let before = state.focused;
-
-            match cursor.position_in(bounds) {
-                // Disabled days cannot take the focus, and the navigation
-                // keeps it in the grid.
-                Some(position) => {
-                    if let Some(day) = self
-                        .grid
-                        .days
-                        .iter()
-                        .find(|day| day.interactive && day.bounds.contains(position))
-                    {
-                        state.focused = Some((day.date, day.month));
-                    }
-                }
-                None => state.focused = None,
-            }
-
-            if state.focused != before {
-                shell.request_redraw();
-            }
-        }
-
-        self.content.as_widget_mut().update(
-            &mut tree.children[0],
-            event,
-            layout.children().next().unwrap(),
-            cursor,
-            renderer,
-            clipboard,
-            shell,
-            viewport,
-        );
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut iced::Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        self.content.as_widget().draw(
-            &tree.children[0],
-            renderer,
-            theme,
-            style,
-            layout.children().next().unwrap(),
-            cursor,
-            viewport,
-        );
-
-        let Some(day) = self.focused(tree.state.downcast_ref::<FocusState>()) else {
-            return;
-        };
-
-        let t = tokens(theme);
-        let bounds = day.bounds + Vector::new(layout.bounds().x, layout.bounds().y);
-        let ring = bounds.expand(3.0);
-
-        renderer.with_layer(ring, |renderer| {
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: ring,
-                    border: Border {
-                        color: alpha(t.palette.ring, 0.5),
-                        width: 3.0,
-                        radius: (t.radius_md() + 3.0).into(),
-                    },
-                    ..renderer::Quad::default()
-                },
-                Color::TRANSPARENT,
-            );
-        });
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-        renderer: &iced::Renderer,
-    ) -> mouse::Interaction {
-        self.content.as_widget().mouse_interaction(
-            &tree.children[0],
-            layout.children().next().unwrap(),
-            cursor,
-            viewport,
-            renderer,
-        )
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &iced::Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
-        self.content.as_widget_mut().overlay(
-            &mut tree.children[0],
-            layout.children().next().unwrap(),
-            renderer,
-            viewport,
-            translation,
-        )
+        (days.into_iter().map(|(day, _)| day).collect(), target)
     }
 }
 
