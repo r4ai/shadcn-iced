@@ -1,5 +1,5 @@
-//! Wheel scrolling like in browsers: smooth, and horizontal with
-//! <kbd>Shift</kbd>.
+//! Wheel scrolling like in browsers: horizontal with <kbd>Shift</kbd>, and
+//! smooth if opted in.
 //!
 //! iced's scrollables jump by the whole delta of a mouse wheel notch and
 //! only turn <kbd>Shift</kbd> + wheel into a horizontal scroll for line
@@ -8,9 +8,19 @@
 //! see them, rewrites the wheel events:
 //!
 //! - <kbd>Shift</kbd> swaps the axes (except on macOS, which does it),
-//! - a notch of a mouse wheel (a line delta, or a large pixel delta) is
-//!   spread over a few frames with an ease-out, like the smooth scrolling of
-//!   browsers. Small pixel deltas (touchpads) apply right away.
+//! - a notch of a mouse wheel (a line delta, or a large pixel delta) scrolls
+//!   100px, like in Chrome,
+//! - with smooth scrolling, a notch is animated like the smooth scrolling of
+//!   Chrome: an `ease-in-out` over 100–200ms (shorter for longer
+//!   distances), and a notch during a scroll retargets it, keeping its
+//!   velocity, so spinning the wheel scrolls faster without jerks. Small
+//!   pixel deltas (touchpads) apply right away.
+//!
+//! Smooth scrolling is off by default. Turn it on for every [`Wheel`] with
+//! [`set_smooth`], or for one of them with [`Wheel::smooth`]. Wheels can be
+//! nested: a [`smooth_scroll`] around a single scroll area makes only that
+//! area smooth, under a [`wheel`] wrapping the whole application (each
+//! event is rewritten once).
 //!
 //! The scrolled scrollable stays the one under the pointer when the scroll
 //! started, and a scroll that reaches the end of every scrollable is not
@@ -18,8 +28,17 @@
 //! content (e.g. the page around a web preview).
 //!
 //! ```no_run
-//! # fn view<'a>(content: iced::Element<'a, ()>) -> iced::Element<'a, ()> {
-//! shadcn_iced_core::primitive::wheel(content).into()
+//! # fn view<'a>(content: iced::Element<'a, ()>, list: iced::Element<'a, ()>) -> iced::Element<'a, ()> {
+//! use shadcn_iced_core::primitive::wheel;
+//!
+//! // Every wheel smooth, from the start of the application:
+//! wheel::set_smooth(true);
+//!
+//! // Or one part of the view only:
+//! let list = wheel::smooth_scroll(list);
+//! # let _ = list;
+//!
+//! wheel::wheel(content).into()
 //! # }
 //! ```
 use crate::animation;
@@ -28,54 +47,202 @@ use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
-use iced::time::Instant;
+use iced::time::{Duration, Instant};
 use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, keyboard, mouse, window};
 
-/// The pixels of a line delta (iced's scrollables use the same factor).
-const LINE: f32 = 60.0;
+use std::cell::Cell;
+use std::sync::atomic::{self, AtomicBool};
+
+/// The pixels of a line delta: a notch scrolls 100px in Chrome.
+const LINE: f32 = 100.0;
 
 /// Pixel deltas from this size are wheel notches (browsers report about
 /// 100px per notch), smaller ones come from touchpads.
 const NOTCH: f32 = 50.0;
 
-/// The time constant of the ease-out: about 95% of a scroll is done after
-/// three of them.
-const TAU: f32 = 0.04;
+/// The duration of a frame, for the first step of a scroll.
+const FRAME: Duration = Duration::from_millis(16);
 
-/// Smooth wheel scrolling for some content. See the
+/// The control points of Chrome's `ease-in-out` (`cubic-bezier(0.42, 0,
+/// 0.58, 1)`).
+const X1: f32 = 0.42;
+const X2: f32 = 0.58;
+
+static SMOOTH: AtomicBool = AtomicBool::new(false);
+
+/// Turns smooth scrolling on or off for every [`Wheel`] that does not set
+/// it with [`Wheel::smooth`] (off by default).
+pub fn set_smooth(smooth: bool) {
+    SMOOTH.store(smooth, atomic::Ordering::Relaxed);
+}
+
+/// Returns whether wheels scroll smoothly unless they say otherwise.
+pub fn smooth() -> bool {
+    SMOOTH.load(atomic::Ordering::Relaxed)
+}
+
+/// Browser-like wheel scrolling for some content. See the
 /// [module documentation](self).
 pub struct Wheel<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
-    smooth: bool,
+    smooth: Option<bool>,
 }
 
-/// Wraps `content` in a [`Wheel`].
+/// Wraps `content` in a [`Wheel`], smooth if [`set_smooth`] says so.
 pub fn wheel<'a, Message, Theme, Renderer>(
     content: impl Into<Element<'a, Message, Theme, Renderer>>,
 ) -> Wheel<'a, Message, Theme, Renderer> {
     Wheel {
         content: content.into(),
-        smooth: true,
+        smooth: None,
     }
 }
 
+/// Wraps `content` in a smooth [`Wheel`], whatever [`set_smooth`] says,
+/// e.g. to make a single scroll area smooth.
+pub fn smooth_scroll<'a, Message, Theme, Renderer>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+) -> Wheel<'a, Message, Theme, Renderer> {
+    wheel(content).smooth(true)
+}
+
 impl<Message, Theme, Renderer> Wheel<'_, Message, Theme, Renderer> {
-    /// Sets whether wheel notches scroll smoothly (on by default, and off
-    /// while animations are disabled).
+    /// Sets whether wheel notches scroll smoothly, overriding
+    /// [`set_smooth`]. Scrolling is never smooth while animations are
+    /// disabled.
     pub fn smooth(mut self, smooth: bool) -> Self {
-        self.smooth = smooth;
+        self.smooth = Some(smooth);
         self
     }
+}
+
+/// What the wheels around the one handling an event did to it.
+#[derive(Debug, Clone, Copy, Default)]
+struct Handled {
+    /// The event comes from an outer wheel, which swapped the axes for
+    /// `Shift` and turned lines into pixels.
+    rewritten: bool,
+    /// Whether the original event was a notch.
+    notch: bool,
+    /// The event is a step of a smooth scroll.
+    smoothed: bool,
+}
+
+thread_local! {
+    static HANDLED: Cell<Handled> = Cell::new(Handled::default());
+}
+
+/// Runs `f` with the wheel events it dispatches marked as `handled`.
+fn handled<T>(handled: Handled, f: impl FnOnce() -> T) -> T {
+    let outer = HANDLED.replace(handled);
+    let result = f();
+    HANDLED.set(outer);
+    result
+}
+
+/// A smooth scroll in progress: a segment from where the content was when
+/// it started (or was retargeted) to `delta` further.
+#[derive(Debug, Clone, Copy)]
+struct Scroll {
+    /// The distance of the segment, in pixels (wheel direction).
+    delta: Vector,
+    /// The distance scrolled so far.
+    scrolled: Vector,
+    start: Instant,
+    duration: f32,
+    /// The initial velocity, relative to the average one (0 for an
+    /// `ease-in-out`).
+    slope: f32,
+    /// Where the pointer was when the scroll started.
+    position: Point,
+}
+
+impl Scroll {
+    fn new(delta: Vector, slope: f32, start: Instant, position: Point) -> Self {
+        let duration = duration(delta);
+
+        Self {
+            delta,
+            scrolled: Vector::ZERO,
+            start,
+            duration,
+            slope: slope.clamp(0.0, 1.0 / X1),
+            position,
+        }
+    }
+
+    /// The linear progress of the segment at `now`, from 0 to 1.
+    fn time(&self, now: Instant) -> f32 {
+        let elapsed = now.saturating_duration_since(self.start).as_secs_f32();
+
+        (elapsed / self.duration).clamp(0.0, 1.0)
+    }
+
+    /// The eased progress at the linear progress `t`: Chrome's
+    /// `ease-in-out`, or an ease-out starting at the velocity of a
+    /// retargeted scroll.
+    fn progress(&self, t: f32) -> f32 {
+        animation::cubic_bezier(X1, X1 * self.slope, X2, 1.0, t)
+    }
+
+    /// The distance the content should have scrolled at `now`.
+    fn target(&self, now: Instant) -> Vector {
+        self.delta * self.progress(self.time(now))
+    }
+
+    /// The velocity at `now`, in pixels per second.
+    fn velocity(&self, now: Instant) -> Vector {
+        let t = self.time(now);
+        let h = 0.01;
+        let (a, b) = ((t - h).max(0.0), (t + h).min(1.0));
+
+        if b <= a {
+            return Vector::ZERO;
+        }
+
+        self.delta * ((self.progress(b) - self.progress(a)) / (b - a) / self.duration)
+    }
+
+    /// Adds `pixels` to the scroll at `now`, keeping its velocity, like
+    /// Chrome does for a notch during a smooth scroll.
+    fn retarget(&mut self, pixels: Vector, now: Instant) {
+        let remaining = self.delta - self.scrolled + pixels;
+        let velocity = self.velocity(now);
+        let duration = duration(remaining);
+
+        // The velocity relative to the average one of the new segment,
+        // along its main axis (0 when going the other way).
+        let slope = if remaining.x.abs() > remaining.y.abs() {
+            velocity.x * duration / remaining.x
+        } else if remaining.y != 0.0 {
+            velocity.y * duration / remaining.y
+        } else {
+            0.0
+        };
+
+        *self = Self::new(remaining, slope, now, self.position);
+    }
+}
+
+/// The duration of a smooth scroll of `delta`, in seconds: Chrome's
+/// "inverse delta" durations, from 200ms up to 120px down to 100ms from
+/// 480px.
+fn duration(delta: Vector) -> f32 {
+    const MIN: f32 = 0.1;
+    const MAX: f32 = 0.2;
+    const RAMP_START: f32 = 120.0;
+    const RAMP_END: f32 = 480.0;
+
+    let distance = delta.x.abs().max(delta.y.abs());
+    let ramp = ((distance - RAMP_START) / (RAMP_END - RAMP_START)).clamp(0.0, 1.0);
+
+    MAX - (MAX - MIN) * ramp
 }
 
 #[derive(Debug, Default)]
 struct State {
     modifiers: keyboard::Modifiers,
-    /// The distance left to scroll, in pixels (wheel direction).
-    remaining: Vector,
-    /// Where the pointer was when the scroll started.
-    position: Option<Point>,
-    last_frame: Option<Instant>,
+    scroll: Option<Scroll>,
 }
 
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -148,34 +315,23 @@ where
         }
 
         let Event::Mouse(mouse::Event::WheelScrolled { delta }) = event else {
-            if let Event::Window(window::Event::RedrawRequested(now)) = event {
-                self.content.as_widget_mut().update(
-                    &mut tree.children[0],
-                    event,
-                    layout,
-                    cursor,
-                    renderer,
-                    clipboard,
-                    shell,
-                    viewport,
-                );
+            self.content.as_widget_mut().update(
+                &mut tree.children[0],
+                event,
+                layout,
+                cursor,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
 
+            if let Event::Window(window::Event::RedrawRequested(now)) = event {
                 frame(
                     &mut self.content,
                     tree,
                     *now,
                     layout,
-                    renderer,
-                    clipboard,
-                    shell,
-                    viewport,
-                );
-            } else {
-                self.content.as_widget_mut().update(
-                    &mut tree.children[0],
-                    event,
-                    layout,
-                    cursor,
                     renderer,
                     clipboard,
                     shell,
@@ -190,56 +346,13 @@ where
             return;
         }
 
-        let (pixels, notch) = match *delta {
-            mouse::ScrollDelta::Lines { x, y } => (Vector::new(x, y) * LINE, true),
-            mouse::ScrollDelta::Pixels { x, y } => {
-                (Vector::new(x, y), x.abs().max(y.abs()) >= NOTCH)
-            }
-        };
+        let outer = HANDLED.get();
 
-        // macOS swaps the axes of `Shift` + wheel itself.
-        let pixels = if state.modifiers.shift() && !cfg!(target_os = "macos") {
-            Vector::new(pixels.y, pixels.x)
-        } else {
-            pixels
-        };
-
-        let smooth = self.smooth && notch && animation::enabled();
-
-        // A new scroll in another direction or somewhere else stops the
-        // one in progress.
-        if !smooth || cursor.position() != state.position {
-            let remaining = std::mem::take(&mut state.remaining);
-            let position = state.position.take();
-
-            if remaining != Vector::ZERO
-                && let Some(position) = position
-            {
-                let _ = scroll(
-                    &mut self.content,
-                    &mut tree.children[0],
-                    remaining,
-                    position,
-                    layout,
-                    renderer,
-                    clipboard,
-                    shell,
-                    viewport,
-                );
-            }
-        }
-
-        let state = tree.state.downcast_mut::<State>();
-
-        if !smooth {
+        // A step of a smooth scroll of an outer wheel: already rewritten.
+        if outer.smoothed {
             self.content.as_widget_mut().update(
                 &mut tree.children[0],
-                &Event::Mouse(mouse::Event::WheelScrolled {
-                    delta: mouse::ScrollDelta::Pixels {
-                        x: pixels.x,
-                        y: pixels.y,
-                    },
-                }),
+                event,
                 layout,
                 cursor,
                 renderer,
@@ -251,13 +364,93 @@ where
             return;
         }
 
+        let (pixels, notch) = if outer.rewritten {
+            let pixels = match *delta {
+                mouse::ScrollDelta::Lines { x, y } => Vector::new(x, y) * LINE,
+                mouse::ScrollDelta::Pixels { x, y } => Vector::new(x, y),
+            };
+
+            (pixels, outer.notch)
+        } else {
+            let (pixels, notch) = match *delta {
+                mouse::ScrollDelta::Lines { x, y } => (Vector::new(x, y) * LINE, true),
+                mouse::ScrollDelta::Pixels { x, y } => {
+                    (Vector::new(x, y), x.abs().max(y.abs()) >= NOTCH)
+                }
+            };
+
+            // macOS swaps the axes of `Shift` + wheel itself.
+            let pixels = if state.modifiers.shift() && !cfg!(target_os = "macos") {
+                Vector::new(pixels.y, pixels.x)
+            } else {
+                pixels
+            };
+
+            (pixels, notch)
+        };
+
+        let smooth = self.smooth.unwrap_or_else(smooth) && notch && animation::enabled();
+
+        // A new scroll somewhere else (or not smooth) ends the one in
+        // progress.
+        if let Some(scroll) = state.scroll
+            && (!smooth || cursor.position() != Some(scroll.position))
+        {
+            state.scroll = None;
+
+            let _ = self::scroll(
+                &mut self.content,
+                &mut tree.children[0],
+                scroll.delta - scroll.scrolled,
+                scroll.position,
+                layout,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
+        }
+
+        let state = tree.state.downcast_mut::<State>();
+
+        if !smooth {
+            handled(
+                Handled {
+                    rewritten: true,
+                    notch,
+                    smoothed: false,
+                },
+                || {
+                    self.content.as_widget_mut().update(
+                        &mut tree.children[0],
+                        &Event::Mouse(mouse::Event::WheelScrolled {
+                            delta: mouse::ScrollDelta::Pixels {
+                                x: pixels.x,
+                                y: pixels.y,
+                            },
+                        }),
+                        layout,
+                        cursor,
+                        renderer,
+                        clipboard,
+                        shell,
+                        viewport,
+                    );
+                },
+            );
+
+            return;
+        }
+
         let Some(position) = cursor.position() else {
             return;
         };
 
-        // A scroll in progress goes on further.
-        if state.remaining != Vector::ZERO {
-            state.remaining += pixels;
+        let now = Instant::now();
+
+        // A scroll in progress goes on further, faster.
+        if let Some(scroll) = &mut state.scroll {
+            scroll.retarget(pixels, now);
             shell.capture_event();
             shell.request_redraw();
             return;
@@ -265,8 +458,16 @@ where
 
         // The first frame of the scroll, right away: whether something
         // captures it tells whether anything can scroll.
-        let first = pixels * 0.25;
-        let captured = scroll(
+        let mut scroll = Scroll::new(pixels, 0.0, now - FRAME, position);
+        let first = scroll.target(now);
+
+        // At least a pixel, for the scrollable to tell whether it scrolls.
+        let first = Vector::new(
+            at_least_a_pixel(first.x, pixels.x),
+            at_least_a_pixel(first.y, pixels.y),
+        );
+
+        let captured = self::scroll(
             &mut self.content,
             &mut tree.children[0],
             first,
@@ -278,12 +479,10 @@ where
             viewport,
         );
 
-        let state = tree.state.downcast_mut::<State>();
-
         if captured {
-            state.remaining += pixels - first;
-            state.position = Some(position);
-            state.last_frame = Some(Instant::now());
+            scroll.scrolled = first;
+
+            tree.state.downcast_mut::<State>().scroll = Some(scroll);
             shell.capture_event();
             shell.request_redraw();
         }
@@ -345,6 +544,16 @@ where
     }
 }
 
+/// `step`, or a pixel in the direction of `delta` if it is smaller, but
+/// never further than `delta`.
+fn at_least_a_pixel(step: f32, delta: f32) -> f32 {
+    if delta == 0.0 || step.abs() >= 1.0 {
+        step
+    } else {
+        delta.signum() * delta.abs().min(1.0)
+    }
+}
+
 /// Scrolls a frame of the scroll in progress, if any.
 fn frame<Message, Theme, Renderer>(
     content: &mut Element<'_, Message, Theme, Renderer>,
@@ -360,30 +569,25 @@ fn frame<Message, Theme, Renderer>(
 {
     let state = tree.state.downcast_mut::<State>();
 
-    let Some(position) = state.position else {
+    let Some(scroll) = &mut state.scroll else {
         return;
     };
 
-    let elapsed = state
-        .last_frame
-        .map_or(0.016, |last| (now - last).as_secs_f32())
-        .clamp(0.0, 0.1);
+    let done = scroll.time(now) >= 1.0;
+    let target = if done {
+        scroll.delta
+    } else {
+        scroll.target(now)
+    };
+    let step = target - scroll.scrolled;
+    let position = scroll.position;
 
-    let mut step = state.remaining * (1.0 - (-elapsed / TAU).exp());
-    let left = state.remaining - step;
+    scroll.scrolled = target;
 
-    if left.x.abs() < 0.5 && left.y.abs() < 0.5 {
-        step = state.remaining;
-    }
-
-    state.remaining -= step;
-    state.last_frame = Some(now);
-
-    let done = state.remaining == Vector::ZERO;
-
-    // A scroll that reaches the end stops.
-    let scrolled = step == Vector::ZERO
-        || scroll(
+    // A scroll that reaches the end stops (steps under half a pixel may
+    // not move the content).
+    let scrolled = step.x.abs().max(step.y.abs()) < 0.5
+        || self::scroll(
             content,
             &mut tree.children[0],
             step,
@@ -398,9 +602,7 @@ fn frame<Message, Theme, Renderer>(
     let state = tree.state.downcast_mut::<State>();
 
     if done || !scrolled {
-        state.remaining = Vector::ZERO;
-        state.position = None;
-        state.last_frame = None;
+        state.scroll = None;
     } else {
         shell.request_redraw();
     }
@@ -425,20 +627,29 @@ where
     let mut messages = Vec::new();
     let mut inner = Shell::new(&mut messages);
 
-    content.as_widget_mut().update(
-        tree,
-        &Event::Mouse(mouse::Event::WheelScrolled {
-            delta: mouse::ScrollDelta::Pixels {
-                x: pixels.x,
-                y: pixels.y,
-            },
-        }),
-        layout,
-        mouse::Cursor::Available(position),
-        renderer,
-        clipboard,
-        &mut inner,
-        viewport,
+    handled(
+        Handled {
+            rewritten: true,
+            notch: true,
+            smoothed: true,
+        },
+        || {
+            content.as_widget_mut().update(
+                tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels {
+                        x: pixels.x,
+                        y: pixels.y,
+                    },
+                }),
+                layout,
+                mouse::Cursor::Available(position),
+                renderer,
+                clipboard,
+                &mut inner,
+                viewport,
+            );
+        },
     );
 
     let captured = inner.is_event_captured();
