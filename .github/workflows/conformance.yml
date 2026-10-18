@@ -1,19 +1,14 @@
 name: Conformance
 
-# Compares shadcn_iced with shadcn/ui (see conformance/README.md).
+# Compares shadcn_iced with shadcn/ui (see conformance/README.md), run by
+# `ci.yml`.
 #
-# The weekly run first updates shadcn/ui to its latest release, so that it
-# fails when shadcn/ui changed in a way shadcn_iced does not follow yet.
+# The weekly run first updates shadcn/ui to its latest release (at least 7
+# days old, `minimumReleaseAge`), so that it fails when shadcn/ui changed in a
+# way shadcn_iced does not follow yet.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    paths:
-      - "crates/**"
-      - "conformance/**"
-      - "Cargo.lock"
-      - ".github/workflows/conformance.yml"
+  workflow_call:
   schedule:
     - cron: "0 3 * * 1"
   workflow_dispatch:
@@ -23,56 +18,60 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: read
-
-concurrency:
-  group: conformance-${{ github.ref }}
-  cancel-in-progress: true
+permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  conformance:
+  typecheck:
+    name: Type check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: ./.github/actions/setup-pnpm
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          version: 10
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: conformance/pnpm-lock.yaml
-      - name: Install
+          directory: conformance
+      - run: pnpm typecheck
         working-directory: conformance
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm exec playwright install --with-deps chromium
+
+  compare:
+    name: Compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: conformance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: ./.github/actions/setup-pnpm
+        with:
+          directory: conformance
+      - run: pnpm exec playwright install --with-deps --only-shell chromium
       - name: Update shadcn/ui
         if: github.event_name == 'schedule' || inputs.update
-        working-directory: conformance
-        run: pnpm shadcn:update
-      - name: Type check
-        working-directory: conformance
-        run: pnpm typecheck
+        run: |
+          pnpm shadcn:update
+          pnpm typecheck
       - name: Render with shadcn_iced
-        working-directory: conformance
         run: pnpm iced
       - name: Compare with shadcn/ui
-        working-directory: conformance
         run: pnpm test
       - name: Report
         if: ${{ !cancelled() }}
-        working-directory: conformance
         run: |
           pnpm report
           # The scores of this run, to commit when the baseline should change.

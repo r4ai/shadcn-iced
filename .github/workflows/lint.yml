@@ -1,0 +1,61 @@
+name: Lint
+
+# The checks of the workflows and of the Python scripts, run by `ci.yml`. The
+# tools come from `mise.toml`, checked against the checksums of `mise.lock`.
+
+on:
+  workflow_call:
+
+permissions: {}
+
+env:
+  # Install only what `mise.lock` records, checked against its checksums.
+  MISE_LOCKED: "true"
+
+jobs:
+  actions:
+    name: Workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          version: 2026.10.7
+          sha256: 6eb1b890e90818417ca34c90dbbd47881917d5cd199f31b63b062ea9c6b18d85
+          install_args: actionlint aqua:zizmorcore/zizmor aqua:suzuki-shunsuke/pinact
+      - name: actionlint
+        run: actionlint
+      # Every action is pinned to the commit of its version tag.
+      - name: pinact
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pinact run --check --verify
+      - name: zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: zizmor --config .github/zizmor.yml --format=github .
+
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          version: 2026.10.7
+          sha256: 6eb1b890e90818417ca34c90dbbd47881917d5cd199f31b63b062ea9c6b18d85
+          install_args: uv
+      # `uv.lock` is up to date with `pyproject.toml`, and every script
+      # compiles with its locked dependencies.
+      - run: uv lock --check --project scripts
+      - run: uv run --locked --project scripts python -m compileall -q -x '/\.venv/' scripts

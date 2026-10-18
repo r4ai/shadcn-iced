@@ -21,8 +21,8 @@ blockExoticSubdeps: true
 # Install scripts are not run, and a new package with one fails the install
 # until it is reviewed and listed here.
 strictDepBuilds: true
-ignoredBuiltDependencies:
+allowBuilds:
   # Their scripts only check the binaries that their platform packages
   # (optional dependencies) already install.
-  - esbuild
-  - workerd
+  esbuild: false
+  workerd: false

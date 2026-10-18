@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tile snapshot PNGs into a 2x2 contact sheet at half resolution.
 
-Usage: python3 scripts/montage.py out.png a.png b.png [c.png d.png]
+Usage: uv run --project scripts scripts/montage.py out.png a.png b.png [c.png d.png]
 """
 import sys
 from PIL import Image

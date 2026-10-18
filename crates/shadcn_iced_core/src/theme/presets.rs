@@ -1,6 +1,6 @@
 //! Color presets generated from shadcn/ui's `registry/themes.ts`.
 //!
-//! Do not edit by hand: run `python3 scripts/gen_themes.py <shadcn-ui>`.
+//! Do not edit by hand: run `uv run --project scripts scripts/gen_themes.py <shadcn-ui>`.
 #![allow(clippy::unreadable_literal)]
 
 use super::{Palette, PaletteOverrides, rgb, rgba};

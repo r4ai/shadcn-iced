@@ -8,10 +8,11 @@ This guide covers building, testing, inspecting, and contributing to `shadcn-ice
 
 | Tool | Requirement | Used For |
 | :--- | :--- | :--- |
-| **Rust** | `1.88+` (`2024` edition) | Building workspace crates, CLI,<br/>gallery, and conformance runner |
-| **Node.js & `pnpm`** | Node `22+` (site), `24+` (conformance), `pnpm 10+` | Running the docs site (`site/`)<br/>and conformance suite (`conformance/`) |
-| **`wasm32-unknown-unknown` & `wasm-bindgen-cli`** | `wasm-bindgen-cli` matching the<br/>`wasm-bindgen` version in `Cargo.lock` | Compiling interactive WebAssembly<br/>previews (`examples/gallery-web`) |
-| **Python 3 / `uv`** | Optional | Running theme, icon, font, and<br/>snapshot scripts in `scripts/` |
+| **Rust** | `1.88+` (`2024` edition), via `rustup` | Building workspace crates, CLI,<br/>gallery, and conformance runner |
+| **[mise](https://mise.jdx.dev)** | `2026.10+` | Installing the pinned Node.js, `pnpm`,<br/>`uv`, and workflow linters of `mise.toml` |
+| **`wasm-bindgen-cli`** | The version of `Cargo.lock` (`wasm32-unknown-unknown`) | Compiling interactive WebAssembly<br/>previews (`examples/gallery-web`) |
+
+`mise install` installs the tools of [`mise.toml`](../mise.toml) (Node.js, `pnpm`, `uv`, `actionlint`, `zizmor`, `pinact`), checked against the checksums of `mise.lock`. Rust is not managed by mise: install it with `rustup`.
 
 ---
 
@@ -246,22 +247,48 @@ pnpm test:e2e
 | Script | Purpose |
 | :--- | :--- |
 | `bash scripts/check-copy.sh` | Verifies `cargo shadcn-iced add --all` compiles<br/>cleanly with `-D warnings` in an isolated crate. |
-| `python3 scripts/gen_themes.py <shadcn-ui-dir>` | Converts OKLCH tokens from `apps/v4/registry/themes.ts`<br/>and writes `crates/shadcn_iced_core/src/theme/presets.rs`. |
-| `python3 scripts/gen_icons.py <lucide-dir>` | Reads `font/codepoints.json` from `lucide-static` and<br/>writes `crates/shadcn_iced_core/src/icon/lucide.rs`. |
-| `uv run --with fonttools scripts/gen_fonts.py` | Builds `ShadcnIcedSymbols-Regular.ttf` and<br/>`conformance/fonts/NotoEmoji-Regular.ttf`. |
-| `uv run --with pillow scripts/grid.py <out-prefix> <pngs...>` | Tiles PNG snapshots into `3×3` contact sheets<br/>(`<out-prefix><n>.png`) for visual inspection. |
-| `uv run --with pillow scripts/montage.py <out.png> <pngs...>` | Combines up to 4 snapshots into one `2×2`<br/>contact sheet at half resolution. |
+| `uv run --project scripts scripts/gen_themes.py <shadcn-ui-dir>` | Converts OKLCH tokens from `apps/v4/registry/themes.ts`<br/>and writes `crates/shadcn_iced_core/src/theme/presets.rs`. |
+| `uv run --project scripts scripts/gen_icons.py <lucide-dir>` | Reads `font/codepoints.json` from `lucide-static` and<br/>writes `crates/shadcn_iced_core/src/icon/lucide.rs`. |
+| `uv run --project scripts scripts/gen_fonts.py` | Builds `ShadcnIcedSymbols-Regular.ttf` and<br/>`conformance/fonts/NotoEmoji-Regular.ttf`. |
+| `uv run --project scripts scripts/grid.py <out-prefix> <pngs...>` | Tiles PNG snapshots into `3×3` contact sheets<br/>(`<out-prefix><n>.png`) for visual inspection. |
+| `uv run --project scripts scripts/montage.py <out.png> <pngs...>` | Combines up to 4 snapshots into one `2×2`<br/>contact sheet at half resolution. |
+| `bash scripts/prepare-publish.sh` | Copies the components into `crates/cargo-shadcn-iced/components/`<br/>for `cargo publish` (see [Releasing](#releasing)). |
+
+The Python dependencies are locked in `scripts/uv.lock` (`scripts/pyproject.toml`); uv only resolves releases at least 7 days old.
 
 ---
 
 ## CI/CD Workflows (`.github/workflows/`)
 
-- **`ci.yml`** (push to `main`, pull requests, manual dispatch)
-  - `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `./scripts/check-copy.sh`
-  - Renders every component page with `snapshot` (`tiny-skia`) and uploads them as the `snapshots` artifact
-- **`site.yml`** (push to `main`, pull requests touching `site/`, `examples/`, or `crates/`, manual dispatch)
-  - **Build Job**: `pnpm lint`, `pnpm fmt:check`, `pnpm data`, `pnpm wasm`, `pnpm build`, `pnpm check`, and `pnpm test:e2e`
-  - **Deploy Job** (`main` only): deploys `site/dist/client` to Cloudflare Workers static assets (`site/wrangler.jsonc`)<br/>with the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets of the `production` environment
-- **`conformance.yml`** (push to `main`, pull requests touching `crates/`, `conformance/`, or `Cargo.lock`, weekly on Monday, manual dispatch)
-  - Runs `pnpm typecheck`, `pnpm iced`, `pnpm test`, and `pnpm report` against `baseline.json`, and uploads the report with the `baseline.json` of the run, ready to be committed
-  - The weekly run (and a manual run with `update`) first updates shadcn/ui to its latest release with `pnpm shadcn:update`
+`ci.yml` (**CI**) runs on pull requests and on `main`. It looks at the files a pull request changes and calls the workflows of the parts they touch (every part on `main`), all in parallel. Its **Result** job is the single required status check of `main`.
+
+| Workflow | Jobs | Runs when |
+| :--- | :--- | :--- |
+| `rust.yml` (**Rust**) | Format, Clippy, Test, Snapshots,<br/>Copy components, Package | Rust code, `Cargo.*` or `scripts/` change |
+| `site.yml` (**Site**) | Lint, Data, Live previews, Build (+ e2e),<br/>Deploy (`main` only, `production` environment) | `site/`, `crates/` or `examples/` change |
+| `conformance.yml` (**Conformance**) | Type check, Compare | `crates/` or `conformance/` change;<br/>weekly with the latest shadcn/ui |
+| `lint.yml` (**Lint**) | Workflows (actionlint, zizmor, pinact),<br/>Python (`uv.lock`, compile) | `.github/` or `scripts/` change |
+| `release.yml` (**Release**) | Release PR, Check, Publish, Binaries | Every push to `main` (see [Releasing](#releasing)) |
+
+### Supply-chain policies
+
+- **Actions** are pinned to the commit of their release (`pinact run -u -m 7`, checked by `pinact run --check --verify`), and every job declares the permissions it needs (`permissions: {}` at the top of each workflow).
+- **Rust** is installed with the rustup of the runner (`.github/actions/setup-rust`), not a third-party action.
+- **pnpm** (`site/` and `conformance/`, `pnpm-workspace.yaml`): `minimumReleaseAge` of 7 days, `trustPolicy: no-downgrade`, `blockExoticSubdeps`, and `strictDepBuilds` with an explicit `allowBuilds`. pnpm 12 also checks the lockfile against these policies on every install.
+- **uv** (`scripts/`): `exclude-newer = "7 days"`.
+- **Dependabot** waits 7 days (`cooldown`) before proposing an update; the tools of `mise.toml` are updated by hand (`mise lock`).
+
+---
+
+## Releasing
+
+The crates `shadcn-iced` (imported as `shadcn_iced`), `shadcn_iced_core` and `cargo-shadcn-iced` share the workspace version and are released together by [release-plz](https://release-plz.dev) (`release-plz.toml`, `.github/workflows/release.yml`):
+
+1. Every push to `main` opens or updates the **release pull request**: it bumps the version (following the conventional commits and `cargo-semver-checks`) and updates `CHANGELOG.md`.
+2. Merging it **publishes** the crates to crates.io with [trusted publishing](https://crates.io/docs/trusted-publishing) (no token), tags `v<version>` and creates the GitHub release.
+3. The **binaries** of `cargo shadcn-iced` (Linux, macOS and Windows, x86-64 and ARM64) are attached to the release with their build provenance, for `cargo binstall cargo-shadcn-iced`.
+
+One-time setup:
+
+- **crates.io**: trusted publishing cannot create a crate, so publish `shadcn_iced_core` and `cargo-shadcn-iced` once by hand (`shadcn-iced` already exists). Then add a trusted publisher to each of the three crates: repository `r4ai/shadcn-iced`, workflow `release.yml`, environment `crates-io`.
+- **GitHub**: create the `crates-io` environment (restricted to `main`). For the release pull request to trigger CI, create a GitHub App with the *Contents* and *Pull requests* write permissions, and add its ID as the `RELEASE_APP_ID` variable and its key as the `RELEASE_APP_PRIVATE_KEY` secret; without it, release-plz opens the pull request with `GITHUB_TOKEN` (enable "Allow GitHub Actions to create and approve pull requests").

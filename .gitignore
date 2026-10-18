@@ -25,3 +25,10 @@ id_ed25519
 .claude/settings.local.json
 test-results/
 playwright-report/
+
+# uv (`scripts/pyproject.toml`)
+.venv/
+__pycache__/
+
+# The copy of the components of `cargo-shadcn-iced` (`scripts/prepare-publish.sh`)
+/crates/cargo-shadcn-iced/components/

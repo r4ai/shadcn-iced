@@ -1,5 +1,5 @@
 [package]
-name = "shadcn_iced"
+name = "shadcn-iced"
 description = "shadcn/ui components for iced"
 version.workspace = true
 edition.workspace = true

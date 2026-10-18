@@ -1,0 +1,22 @@
+# The versions of the tools of this repository, for development and for CI
+# (`.github/workflows`). Rust comes from rustup (the stable toolchain).
+#
+# Every version is a release at least 7 days old, like the cooldown of
+# Dependabot (`.github/dependabot.yml`), and `mise.lock` records the checksum
+# of every download: update both with `mise lock` after a change.
+
+[tools]
+# CI reads this version (`actions/setup-node` with `node-version-file`).
+node = "24.21.0"
+# The version of `packageManager` in `site/package.json` and
+# `conformance/package.json`, which CI reads (`pnpm/action-setup`).
+pnpm = "12.12.0"
+# The Python scripts of `scripts/` (`scripts/pyproject.toml`).
+uv = "0.13.0"
+# The linters of `.github/workflows` (`.github/workflows/actions.yml`).
+actionlint = "1.7.12"
+"aqua:zizmorcore/zizmor" = "1.30.1"
+"aqua:suzuki-shunsuke/pinact" = "5.0.0"
+
+[settings]
+lockfile = true

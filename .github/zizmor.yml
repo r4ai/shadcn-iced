@@ -1,0 +1,6 @@
+# zizmor (`.github/workflows/lint.yml`, https://docs.zizmor.sh/configuration/).
+rules:
+  # The self-repository syntax (`uses: $/...`) is not supported by actionlint
+  # 1.7.12 yet: keep `uses: ./...` until it is.
+  self-repository:
+    disable: true

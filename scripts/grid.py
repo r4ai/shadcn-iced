@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Tile snapshots into 3x3 contact sheets: grid.py <out-prefix> <png>..."""
+"""Tile snapshots into 3x3 contact sheets.
+
+Usage: uv run --project scripts scripts/grid.py <out-prefix> <png>...
+"""
 import sys
 from PIL import Image, ImageDraw
 

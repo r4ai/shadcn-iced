@@ -1,41 +1,106 @@
 name: CI
 
+# The entry point of the checks: it runs the workflows of the parts that a
+# pull request changes (every part on `main`), in parallel, and `Result`
+# reports them all as the single required check of `main`.
+
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
-env:
-  CARGO_TERM_COLOR: always
-  ICED_TEST_BACKEND: tiny-skia
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # A new push to a pull request supersedes its previous run; `main` runs to
+  # the end, to deploy the site of every commit.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
+  changes:
+    name: Changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      site: ${{ steps.filter.outputs.site }}
+      conformance: ${{ steps.filter.outputs.conformance }}
+      lint: ${{ steps.filter.outputs.lint }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: Format
-        run: cargo fmt --all --check
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Test
-        run: cargo test --workspace
-      - name: Copy-paste components into a fresh project
-        run: ./scripts/check-copy.sh
-      - name: Render gallery snapshots
-        run: cargo run -p gallery --bin snapshot
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: snapshots
-          path: target/snapshots/*-tiny-skia.png
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            files="$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename')"
+          fi
+          # `<output> <regex>`: whether a changed file matches (always on push).
+          filter() {
+            if [ "$EVENT" != pull_request ] || grep -qE "$2" <<< "$files"; then
+              echo "$1=true"
+            else
+              echo "$1=false"
+            fi | tee -a "$GITHUB_OUTPUT"
+          }
+          shared='^(Cargo\.(toml|lock)|mise\.(toml|lock)|\.github/workflows/ci\.yml)$'
+          filter rust "$shared|^(crates|examples|conformance/iced|scripts)/|^\.github/workflows/rust\.yml$"
+          filter site "$shared|^(crates|examples|site)/|^\.github/workflows/site\.yml$"
+          filter conformance "$shared|^(crates|conformance)/|^\.github/workflows/conformance\.yml$"
+          filter lint "$shared|^(\.github|scripts)/"
+
+  rust:
+    name: Rust
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/rust.yml
+
+  site:
+    name: Site
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/site.yml
+    with:
+      deploy: ${{ github.event_name == 'push' }}
+
+  conformance:
+    name: Conformance
+    needs: changes
+    if: needs.changes.outputs.conformance == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/conformance.yml
+
+  lint:
+    name: Lint
+    needs: changes
+    if: needs.changes.outputs.lint == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/lint.yml
+
+  # The required status check of `main`: it passes when every workflow that
+  # ran passed, whichever of them the changes skipped.
+  result:
+    name: Result
+    needs: [changes, rust, site, conformance, lint]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          jq -e 'all(. == "success" or . == "skipped")' <<< "$RESULTS"
