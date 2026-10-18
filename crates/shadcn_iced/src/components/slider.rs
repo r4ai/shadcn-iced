@@ -211,6 +211,8 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
 #[derive(Debug, Default)]
 struct State {
     dragging: Option<usize>,
+    /// The thumb under the cursor, which shows a ring.
+    hovered: Option<usize>,
     /// The keyboard focus of each thumb.
     focus: Vec<Focus>,
 }
@@ -414,9 +416,18 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
                 if let (Some(index), Some(position)) = (state.dragging, cursor.position()) {
                     change(index, position, shell);
                     shell.capture_event();
+                    shell.request_redraw();
                 }
 
-                shell.request_redraw();
+                // Only the ring of the hovered thumb follows the cursor.
+                let hovered = (!self.disabled)
+                    .then(|| self.hovered_thumb(bounds, cursor))
+                    .flatten();
+
+                if hovered != state.hovered {
+                    state.hovered = hovered;
+                    shell.request_redraw();
+                }
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerLifted { .. } | touch::Event::FingerLost { .. })
