@@ -162,6 +162,7 @@ fn trigger<'a, Message: Clone + 'a>(
     } else {
         Element::new(HoverUnderline {
             content: row.into(),
+            underlined: std::cell::Cell::new(false),
         })
     };
 
@@ -275,6 +276,9 @@ impl<'a, Message: Clone + 'a> From<Accordion<'a, Message>> for Element<'a, Messa
 /// The content is the padded trigger row, whose first child is the title.
 struct HoverUnderline<'a, Message> {
     content: Element<'a, Message>,
+    /// Whether the underline was drawn, to redraw only when the cursor
+    /// enters or leaves the trigger.
+    underlined: std::cell::Cell<bool>,
 }
 
 impl<Message> Widget<Message, Theme, iced::Renderer> for HoverUnderline<'_, Message> {
@@ -330,7 +334,9 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for HoverUnderline<'_, Mess
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        if let Event::Mouse(mouse::Event::CursorMoved { .. }) = event {
+        if let Event::Mouse(mouse::Event::CursorMoved { .. }) = event
+            && cursor.is_over(layout.bounds()) != self.underlined.get()
+        {
             shell.request_redraw();
         }
 
@@ -355,7 +361,10 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for HoverUnderline<'_, Mess
             .as_widget()
             .draw(tree, renderer, theme, style, layout, cursor, viewport);
 
-        if !cursor.is_over(layout.bounds()) {
+        let underlined = cursor.is_over(layout.bounds());
+        self.underlined.set(underlined);
+
+        if !underlined {
             return;
         }
 
