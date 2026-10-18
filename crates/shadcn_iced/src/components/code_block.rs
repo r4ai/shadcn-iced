@@ -19,6 +19,7 @@
 //! ```
 use super::button::{Size as ButtonSize, Variant as ButtonVariant, icon_button};
 
+use shadcn_iced_core::highlight::{self, Highlighter, Language, Token};
 use shadcn_iced_core::icon::{Icon, lucide};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
@@ -103,6 +104,7 @@ pub struct CodeBlock<'a, Message> {
     start_line: usize,
     wrap: bool,
     max_height: Option<f32>,
+    language: Option<Language>,
 }
 
 /// Creates a [`CodeBlock`] showing `code` (`CodeBlockContent`).
@@ -125,6 +127,7 @@ pub fn code_block<'a, Message: Clone + 'a>(code: impl AsRef<str>) -> CodeBlock<'
         start_line: 1,
         wrap: false,
         max_height: None,
+        language: None,
     }
 }
 
@@ -196,6 +199,15 @@ impl<'a, Message: Clone + 'a> CodeBlock<'a, Message> {
     /// Wraps long lines instead of scrolling horizontally (`wrap`).
     pub fn wrap(mut self, wrap: bool) -> Self {
         self.wrap = wrap;
+        self
+    }
+
+    /// Highlights the syntax of the code (`language` of `CodeBlockContent`),
+    /// e.g. `"rust"`, `"toml"`, `"bash"`, `"tsx"` or `"json"`: see
+    /// [`Language::from_name`]. Other languages, and destructive code
+    /// blocks, keep a single color.
+    pub fn language(mut self, language: &str) -> Self {
+        self.language = Language::from_name(language);
         self
     }
 
@@ -278,6 +290,79 @@ pub fn copy_button<'a, Message: Clone + 'a>(
     action(if copied { lucide::CHECK } else { lucide::COPY }, on_press)
 }
 
+/// A line of code, highlighted with `tokens` if any. Wrapped lines break
+/// between words.
+fn code<'a, Message: 'a>(
+    content: String,
+    tokens: Option<Vec<(std::ops::Range<usize>, Token)>>,
+    size: Size,
+    wrap: bool,
+) -> Element<'a, Message> {
+    let piece = move |content: String| {
+        text(content)
+            .size(size.text_size())
+            .font(font::mono())
+            .line_height(Pixels(size.line_height()))
+    };
+
+    let Some(tokens) = tokens.filter(|_| !content.is_empty()) else {
+        let line = piece(if content.is_empty() {
+            " ".to_owned()
+        } else {
+            content
+        });
+
+        return if wrap {
+            line.width(Length::Fill).into()
+        } else {
+            line.wrapping(text::Wrapping::None).into()
+        };
+    };
+
+    // Each piece is a text of its own: the font is monospaced, so they line
+    // up like a single text.
+    let pieces = tokens.into_iter().flat_map(|(range, token)| {
+        let part = &content[range];
+
+        // Wrapped lines break after the spaces that end a word.
+        let mut words = Vec::new();
+        let mut start = 0;
+        if wrap {
+            let mut in_space = false;
+            for (offset, c) in part.char_indices() {
+                if c.is_whitespace() {
+                    in_space = true;
+                } else if in_space {
+                    words.push(&part[start..offset]);
+                    start = offset;
+                    in_space = false;
+                }
+            }
+        }
+        words.push(&part[start..]);
+
+        words
+            .into_iter()
+            .map(move |word| (word.to_owned(), token))
+            .collect::<Vec<_>>()
+    });
+
+    let row = Row::with_children(pieces.map(|(word, token)| {
+        piece(word)
+            .wrapping(text::Wrapping::None)
+            .style(move |theme: &Theme| text::Style {
+                color: Some(highlight::color(theme, token)),
+            })
+            .into()
+    }));
+
+    if wrap {
+        row.width(Length::Fill).wrap().into()
+    } else {
+        row.into()
+    }
+}
+
 fn line_background(theme: &Theme, line: Line) -> Option<Background> {
     let p = tokens(theme).palette;
 
@@ -345,16 +430,17 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
             ))
         };
 
-        let code = |content: String| {
-            text(if content.is_empty() {
-                " ".to_owned()
-            } else {
-                content
-            })
-            .size(size.text_size())
-            .font(font::mono())
-            .line_height(Pixels(line_height))
-        };
+        // The tokens of every line, when highlighted.
+        let mut highlighter = block
+            .language
+            .filter(|_| variant == Variant::Default)
+            .map(Highlighter::new);
+        let mut highlights = block
+            .lines
+            .iter()
+            .map(|(content, _)| highlighter.as_mut().map(|h| h.line(content)))
+            .collect::<Vec<_>>()
+            .into_iter();
 
         // `px-3 py-3`, `pt-2` under a header, `pb-2` above a footer
         // (`pt-1.5` / `py-2.5` when small).
@@ -375,7 +461,7 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
                 .map(|(index, (content, line))| {
                     let row = Row::new()
                         .push(numbers.then(|| number(index)))
-                        .push(code(content).width(Length::Fill))
+                        .push(code(content, highlights.next().flatten(), size, true))
                         .spacing(12);
 
                     let line_row = container(row)
@@ -420,7 +506,7 @@ impl<'a, Message: Clone + 'a> From<CodeBlock<'a, Message>> for Element<'a, Messa
                 |(index, (content, _))| {
                     Row::new()
                         .push(numbers.then(|| number(index)))
-                        .push(code(content).wrapping(text::Wrapping::None))
+                        .push(code(content, highlights.next().flatten(), size, false))
                         .spacing(12)
                         .into()
                 },

@@ -6,6 +6,7 @@
 //! `shadcn_iced_core`, which is what makes them copy-pasteable.
 pub mod animation;
 pub mod font;
+pub mod highlight;
 pub mod icon;
 pub mod primitive;
 pub mod style;
