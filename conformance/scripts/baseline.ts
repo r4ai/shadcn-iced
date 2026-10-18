@@ -30,7 +30,9 @@ const { platform, scores, knownFailures } = readBaseline()
 
 if (platform !== process.platform) {
   console.warn(
-    `baseline.json was produced on ${platform}, not ${process.platform}: its scores will be replaced. Prefer producing it on Linux, like CI.`
+    filters.length
+      ? `baseline.json was produced on ${platform}, not ${process.platform}: the scores of this platform are mixed in. Prefer producing it on Linux, like CI.`
+      : `baseline.json was produced on ${platform}, not ${process.platform}: its scores will be replaced. Prefer producing it on Linux, like CI.`
   )
 }
 let updated = 0
@@ -80,7 +82,8 @@ writeFileSync(
   join(root, "baseline.json"),
   JSON.stringify(
     {
-      platform: process.platform,
+      // Recording a few scores keeps the platform of the others.
+      platform: filters.length ? platform : process.platform,
       scores: sorted(scores),
       knownFailures: sorted(knownFailures),
     },
