@@ -1,5 +1,5 @@
 {
-  "platform": "win32",
+  "platform": "linux",
   "scores": {
     "accordion/borders/first-open/dark": 0,
     "accordion/borders/first-open/light": 0,
