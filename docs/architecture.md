@@ -62,7 +62,7 @@ flowchart LR
 
 | Path | Package / Role | Description |
 | :--- | :--- | :--- |
-| `crates/shadcn_iced_core` | `shadcn_iced_core` | Design tokens, OKLCH-converted palettes, theme builder,<br/>bundled fonts & icons, animations, and 17 headless primitives. |
+| `crates/shadcn_iced_core` | `shadcn_iced_core` | Design tokens, OKLCH-converted palettes, theme builder,<br/>bundled fonts & icons, animations, and 22 headless primitives. |
 | `crates/shadcn_iced` | `shadcn_iced` | All 66 styled components (`src/components/*.rs`),<br/>re-exports of `shadcn_iced_core`, and `shadcn_iced::prelude`. |
 | `crates/cargo-shadcn-iced` | `cargo-shadcn-iced` | CLI binary (`cargo shadcn-iced`) that embeds `components/*.rs`<br/>and copies selected components with transitive siblings. |
 | `examples/hello` | `hello` | Minimal single-file app (`cargo run -p hello`)<br/>demonstrating the `README.md` quick start. |
@@ -155,7 +155,7 @@ pub fn button<'a, Message: Clone + 'a>(label: impl Into<String>) -> Button<'a, M
 
 ## Headless Primitives (`shadcn_iced_core::primitive`)
 
-`shadcn_iced_core::primitive` implements **17 headless primitives**: 16 widgets on top of `iced::advanced::Widget` and `iced::advanced::Overlay`, plus `plot`, the plain geometry (functions and types) behind charts.
+`shadcn_iced_core::primitive` implements **22 headless primitives**: 20 widgets on top of `iced::advanced::Widget` and `iced::advanced::Overlay`, plus two plain models (functions and types): `plot`, the geometry behind charts, and `questionnaire`, the steps and answers of a questionnaire.
 
 ```mermaid
 flowchart TD
@@ -174,12 +174,17 @@ flowchart TD
 | `breakpoint` | Responsive variants (`SM = 640px`, `MD = 768px`) for the content of overlays,<br/>laid out with the window size (`measure`, `either`). | `Dialog`, `AlertDialog` |
 | `disclosure` | Animated height reveal/collapse container that clips content<br/>during transitions and hides it when closed. | `Accordion`, `Collapsible`, `Trace` |
 | `focus` | Tracks direct (`Focus`) or descendant (`FocusWithin`) focus and draws<br/>the focus ring (`Ring`, outside the bounds like CSS `ring-[3px]`). | `Input`, `Textarea`, `InputGroup`, `Checkbox`,<br/>`RadioGroup`, `Slider`, `Tabs`, `NativeSelect`,<br/>`Combobox`, `Card`, `Avatar` |
+| `focus_grid` | The focused cell of a grid (the days of a calendar): a pressed cell takes the focus,<br/>which moves to a fallback cell when it is no longer displayed, and shows a ring. | `Calendar` |
+| `keys` | Keyboard shortcuts of a region: once clicked (standing for the focus within it),<br/>the keys it handles become messages before its content sees them. | `Carousel` |
 | `labelled` | HTML `<label>` behavior that focuses and activates<br/>the first interactive child control when clicked. | `Field`, `Label`, `Checkbox`,<br/>`RadioGroup`, `Switch` |
 | `layer` | Content on top of the whole window (centered, against an edge, or in a corner),<br/>with an optional backdrop (`bg-black/10` by default) that blocks the rest of the interface. | `AlertDialog`, `Dialog`, `Sheet`,<br/>`Drawer`, `Sonner`, `Toast` |
 | `listbox` | Vertical list with a highlighted item that follows the mouse and<br/>the keys (`ArrowUp`, `ArrowDown`, `Home`, `End`); `Enter` or a click selects it. | `Select`, `Combobox`, `Command`, menus |
+| `otp` | The invisible text input behind one-time password slots: value filtering, focus,<br/>active slot and blinking caret, with the slots drawn by the component. | `InputOtp` |
 | `plot` | Chart geometry (not a widget): category and linear scales (vertical or horizontal),<br/>nice ticks, stacking (with expand and sign offsets), natural, monotone, linear and step curves,<br/>polar coordinates, sectors with rounded corners, pies, and pointer hit-testing. | `Chart` (`Area`, `Bar`, `Line`, `Pie`,<br/>`Radar`, `Radial`) |
 | `pressable` | Clickable surface exposing hover, press, and focus status without button chrome;<br/>reacts to hover without `on_press` and can take the keyboard focus. | `Button`, `Toggle`, `Checkbox`, `Switch`,<br/>`Accordion`, `Tabs`, `Select`, `Calendar`,<br/>`Pagination`, `Sidebar`, `Badge`, `Breadcrumb`,<br/>`Item`, `Trace`, and others |
+| `questionnaire` | The model of a questionnaire (not a widget): questions, choices, answers,<br/>and the navigation between the steps, with required and optional questions. | `Questionnaire` |
 | `roving` | Roving focus: arrow keys, `Home`, and `End` move the focus<br/>between the items of a group, which is a single `Tab` stop. | `RadioGroup`, `ToggleGroup`, `Tabs` |
+| `scroll_keys` | Keyboard scrolling of a scrollable once clicked, like a scrollable `div`<br/>(`Home`, `End`, `PageUp`, `PageDown`, `Space`, arrows), with a focus-visible outline. | `MessageScroller` |
 | `split` | Two panes separated by a divider that can be dragged or moved with the keys,<br/>self-managed unless controlled with `ratio` and `on_resize`. | `Resizable` |
 | `toaster` | Animated corner stack manager handling hover-to-expand,<br/>dismiss gestures, auto-dismiss timers, and stack transforms. | `Sonner`, `Toast` |
 | `track` | Horizontal/vertical sliding viewport with drag gestures<br/>and smooth index snapping. | `Carousel` |
