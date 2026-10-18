@@ -315,9 +315,10 @@ impl Previews {
         let example = sensor(natural::natural(example.map(Message::Gallery)))
             .on_resize(move |size| Message::Measured(id, size));
 
-        // Smooth wheel scrolling, horizontal with `Shift`.
+        // Smooth wheel scrolling (opted in), horizontal with `Shift`.
         let example =
-            shadcn_iced::primitive::wheel(container(example).padding(PADDING).center(Fill));
+            shadcn_iced::primitive::wheel(container(example).padding(PADDING).center(Fill))
+                .smooth(true);
 
         wheel::wheel(example, |captured| {
             let _ = preview_wheel(captured);

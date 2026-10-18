@@ -185,7 +185,7 @@ flowchart TD
 | `track` | Horizontal/vertical sliding viewport with drag gestures<br/>and smooth index snapping. | `Carousel` |
 | `tracked` | Character-by-character text layout implementing CSS<br/>`letter-spacing` while supporting widget text lookup. | Shortcuts in `Command` and menus |
 | `underline` | Underlines text while hovered (`hover:underline`). | `Button` (`Variant::Link`) |
-| `wheel` | Browser-like wheel scrolling: smooth, with `Shift + Wheel` scrolling horizontally.<br/>Wraps a whole application view. | Application views (`gallery`, `gallery-web`) |
+| `wheel` | Browser-like wheel scrolling: `Shift + Wheel` scrolls horizontally, and notches scroll<br/>smoothly like Chrome when opted in (`set_smooth`, `Wheel::smooth`, `smooth_scroll`).<br/>Wraps a whole application view, or any part of it. | Application views (`gallery`, `gallery-web`) |
 
 ---
 
