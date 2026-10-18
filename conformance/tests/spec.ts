@@ -22,6 +22,15 @@ export type Locator =
   | { text: string; nth?: number; exact?: boolean }
   /** A logical position in the page. */
   | { at: [number, number] }
+  /**
+   * The center of the control with this accessible name: its `aria-label`
+   * on the web, its widget id in iced (for controls without text, such as
+   * icon buttons).
+   */
+  | { label: string }
+
+/** A locator that is an object, which a scroll step extends. */
+export type ObjectLocator = Exclude<Locator, string>
 
 export type Step =
   | { snapshot: string }
@@ -30,6 +39,11 @@ export type Step =
   | { click: Locator }
   | { rightClick: Locator }
   | { drag: { from: Locator; to: Locator } }
+  /**
+   * Scrolls the wheel at a locator (usually `at`) by `delta` logical pixels,
+   * like `mouse.wheel(dx, dy)`: a positive `dy` scrolls down.
+   */
+  | { scroll: ObjectLocator & { delta: [number, number] } }
   /** A key combination with Playwright's names, e.g. `ArrowDown` or `Shift+Tab`. */
   | { press: string }
   | { type: string }

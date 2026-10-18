@@ -11,7 +11,7 @@ use iced::{Element, Fill, Padding, Pixels, Theme};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
-        "default" => Fixture::new(|_| {
+        "default" | "wheel" => Fixture::new(|_| {
             // `h-72 w-48 rounded-md border`
             // Every separator has a `my-2`, the last one included.
             let tags = column((1..=50).rev().map(|i| {

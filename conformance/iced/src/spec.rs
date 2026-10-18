@@ -76,6 +76,9 @@ pub enum Step {
     Drag {
         drag: Drag,
     },
+    Scroll {
+        scroll: Scroll,
+    },
     Press {
         press: String,
     },
@@ -96,6 +99,16 @@ pub struct Drag {
     pub to: Locator,
 }
 
+/// A wheel scroll: `{ "at": [x, y], "delta": [dx, dy] }`, or any other
+/// object locator instead of `at` (`{ "text": "...", "delta": ... }`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct Scroll {
+    #[serde(flatten)]
+    pub target: Locator,
+    /// The logical pixels to scroll by; a positive `dy` scrolls down.
+    pub delta: [f32; 2],
+}
+
 /// Where a pointer action happens.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
@@ -111,6 +124,10 @@ pub enum Locator {
     },
     /// A logical position in the page.
     At { at: [f32; 2] },
+    /// The center of the control with this accessible name: its
+    /// `aria-label` on the web, its widget id in iced (for controls without
+    /// text, such as icon buttons).
+    Label { label: String },
     /// Shorthand for `{ "text": "..." }`.
     Plain(String),
 }
@@ -164,4 +181,41 @@ pub fn read_all(directory: &Path) -> Result<Vec<File>, String> {
 
     files.sort_by(|a, b| a.component.cmp(&b.component));
     Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_scroll_steps() {
+        let step: Step =
+            serde_json::from_str(r#"{ "scroll": { "at": [10, 20], "delta": [0, 120] } }"#).unwrap();
+        let Step::Scroll { scroll } = step else {
+            panic!("not a scroll: {step:?}");
+        };
+        assert!(matches!(scroll.target, Locator::At { at: [10.0, 20.0] }));
+        assert_eq!(scroll.delta, [0.0, 120.0]);
+
+        let step: Step =
+            serde_json::from_str(r#"{ "scroll": { "text": "Item", "delta": [0, -40] } }"#).unwrap();
+        assert!(matches!(
+            step,
+            Step::Scroll {
+                scroll: Scroll {
+                    target: Locator::Text { .. },
+                    ..
+                }
+            }
+        ));
+    }
+
+    #[test]
+    fn parses_label_locators() {
+        let step: Step = serde_json::from_str(r#"{ "click": { "label": "Close" } }"#).unwrap();
+        assert!(matches!(
+            step,
+            Step::Click { click: Locator::Label { label } } if label == "Close"
+        ));
+    }
 }

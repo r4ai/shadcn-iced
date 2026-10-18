@@ -13,6 +13,7 @@
 mod fixtures;
 mod fonts;
 mod harness;
+mod page;
 mod spec;
 mod store;
 
@@ -204,6 +205,11 @@ fn perform(
             let to = locate(harness, &drag.to)?;
             harness.drag(from, to);
         }
+        Step::Scroll { scroll } => {
+            let position = locate(harness, &scroll.target)?;
+            let [dx, dy] = scroll.delta;
+            harness.scroll(position, iced::Vector::new(dx, dy));
+        }
         Step::Press { press } => harness.press_key(press)?,
         Step::Type { r#type } => harness.type_text(r#type),
         Step::Wait { wait } => harness.wait(*wait),
@@ -239,6 +245,9 @@ fn locate(harness: &mut Harness, locator: &Locator) -> Result<iced::Point, Strin
         Locator::Text { text, nth, exact } => harness
             .locate_text(text, *nth, *exact)
             .ok_or_else(|| format!("text {text:?} (#{nth}) not found")),
+        Locator::Label { label } => harness
+            .locate_id(label)
+            .ok_or_else(|| format!("control labeled {label:?} not found")),
         Locator::Plain(text) => harness
             .locate_text(text, 0, true)
             .ok_or_else(|| format!("text {text:?} not found")),

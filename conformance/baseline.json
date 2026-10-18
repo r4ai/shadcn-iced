@@ -1,5 +1,5 @@
 {
-  "platform": "linux",
+  "platform": "win32",
   "scores": {
     "accordion/borders/first-open/dark": 0,
     "accordion/borders/first-open/light": 0,
@@ -997,6 +997,8 @@
     "scroll-area/horizontal/idle/light": 0.0061,
     "scroll-area/horizontal/scrolled/dark": 0.016,
     "scroll-area/horizontal/scrolled/light": 0.0029,
+    "scroll-area/wheel/scrolled/dark": 0.0003,
+    "scroll-area/wheel/scrolled/light": 0.0001,
     "select/basic/closed/dark": 0,
     "select/basic/closed/light": 0,
     "select/basic/item-hover/dark": 0.0001,
