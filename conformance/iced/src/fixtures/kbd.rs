@@ -47,6 +47,7 @@ pub fn get(id: &str) -> Option<Fixture> {
                 .align_y(Center),
             )
             .variant(Variant::Outline)
+            .inline_end(true)
             .on_press(Msg::Noop)
             .into()
         }),
