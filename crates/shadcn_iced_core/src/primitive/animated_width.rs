@@ -47,6 +47,8 @@ impl<Message, Theme, Renderer> AnimatedWidth<'_, Message, Theme, Renderer> {
 #[derive(Debug, Default)]
 struct State {
     width: Option<Transition>,
+    /// The width of the last layout.
+    laid_out: f32,
 }
 
 impl State {
@@ -57,7 +59,17 @@ impl State {
             width.go(target, DURATION, animation::ease_in_out, now);
         }
 
-        width.value(now)
+        self.laid_out = width.value(now);
+        self.laid_out
+    }
+
+    /// Whether the layout is out of date at `now`: during the transition,
+    /// and once more after it ends, since the last layout of the transition
+    /// is a frame before its end.
+    fn is_stale(&self, now: Instant) -> bool {
+        self.width.as_ref().is_some_and(|width| {
+            width.is_animating(now) || (width.value(now) - self.laid_out).abs() > f32::EPSILON
+        })
     }
 }
 
@@ -141,8 +153,7 @@ where
         viewport: &Rectangle,
     ) {
         if let Event::Window(window::Event::RedrawRequested(now)) = event
-            && let Some(width) = &tree.state.downcast_ref::<State>().width
-            && width.is_animating(*now)
+            && tree.state.downcast_ref::<State>().is_stale(*now)
         {
             shell.invalidate_layout();
             shell.request_redraw();
@@ -243,5 +254,31 @@ where
 {
     fn from(widget: AnimatedWidth<'a, Message, Theme, Renderer>) -> Self {
         Element::new(widget)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_last_frame_of_the_transition_is_laid_out() {
+        let start = Instant::now();
+        let mut state = State::default();
+
+        state.width(100.0, start);
+        assert!(!state.is_stale(start));
+
+        // A layout during the transition...
+        state.width(200.0, start);
+        let during = start + DURATION / 2;
+        state.width(200.0, during);
+        assert!(state.is_stale(during));
+
+        // ...is stale once the transition ended, until laid out again.
+        let after = start + DURATION * 2;
+        assert!(state.is_stale(after));
+        assert_eq!(state.width(200.0, after), 200.0);
+        assert!(!state.is_stale(after));
     }
 }
