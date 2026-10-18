@@ -188,6 +188,8 @@ pub fn search_field<'a, Message: Clone + 'a>(
                 super::input::input(placeholder, query)
                     .on_input(on_query)
                     .chromeless(true)
+                    // `text-sm`, whatever the window.
+                    .text_size(style::text::SM)
                     .padding(Padding::ZERO.top(6).bottom(6)),
             )
             .spacing(6)

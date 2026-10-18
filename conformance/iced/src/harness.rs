@@ -56,7 +56,12 @@ impl Harness {
             clipboard: Clipboard(None),
         };
 
-        harness.redraw();
+        // Like the iced runtime, tell the widgets about the window (e.g. for
+        // `text-base md:text-sm`).
+        harness.dispatch(Event::Window(window::Event::Opened {
+            position: None,
+            size,
+        }));
         harness
     }
 
