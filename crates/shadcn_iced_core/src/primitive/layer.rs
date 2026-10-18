@@ -5,6 +5,13 @@
 //! (centered, against an edge or in a corner), optionally dims everything
 //! behind it with a backdrop and blocks interactions with the rest of the
 //! interface.
+//!
+//! Like Base UI, a modal layer returns the focus to its trigger once it
+//! closes: the control of `base` that was focused when it opened (typically
+//! the button that opened it) keeps the focus, and shows it
+//! (`focus-visible`) once the user has interacted with the layer using the
+//! keyboard, like browsers do for focus moved by a script.
+use super::focus;
 use crate::animation::{self, Appearance, Fade, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -134,6 +141,13 @@ impl Animation {
 #[derive(Debug, Default)]
 struct State {
     presence: Transition,
+    /// Whether the layer was open, to notice when it closes.
+    was_open: bool,
+    /// Whether a key was pressed in the layer since the last press outside
+    /// of its content, which makes the focus returned to the trigger
+    /// visible. Like the keyboard modality of browsers, it outlives the
+    /// layer being closed and opened again.
+    keyboard: bool,
 }
 
 impl<'a, Message, Theme, Renderer> Layer<'a, Message, Theme, Renderer>
@@ -294,6 +308,28 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        let state = tree.state.downcast_mut::<State>();
+
+        // While a modal layer is open, `base` receives no event: the focused
+        // trigger stays focused. Once closed, it shows its focus if the
+        // keyboard was used, as if the focus had come back to it from the
+        // layer.
+        if !self.open && std::mem::take(&mut state.was_open) && state.keyboard {
+            focus::for_each_control(
+                &mut self.base,
+                &mut tree.children[0],
+                layout,
+                renderer,
+                |_, focus| {
+                    if focus.is_focused() {
+                        focus.focus_with_keyboard();
+                    }
+                },
+            );
+
+            shell.request_redraw();
+        }
+
         self.base.as_widget_mut().update(
             &mut tree.children[0],
             event,
@@ -359,6 +395,10 @@ where
         let (base_tree, content_tree) = children.split_at_mut(1);
         let now = iced::time::Instant::now();
 
+        if self.open && self.modal {
+            state.was_open = true;
+        }
+
         state.presence.go(
             if self.open { 1.0 } else { 0.0 },
             self.animation.duration(self.open),
@@ -379,7 +419,7 @@ where
 
         let layer = visible.then(|| {
             overlay::Element::new(Box::new(Overlay {
-                presence: &state.presence,
+                state,
                 closing: !self.open,
                 animation: self.animation,
                 content: &mut self.content,
@@ -429,7 +469,7 @@ where
 }
 
 struct Overlay<'a, 'b, Message, Theme, Renderer> {
-    presence: &'b Transition,
+    state: &'b mut State,
     closing: bool,
     animation: Animation,
     content: &'b mut Element<'a, Message, Theme, Renderer>,
@@ -490,7 +530,7 @@ where
         cursor: mouse::Cursor,
     ) {
         let bounds = layout.bounds();
-        let progress = self.presence.value(iced::time::Instant::now());
+        let progress = self.state.presence.value(iced::time::Instant::now());
 
         if let Some(backdrop) = self.backdrop {
             let color = backdrop(theme);
@@ -554,7 +594,7 @@ where
         let was_captured = shell.is_event_captured();
 
         if let Event::Window(window::Event::RedrawRequested(now)) = event
-            && self.presence.is_animating(*now)
+            && self.state.presence.is_animating(*now)
         {
             shell.request_redraw();
         }
@@ -562,6 +602,17 @@ where
         // A closing layer is only a picture of what it was.
         if self.closing {
             return;
+        }
+
+        match event {
+            Event::Keyboard(keyboard::Event::KeyPressed { .. }) => self.state.keyboard = true,
+            Event::Mouse(mouse::Event::ButtonPressed(_))
+            | Event::Touch(touch::Event::FingerPressed { .. })
+                if !cursor.is_over(content_bounds) =>
+            {
+                self.state.keyboard = false;
+            }
+            _ => {}
         }
 
         self.content.as_widget_mut().update(
