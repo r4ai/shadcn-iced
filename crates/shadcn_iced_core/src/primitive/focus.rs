@@ -197,6 +197,18 @@ where
             viewport,
         );
 
+        // Moving the pointer or scrolling never moves the focus: skip the
+        // walk of the content for those events, the most frequent ones.
+        if let Event::Mouse(
+            mouse::Event::CursorMoved { .. }
+            | mouse::Event::CursorEntered
+            | mouse::Event::CursorLeft
+            | mouse::Event::WheelScrolled { .. },
+        ) = event
+        {
+            return;
+        }
+
         let mut query = FocusQuery { focused: false };
 
         self.content.as_widget_mut().operate(
