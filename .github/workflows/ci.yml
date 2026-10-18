@@ -141,7 +141,7 @@ jobs:
       contents: read
     environment:
       name: preview
-      url: ${{ steps.upload.outputs.deployment-url }}
+      url: ${{ steps.url.outputs.url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -171,6 +171,23 @@ jobs:
           workingDirectory: site
           packageManager: pnpm
           command: versions upload --preview-alias pr-${{ github.event.pull_request.number }} --message "#${{ github.event.pull_request.number }}"
+      # wrangler-action outputs the URL of the version
+      # (`https://<version>-shadcn-iced.<subdomain>.workers.dev`), which
+      # becomes the alias URL of the pull request with its prefix replaced.
+      # Wrangler prints no URL while the Worker has preview URLs disabled:
+      # `wrangler deploy` enables them from `preview_urls`.
+      - id: url
+        env:
+          VERSION_URL: ${{ steps.upload.outputs.deployment-url }}
+          ALIAS: pr-${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$VERSION_URL" ]; then
+            echo "::error::Wrangler printed no preview URL: enable the preview URLs of the Worker (deploy main with \`preview_urls: true\`, or Settings > Domains & Routes in the Cloudflare dashboard)."
+            exit 1
+          fi
+          url="https://$ALIAS-${VERSION_URL#https://*-}"
+          echo "Preview: $url (this version: $VERSION_URL)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
 
   conformance:
     name: Conformance
