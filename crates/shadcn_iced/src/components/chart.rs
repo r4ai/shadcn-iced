@@ -2485,18 +2485,11 @@ fn dashed_indicator<'a, Message: 'a>(
 impl<'a, Message: 'a> From<Chart> for Element<'a, Message> {
     fn from(chart: Chart) -> Self {
         let legend = chart.legend.then(|| chart.legend_element());
-        let tooltips = if chart.tooltip {
-            (0..chart.targets())
-                .map(|index| chart.tooltip_element(index))
-                .collect()
-        } else {
-            Vec::new()
-        };
 
         Element::new(ChartWidget {
             chart,
             legend,
-            tooltips,
+            tooltip: None,
         })
     }
 }
@@ -2515,35 +2508,36 @@ pub struct State {
 struct ChartWidget<'a, Message> {
     chart: Chart,
     legend: Option<Element<'a, Message>>,
-    tooltips: Vec<Element<'a, Message>>,
+    /// The tooltip of the shown target, with that target: built in
+    /// `layout`, since a chart can have a tooltip for each of hundreds of
+    /// targets while it shows one at most.
+    tooltip: Option<(usize, Element<'a, Message>)>,
 }
 
-impl<'a, Message> ChartWidget<'a, Message> {
-    fn children(&self) -> impl Iterator<Item = &Element<'a, Message>> {
-        self.legend.iter().chain(&self.tooltips)
-    }
-
+impl<'a, Message: 'a> ChartWidget<'a, Message> {
     /// What the tooltip shows: the hovered target, or the default one.
     fn shown_target(&self, state: &State) -> Option<usize> {
-        if state.cursor.is_some() {
+        let target = if state.cursor.is_some() {
             state.hovered
         } else {
             state.hovered.or(self.chart.default_index)
-        }
+        }?;
+
+        (self.chart.tooltip && target < self.chart.targets()).then_some(target)
     }
 
-    /// The child index of the tooltip of the hovered category.
-    fn tooltip_index(&self, state: &State) -> Option<usize> {
+    /// The child index of the tooltip, after the legend.
+    fn tooltip_child(&self) -> usize {
+        usize::from(self.legend.is_some())
+    }
+
+    /// The tooltip built for the shown target, if any.
+    fn shown_tooltip(&self, state: &State) -> Option<&Element<'a, Message>> {
         let target = self.shown_target(state)?;
 
-        (target < self.tooltips.len()).then(|| target + usize::from(self.legend.is_some()))
-    }
-
-    /// The children shown: the legend and the hovered tooltip.
-    fn shown(&self, state: &State) -> impl Iterator<Item = usize> {
-        let legend = self.legend.is_some().then_some(0);
-
-        legend.into_iter().chain(self.tooltip_index(state))
+        self.tooltip
+            .as_ref()
+            .and_then(|(built, tooltip)| (*built == target).then_some(tooltip))
     }
 
     /// The category to highlight in the plot.
@@ -2554,7 +2548,7 @@ impl<'a, Message> ChartWidget<'a, Message> {
     }
 }
 
-impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message> {
+impl<'a, Message: 'a> Widget<Message, Theme, iced::Renderer> for ChartWidget<'a, Message> {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
     }
@@ -2563,13 +2557,26 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
         tree::State::new(State::default())
     }
 
+    /// The legend, and a slot for the tooltip, which `layout` fills.
     fn children(&self) -> Vec<Tree> {
-        self.children().map(Tree::new).collect()
+        self.legend
+            .iter()
+            .map(Tree::new)
+            .chain(self.chart.tooltip.then(Tree::empty))
+            .collect()
     }
 
     fn diff(&self, tree: &mut Tree) {
-        let children: Vec<&Element<'_, Message>> = self.children().collect();
-        tree.diff_children(&children);
+        let len = usize::from(self.legend.is_some()) + usize::from(self.chart.tooltip);
+
+        if tree.children.len() != len {
+            tree.children = Widget::<Message, Theme, iced::Renderer>::children(self);
+            return;
+        }
+
+        if let Some(legend) = &self.legend {
+            tree.children[0].diff(legend);
+        }
     }
 
     fn size(&self) -> Size<Length> {
@@ -2620,31 +2627,45 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
         let cursor = state.cursor;
         let shown = self.shown_target(state);
 
-        // Only the shown tooltip is laid out (and drawn): the layout is
+        // Only the shown tooltip is built and laid out: the layout is
         // invalidated whenever the hovered category changes. When only the
         // pointer moves, `draw` moves the tooltip after it.
-        for (index, (tooltip, tree)) in self.tooltips.iter_mut().zip(trees).enumerate() {
-            if shown != Some(index) {
-                nodes.push(layout::Node::default());
-                continue;
+        if let Some(tree) = trees.next() {
+            match shown {
+                Some(target) => {
+                    if self
+                        .tooltip
+                        .as_ref()
+                        .is_none_or(|(built, _)| *built != target)
+                    {
+                        let tooltip = self.chart.tooltip_element(target);
+                        tree.diff(&tooltip);
+                        self.tooltip = Some((target, tooltip));
+                    }
+
+                    let (_, tooltip) = self.tooltip.as_mut().expect("tooltip");
+                    let node = tooltip.as_widget_mut().layout(
+                        tree,
+                        renderer,
+                        &layout::Limits::new(Size::ZERO, Size::INFINITE),
+                    );
+
+                    let category = if self.chart.kind == Kind::Pie {
+                        target
+                    } else {
+                        target % self.chart.count().max(1)
+                    };
+                    let position = self
+                        .chart
+                        .tooltip_position(plot, category, cursor, node.size());
+
+                    nodes.push(node.move_to(position));
+                }
+                None => {
+                    self.tooltip = None;
+                    nodes.push(layout::Node::default());
+                }
             }
-
-            let node = tooltip.as_widget_mut().layout(
-                tree,
-                renderer,
-                &layout::Limits::new(Size::ZERO, Size::INFINITE),
-            );
-
-            let target = if self.chart.kind == Kind::Pie {
-                index
-            } else {
-                index % self.chart.count().max(1)
-            };
-            let position = self
-                .chart
-                .tooltip_position(plot, target, cursor, node.size());
-
-            nodes.push(node.move_to(position));
         }
 
         layout::Node::with_children(size, nodes)
@@ -2657,25 +2678,25 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
         renderer: &iced::Renderer,
         operation: &mut dyn Operation,
     ) {
-        let shown: Vec<usize> = self.shown(tree.state.downcast_ref::<State>()).collect();
-        let legend = usize::from(self.legend.is_some());
+        let shown = self.shown_target(tree.state.downcast_ref::<State>());
+        let index = self.tooltip_child();
         let children: Vec<Layout<'_>> = layout.children().collect();
 
-        for index in shown {
-            let element = if index < legend {
-                self.legend.as_mut()
-            } else {
-                self.tooltips.get_mut(index - legend)
-            };
+        if let Some(legend) = &mut self.legend {
+            legend
+                .as_widget_mut()
+                .operate(&mut tree.children[0], children[0], renderer, operation);
+        }
 
-            if let Some(element) = element {
-                element.as_widget_mut().operate(
-                    &mut tree.children[index],
-                    children[index],
-                    renderer,
-                    operation,
-                );
-            }
+        if let Some((built, tooltip)) = &mut self.tooltip
+            && Some(*built) == shown
+        {
+            tooltip.as_widget_mut().operate(
+                &mut tree.children[index],
+                children[index],
+                renderer,
+                operation,
+            );
         }
     }
 
@@ -2766,9 +2787,9 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for ChartWidget<'_, Message
             );
         }
 
-        if let Some(index) = self.tooltip_index(state) {
-            let target = index - usize::from(self.legend.is_some());
-            let tooltip = &self.tooltips[target];
+        if let (Some(target), Some(tooltip)) = (self.shown_target(state), self.shown_tooltip(state))
+        {
+            let index = self.tooltip_child();
             let laid = children[index].bounds();
 
             // The tooltip was laid out for the pointer of the last layout:
