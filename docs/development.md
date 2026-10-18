@@ -38,7 +38,7 @@ bash scripts/check-copy.sh
 
 ## Running the Desktop Gallery
 
-The `gallery` package (`examples/gallery`) showcases all **65** component pages. The **4** chart pages (`charts-area`, `charts-bar`, `charts-line`, `charts-pie`) are only shown on the website, through `gallery-web`.
+The `gallery` package (`examples/gallery`) showcases all **65** component pages. The **7** chart pages (`charts-area`, `charts-bar`, `charts-line`, `charts-pie`, `charts-radar`, `charts-radial`, `charts-tooltip`) are only shown on the website, through `gallery-web`, and can be rendered on their own by `snapshot` (e.g. `charts-radar:dark --size 440x4600`).
 
 ```sh
 # The minimal app of the README quick start

@@ -6,36 +6,1434 @@
       "id": "bar",
       "viewport": [416, 282],
       "steps": [
-        { "wait": 300 },
-        { "snapshot": "idle" },
-        { "hover": { "at": [116, 150] } },
-        { "wait": 200 },
-        { "expect": { "visible": ["February"] } },
-        { "snapshot": "tooltip" }
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "expect": {
+            "visible": ["February"]
+          }
+        },
+        {
+          "snapshot": "tooltip"
+        }
       ]
     },
     {
       "id": "line",
       "viewport": [416, 282],
       "steps": [
-        { "wait": 300 },
-        { "snapshot": "idle" },
-        { "hover": { "at": [116, 150] } },
-        { "wait": 200 },
-        { "expect": { "visible": ["February"] } },
-        { "snapshot": "tooltip" }
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "expect": {
+            "visible": ["February"]
+          }
+        },
+        {
+          "snapshot": "tooltip"
+        }
       ]
     },
     {
       "id": "area-stacked",
       "viewport": [416, 282],
       "steps": [
-        { "wait": 300 },
-        { "snapshot": "idle" },
-        { "hover": { "at": [116, 150] } },
-        { "wait": 200 },
-        { "expect": { "visible": ["February"] } },
-        { "snapshot": "tooltip" }
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "expect": {
+            "visible": ["February"]
+          }
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "area-axes",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "area-default",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "area-gradient",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "area-icons",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "area-legend",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "area-linear",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "area-stacked-expand",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "area-step",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-active",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-default",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-horizontal",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-label",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-label-custom",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-mixed",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-multiple",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-negative",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "bar-stacked",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "line-default",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "line-dots",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "line-dots-colors",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "line-label",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "line-label-custom",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "line-linear",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "line-multiple",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "line-step",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [116, 150]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-donut",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-donut-active",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-donut-text",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-label",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-label-custom",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-label-list",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-legend",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-separator-none",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-simple",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "pie-stacked",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-default",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-dots",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-grid-circle",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-grid-circle-fill",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-grid-circle-no-lines",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-grid-custom",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-grid-fill",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-grid-none",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-icons",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-legend",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-lines-only",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-multiple",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radar-radius",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radial-grid",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radial-label",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radial-shape",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radial-simple",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radial-stacked",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "radial-text",
+      "viewport": [282, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        },
+        {
+          "hover": {
+            "at": [180, 110]
+          }
+        },
+        {
+          "wait": 200
+        },
+        {
+          "snapshot": "tooltip"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-advanced",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-default",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-formatter",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-icons",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-indicator-line",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-indicator-none",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-label-custom",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-label-formatter",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "tooltip-label-none",
+      "viewport": [416, 282],
+      "steps": [
+        {
+          "wait": 300
+        },
+        {
+          "snapshot": "idle"
+        }
       ]
     }
   ]

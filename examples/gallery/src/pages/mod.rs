@@ -24,7 +24,15 @@ pub struct Page {
 
 /// The pages of the chart showcase of the website (`/charts`), which are
 /// not components.
-pub const CHARTS: &[Page] = &[charts::AREA, charts::BAR, charts::LINE, charts::PIE];
+pub const CHARTS: &[Page] = &[
+    charts::AREA,
+    charts::BAR,
+    charts::LINE,
+    charts::PIE,
+    charts::RADAR,
+    charts::RADIAL,
+    charts::TOOLTIP,
+];
 
 /// The example apps of the website (`/examples`), which are not
 /// components either: one example each, the whole app.
