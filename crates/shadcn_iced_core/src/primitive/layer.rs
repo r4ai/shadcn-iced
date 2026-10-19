@@ -198,6 +198,8 @@ struct State {
     /// Whether a swipe asked to dismiss the layer, which comes back if it
     /// stays open.
     swiped_out: bool,
+    /// Whether the focus was returned to the trigger, to redraw it.
+    restored: bool,
 }
 
 /// How far a swiped layer has to move, relative to its size, to be
@@ -212,14 +214,32 @@ const SWIPE_VELOCITY: f32 = 0.4;
 /// How long a swiped layer takes to come back (Vaul's `0.5s` transition).
 const SWIPE_BACK: Duration = Duration::from_millis(500);
 
-/// A control of `base` that was focused, to return the focus to it.
+/// A control of `base` (or of its overlays) that was focused, to return the
+/// focus to it.
+///
+/// Widgets have no identity but their [`Id`], so without one the trigger is
+/// the n-th focusable widget, as long as it is still where it was and has
+/// the same label: a page that changed while the layer was open (a row
+/// removed) gets no focus back, like a trigger removed from the DOM.
+#[derive(Debug, Clone, PartialEq)]
+struct Trigger {
+    kind: Kind,
+    /// Its position among the widgets of its kind.
+    index: usize,
+    id: Option<Id>,
+    bounds: Rectangle,
+    /// Its first text.
+    label: Option<String>,
+}
+
+/// The kind of a [`Trigger`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Trigger {
-    /// The n-th control with a [`focus::Focus`] state, and whether it showed
-    /// its focus.
-    Control(usize, bool),
-    /// The n-th focusable widget of another kind (a text input).
-    Focusable(usize),
+enum Kind {
+    /// A control with a [`focus::Focus`] state, and whether it showed its
+    /// focus.
+    Control(bool),
+    /// A focusable widget of another kind (a text input).
+    Focusable,
 }
 
 /// A pointer pressing the content of a layer that can be swiped away.
@@ -428,26 +448,8 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        let state = tree.state.downcast_mut::<State>();
-
-        // Once closed, the focus returns to the trigger (`onCloseAutoFocus`),
-        // visible if the keyboard was used in the layer, as if the focus had
-        // come back to it from the layer.
-        if !self.open && std::mem::take(&mut state.was_open) {
-            if let Some(trigger) = state.trigger.take() {
-                self.base.as_widget_mut().operate(
-                    &mut tree.children[0],
-                    layout,
-                    renderer,
-                    &mut Restore {
-                        trigger,
-                        keyboard: state.keyboard,
-                        controls: 0,
-                        focusables: 0,
-                    },
-                );
-            }
-
+        // The focus returned to the trigger in `overlay`, which comes first.
+        if std::mem::take(&mut tree.state.downcast_mut::<State>().restored) {
             shell.request_redraw();
         }
 
@@ -517,21 +519,72 @@ where
         let now = iced::time::Instant::now();
 
         // When a modal layer opens, its trigger loses the focus, which moves
-        // into the content on its first event.
+        // into the content on its first event. The trigger may be in an
+        // overlay of `base`, like a popover.
         if self.open && self.modal && !state.was_open {
             state.was_open = true;
 
             let mut blur = Blur::default();
-            self.base
-                .as_widget_mut()
-                .operate(&mut base_tree[0], layout, renderer, &mut blur);
+            operate_page(
+                &mut self.base,
+                &mut base_tree[0],
+                layout,
+                renderer,
+                viewport,
+                translation,
+                &mut blur,
+            );
 
+            state.auto_focus = Some(matches!(
+                blur.trigger,
+                Some(Trigger {
+                    kind: Kind::Control(true),
+                    ..
+                })
+            ));
             state.trigger = blur.trigger;
-            state.auto_focus = Some(matches!(blur.trigger, Some(Trigger::Control(_, true))));
             state.drag = None;
             state.backdrop = None;
             state.swipe.set(0.0);
             state.swiped_out = false;
+        }
+
+        // Once closed, the focus returns to the trigger (`onCloseAutoFocus`),
+        // visible if the keyboard was used in the layer, as if the focus had
+        // come back to it from the layer.
+        if !self.open && std::mem::take(&mut state.was_open) {
+            if let Some(trigger) = state.trigger.take() {
+                let mut find = FindTrigger::new(&trigger);
+                operate_page(
+                    &mut self.base,
+                    &mut base_tree[0],
+                    layout,
+                    renderer,
+                    viewport,
+                    translation,
+                    &mut find,
+                );
+
+                if let Some((kind, index)) = find.result() {
+                    operate_page(
+                        &mut self.base,
+                        &mut base_tree[0],
+                        layout,
+                        renderer,
+                        viewport,
+                        translation,
+                        &mut Restore {
+                            kind,
+                            index,
+                            keyboard: state.keyboard,
+                            controls: 0,
+                            focusables: 0,
+                        },
+                    );
+                }
+            }
+
+            state.restored = true;
         }
 
         state.presence.go(
@@ -573,6 +626,12 @@ where
         match (base, layer) {
             (None, None) => None,
             (Some(overlay), None) | (None, Some(overlay)) => Some(overlay),
+            // The overlays of the page are as `inert` as the page behind an
+            // open modal layer: an open popover would otherwise take the
+            // keys first, and move the focus behind the layer.
+            (Some(base), Some(layer)) if self.open && self.modal => {
+                Some(overlay::Element::new(Box::new(Behind { base, layer })))
+            }
             (Some(base), Some(layer)) => {
                 Some(overlay::Group::with_children(vec![base, layer]).overlay())
             }
@@ -1185,11 +1244,159 @@ impl Operation for Inert<'_> {
     }
 }
 
-/// Unfocuses the focused control of `base` when a layer opens, and
+/// The overlays of the page behind an open modal layer, and the layer. Like
+/// the page, they are `inert`: they show, but only the layer gets the input,
+/// and focus operations skip their focusable widgets.
+struct Behind<'a, Message, Theme, Renderer> {
+    base: overlay::Element<'a, Message, Theme, Renderer>,
+    layer: overlay::Element<'a, Message, Theme, Renderer>,
+}
+
+impl<Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
+    for Behind<'_, Message, Theme, Renderer>
+where
+    Renderer: iced::advanced::Renderer,
+{
+    fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
+        layout::Node::with_children(
+            bounds,
+            vec![
+                self.base.as_overlay_mut().layout(renderer, bounds),
+                self.layer.as_overlay_mut().layout(renderer, bounds),
+            ],
+        )
+    }
+
+    fn draw(
+        &self,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+    ) {
+        let mut children = layout.children();
+        let (base, layer) = (children.next().unwrap(), children.next().unwrap());
+
+        self.base
+            .as_overlay()
+            .draw(renderer, theme, style, base, mouse::Cursor::Unavailable);
+        self.layer
+            .as_overlay()
+            .draw(renderer, theme, style, layer, cursor);
+    }
+
+    fn operate(&mut self, layout: Layout<'_>, renderer: &Renderer, operation: &mut dyn Operation) {
+        let mut children = layout.children();
+        let (base, layer) = (children.next().unwrap(), children.next().unwrap());
+
+        operation.traverse(&mut |operation| {
+            self.base
+                .as_overlay_mut()
+                .operate(base, renderer, &mut Inert { operation });
+            self.layer
+                .as_overlay_mut()
+                .operate(layer, renderer, operation);
+        });
+    }
+
+    fn update(
+        &mut self,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+    ) {
+        let mut children = layout.children();
+        let (base, layer) = (children.next().unwrap(), children.next().unwrap());
+
+        self.layer
+            .as_overlay_mut()
+            .update(event, layer, cursor, renderer, clipboard, shell);
+
+        // The overlays of the page still animate, but get no input.
+        if let Event::Window(_) = event {
+            self.base.as_overlay_mut().update(
+                event,
+                base,
+                mouse::Cursor::Unavailable,
+                renderer,
+                clipboard,
+                shell,
+            );
+        }
+    }
+
+    fn mouse_interaction(
+        &self,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        let layer = layout.children().nth(1).unwrap();
+
+        self.layer
+            .as_overlay()
+            .mouse_interaction(layer, cursor, renderer)
+    }
+
+    // The overlays of the page get no input, so neither do theirs: only the
+    // ones of the layer show.
+    fn overlay<'c>(
+        &'c mut self,
+        layout: Layout<'c>,
+        renderer: &Renderer,
+    ) -> Option<overlay::Element<'c, Message, Theme, Renderer>> {
+        let layer = layout.children().nth(1).unwrap();
+
+        self.layer.as_overlay_mut().overlay(layer, renderer)
+    }
+
+    fn index(&self) -> f32 {
+        self.base
+            .as_overlay()
+            .index()
+            .min(self.layer.as_overlay().index())
+    }
+}
+
+/// Runs `operation` on the page behind a layer: `base`, then its overlays
+/// (an open popover), laid out in the window.
+fn operate_page<Message, Theme, Renderer>(
+    base: &mut Element<'_, Message, Theme, Renderer>,
+    tree: &mut Tree,
+    layout: Layout<'_>,
+    renderer: &Renderer,
+    viewport: &Rectangle,
+    translation: Vector,
+    operation: &mut dyn Operation,
+) where
+    Renderer: iced::advanced::Renderer,
+{
+    base.as_widget_mut()
+        .operate(tree, layout, renderer, operation);
+
+    if let Some(mut overlay) =
+        base.as_widget_mut()
+            .overlay(tree, layout, renderer, viewport, translation)
+    {
+        let node = overlay.as_overlay_mut().layout(renderer, viewport.size());
+
+        overlay
+            .as_overlay_mut()
+            .operate(Layout::new(&node), renderer, operation);
+    }
+}
+
+/// Unfocuses the focused control of the page when a layer opens, and
 /// remembers it.
 #[derive(Default)]
 struct Blur {
     trigger: Option<Trigger>,
+    /// Whether the next text within the trigger is its label.
+    labelling: bool,
     controls: usize,
     focusables: usize,
 }
@@ -1199,11 +1406,22 @@ impl Operation for Blur {
         operate(self);
     }
 
-    fn custom(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
+    fn custom(&mut self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn std::any::Any) {
         if let Some(focus) = state.downcast_mut::<focus::Focus>() {
+            self.labelling = false;
+
+            // The last focused control wins: an overlay (a popover) comes
+            // after the page, and its trigger may still have the focus.
             if focus.is_focused() {
-                self.trigger
-                    .get_or_insert(Trigger::Control(self.controls, focus.is_visible()));
+                self.trigger = Some(Trigger {
+                    kind: Kind::Control(focus.is_visible()),
+                    index: self.controls,
+                    id: id.cloned(),
+                    bounds,
+                    label: None,
+                });
+                self.labelling = true;
+
                 focus.blur();
             }
 
@@ -1213,20 +1431,118 @@ impl Operation for Blur {
 
     // Controls report their `Focus` as a custom state first, so only other
     // widgets are still focused here.
-    fn focusable(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn Focusable) {
+    fn focusable(&mut self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn Focusable) {
         if state.is_focused() {
-            self.trigger
-                .get_or_insert(Trigger::Focusable(self.focusables));
+            self.trigger = Some(Trigger {
+                kind: Kind::Focusable,
+                index: self.focusables,
+                id: id.cloned(),
+                bounds,
+                label: None,
+            });
+            self.labelling = false;
             state.unfocus();
         }
 
         self.focusables += 1;
     }
+
+    fn text(&mut self, _id: Option<&Id>, bounds: Rectangle, text: &str) {
+        if self.labelling
+            && let Some(trigger) = self.trigger.as_mut()
+            && trigger.bounds.contains(bounds.center())
+        {
+            trigger.label = Some(text.to_owned());
+            self.labelling = false;
+        }
+    }
 }
 
-/// Returns the focus to the [`Trigger`] of a layer once it closes.
+/// Finds the [`Trigger`] of a layer in the page once it closes: the widget
+/// with its [`Id`], or else the widget of its kind and index, if it is still
+/// where it was and has the same label.
+struct FindTrigger<'a> {
+    trigger: &'a Trigger,
+    found: Option<(Kind, usize)>,
+    label: Option<String>,
+    labelling: bool,
+    controls: usize,
+    focusables: usize,
+}
+
+impl<'a> FindTrigger<'a> {
+    fn new(trigger: &'a Trigger) -> Self {
+        Self {
+            trigger,
+            found: None,
+            label: None,
+            labelling: false,
+            controls: 0,
+            focusables: 0,
+        }
+    }
+
+    fn is_trigger(&self, kind: Kind, index: usize, id: Option<&Id>, bounds: Rectangle) -> bool {
+        match &self.trigger.id {
+            Some(trigger) => id == Some(trigger),
+            None => {
+                matches!(
+                    (kind, self.trigger.kind),
+                    (Kind::Control(_), Kind::Control(_)) | (Kind::Focusable, Kind::Focusable)
+                ) && index == self.trigger.index
+                    && bounds == self.trigger.bounds
+            }
+        }
+    }
+
+    /// The kind and index of the trigger, if it is still there.
+    fn result(&self) -> Option<(Kind, usize)> {
+        self.found
+            .filter(|_| self.trigger.id.is_some() || self.label == self.trigger.label)
+    }
+}
+
+impl Operation for FindTrigger<'_> {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+
+    fn custom(&mut self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn std::any::Any) {
+        if state.is::<focus::Focus>() {
+            self.labelling = false;
+
+            if self.found.is_none()
+                && self.is_trigger(Kind::Control(false), self.controls, id, bounds)
+            {
+                self.found = Some((Kind::Control(false), self.controls));
+                self.labelling = true;
+            }
+
+            self.controls += 1;
+        }
+    }
+
+    fn focusable(&mut self, id: Option<&Id>, bounds: Rectangle, _state: &mut dyn Focusable) {
+        if self.found.is_none() && self.is_trigger(Kind::Focusable, self.focusables, id, bounds) {
+            self.found = Some((Kind::Focusable, self.focusables));
+        }
+
+        self.focusables += 1;
+    }
+
+    fn text(&mut self, _id: Option<&Id>, bounds: Rectangle, text: &str) {
+        if self.labelling && self.trigger.bounds.contains(bounds.center()) {
+            self.label = Some(text.to_owned());
+            self.labelling = false;
+        }
+    }
+}
+
+/// Returns the focus to the [`Trigger`] of a layer once it closes, found
+/// with [`FindTrigger`].
 struct Restore {
-    trigger: Trigger,
+    kind: Kind,
+    index: usize,
     keyboard: bool,
     controls: usize,
     focusables: usize,
@@ -1239,7 +1555,7 @@ impl Operation for Restore {
 
     fn custom(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
         if let Some(focus) = state.downcast_mut::<focus::Focus>() {
-            if matches!(self.trigger, Trigger::Control(index, _) if index == self.controls) {
+            if matches!(self.kind, Kind::Control(_)) && self.index == self.controls {
                 if self.keyboard {
                     focus.focus_with_keyboard();
                 } else {
@@ -1252,7 +1568,7 @@ impl Operation for Restore {
     }
 
     fn focusable(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn Focusable) {
-        if self.trigger == Trigger::Focusable(self.focusables) {
+        if self.kind == Kind::Focusable && self.index == self.focusables {
             state.focus();
         }
 

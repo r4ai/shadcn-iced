@@ -20,6 +20,8 @@ enum Message {
     Close,
     Page,
     Action,
+    /// Removes the first row of [`Kind::Rows`] and closes the dialog.
+    Remove,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -27,11 +29,17 @@ enum Kind {
     Dialog,
     AlertDialog,
     Drawer,
+    /// An alert dialog opened from a button of a popover.
+    PopoverAlertDialog,
+    /// A dialog opened from a row of a list, which it can remove.
+    Rows,
 }
 
 struct App {
     kind: Kind,
     open: bool,
+    /// Whether the first row of [`Kind::Rows`] is still there.
+    first_row: bool,
 }
 
 impl App {
@@ -44,6 +52,39 @@ impl App {
         .padding(20);
 
         let modal: Element<'static, Message> = match self.kind {
+            Kind::PopoverAlertDialog => {
+                let page = column![
+                    shadcn_iced::popover::popover(
+                        button("Menu").on_press(Message::Page),
+                        button("Delete…").on_press(Message::Open),
+                    ),
+                    button("Page").on_press(Message::Page),
+                ]
+                .spacing(8)
+                .padding(20);
+
+                shadcn_iced::alert_dialog::alert_dialog(page, self.open)
+                    .title("Are you absolutely sure?")
+                    .cancel("Cancel", Message::Close)
+                    .action("Continue", Message::Action)
+                    .into()
+            }
+            Kind::Rows => {
+                let mut page = column![].spacing(8).padding(20);
+
+                if self.first_row {
+                    page = page.push(button("Delete row 1").on_press(Message::Open));
+                }
+
+                let page = page.push(button("Delete row 2").on_press(Message::Open));
+
+                shadcn_iced::dialog::dialog(page, self.open)
+                    .title("Delete the row?")
+                    .content(button("Keep").on_press(Message::Close))
+                    .footer(button("Delete").on_press(Message::Remove))
+                    .on_close(Message::Close)
+                    .into()
+            }
             Kind::Dialog => shadcn_iced::dialog::dialog(page, self.open)
                 .title("Edit profile")
                 .content(button("First").on_press(Message::Action))
@@ -70,6 +111,10 @@ impl App {
         match message {
             Message::Open => self.open = true,
             Message::Close => self.open = false,
+            Message::Remove => {
+                self.first_row = false;
+                self.open = false;
+            }
             Message::Page | Message::Action => {}
         }
     }
@@ -98,7 +143,11 @@ impl Harness {
         .expect("a headless renderer");
 
         let mut harness = Self {
-            app: App { kind, open },
+            app: App {
+                kind,
+                open,
+                first_row: true,
+            },
             cache: Some(Cache::default()),
             renderer,
             cursor: mouse::Cursor::Unavailable,
@@ -510,4 +559,64 @@ fn a_drag_on_the_backdrop_does_not_dismiss() {
         ui.finger(lifted, Point::new(12.0, 10.0));
         assert_eq!(ui.take_messages(), [Message::Close], "{kind:?}");
     }
+}
+
+const POPOVER: &[&str] = &["Menu", "Delete…", "Page", "Cancel", "Continue"];
+
+#[test]
+fn a_popover_behind_an_alert_dialog_gets_no_keys() {
+    let mut ui = Harness::new(Kind::PopoverAlertDialog, false);
+    ui.click("Menu");
+    ui.click("Delete…");
+    assert!(ui.app.open);
+
+    // The button of the popover lost the focus to the dialog.
+    assert_eq!(labels(ui.focused(POPOVER)), ["Cancel"]);
+
+    // Tab stays in the dialog, rather than cycling through the popover.
+    for _ in 0..4 {
+        ui.tab();
+        let focused = labels(ui.focused(POPOVER));
+
+        assert!(
+            focused == ["Cancel"] || focused == ["Continue"],
+            "the focus left the dialog: {focused:?}"
+        );
+    }
+
+    assert_eq!(labels(ui.focused(POPOVER)), ["Cancel"]);
+    ui.take_messages();
+
+    // Enter presses the cancel button, not the button of the popover.
+    ui.key(Named::Enter, keyboard::Modifiers::empty());
+    assert_eq!(ui.take_messages(), [Message::Close]);
+    assert!(!ui.app.open);
+
+    // And the focus returns to the button of the popover.
+    assert_eq!(ui.focused(POPOVER), vec![("Delete…".to_owned(), true)]);
+
+    // Escape closes the dialog only: the popover behind it does not see it.
+    ui.key(Named::Enter, keyboard::Modifiers::empty());
+    assert!(ui.app.open);
+    ui.key(Named::Escape, keyboard::Modifiers::empty());
+    assert!(!ui.app.open);
+    assert!(ui.find("Delete…").is_some(), "the popover closed");
+}
+
+const ROWS: &[&str] = &["Delete row 1", "Delete row 2", "Keep", "Delete"];
+
+#[test]
+fn closing_a_dialog_focuses_its_trigger_only_if_it_is_still_there() {
+    let mut ui = Harness::new(Kind::Rows, false);
+
+    ui.click("Delete row 1");
+    ui.key(Named::Escape, keyboard::Modifiers::empty());
+    assert_eq!(ui.focused(ROWS), vec![("Delete row 1".to_owned(), true)]);
+
+    // The dialog removed its trigger: the row that took its place does not
+    // get the focus.
+    ui.click("Delete row 1");
+    ui.click("Delete");
+    assert!(!ui.app.first_row && !ui.app.open);
+    assert_eq!(ui.focused(ROWS), []);
 }
