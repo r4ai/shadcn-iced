@@ -188,13 +188,28 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
         .clamp(0.0, 1.0);
 
         let (start, end) = (*self.range.start(), *self.range.end());
-        let value = start + ratio * (end - start);
 
-        if self.step > 0.0 {
-            (start + ((value - start) / self.step).round() * self.step).clamp(start, end)
+        self.snap(start + ratio * (end - start))
+    }
+
+    /// Snaps `value` to the closest step of the range, rounded to the
+    /// decimals of the step so that steps do not drift (`0.1 + 0.2`), and
+    /// keeps it in the range.
+    fn snap(&self, value: f32) -> f32 {
+        let (start, end) = (*self.range.start(), *self.range.end());
+
+        let value = if self.step > 0.0 {
+            let (start, step) = (f64::from(start), f64::from(self.step));
+            let snapped = start + ((f64::from(value) - start) / step).round() * step;
+            let decimals = decimals(self.step).max(decimals(*self.range.start()));
+            let factor = 10f64.powi(decimals.min(9));
+
+            ((snapped * factor).round() / factor) as f32
         } else {
             value
-        }
+        };
+
+        value.clamp(start.min(end), end.max(start))
     }
 
     /// The values the thumb at `index` can take: thumbs cannot cross their
@@ -228,13 +243,13 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
         index
     }
 
-    /// Moves the thumb at `index` towards `value`, kept between its
-    /// neighbors. Returns the thumb that moved, and its new value if it
-    /// changed.
+    /// Moves the thumb at `index` towards `value`, snapped to the steps and
+    /// kept between its neighbors. Returns the thumb that moved, and its new
+    /// value if it changed.
     fn move_to(&self, index: usize, value: f32) -> (usize, Option<f32>) {
         let index = self.moving(index, value);
         let (low, high) = self.limits(index);
-        let value = value.clamp(low, high);
+        let value = self.snap(value).clamp(low, high);
 
         (
             index,
@@ -251,6 +266,14 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
                 .contains(position)
         })
     }
+}
+
+/// The number of decimals of `value`, as written.
+fn decimals(value: f32) -> i32 {
+    value
+        .to_string()
+        .split_once('.')
+        .map_or(0, |(_, decimals)| decimals.len() as i32)
 }
 
 #[derive(Debug, Default)]
@@ -651,6 +674,25 @@ impl<'a, Message: Clone + 'a> From<Slider<'a, Message>> for Element<'a, Message>
 #[cfg(test)]
 mod tests {
     use super::Slider;
+
+    #[test]
+    fn steps_do_not_drift() {
+        let slider = Slider::<()>::new(0.0..=1.0, vec![0.3]).step(0.1);
+
+        assert_eq!(slider.move_to(0, 0.3 + 0.1), (0, Some(0.4)));
+        assert_eq!(slider.snap(0.1 + 0.2), 0.3);
+        assert_eq!(slider.snap(0.66), 0.7);
+        assert_eq!(slider.snap(1.2), 1.0);
+    }
+
+    #[test]
+    fn steps_snap_to_the_grid_of_the_range() {
+        let slider = Slider::<()>::new(1.0..=11.0, vec![3.0]).step(2.0);
+
+        // From a value off the grid, the next step lands on it.
+        assert_eq!(slider.snap(4.0 + 2.0), 7.0);
+        assert_eq!(slider.snap(5.9), 5.0);
+    }
 
     #[test]
     fn thumbs_do_not_cross() {
