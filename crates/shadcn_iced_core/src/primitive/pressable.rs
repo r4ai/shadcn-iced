@@ -13,10 +13,18 @@
 //! <kbd>Space</kbd> and <kbd>Enter</kbd> press it, and its style knows
 //! whether the focus is visible (`:focus-visible`): focus gained with the
 //! keyboard is, focus gained with the pointer is not until a key is pressed.
+//! Like browsers, <kbd>Enter</kbd> clicks a button as it goes down, and
+//! <kbd>Space</kbd> as it goes up (the button looks pressed meanwhile).
+//!
+//! With touch, it behaves like a button of a mobile browser: a finger does
+//! not hover it once lifted, and a press is a tap only when the finger
+//! barely moved (see [`Press`]). It leaves the press of a finger to its
+//! parents, so that a scrollable around it scrolls when the finger drags.
 //!
 //! It reuses [`button::Style`] and [`button::Status`], so any iced button
 //! style function works with it.
 use super::focus::{Focus, Ring};
+use super::pointer::{self, Gesture, Press};
 use crate::animation::{self, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -30,6 +38,7 @@ use iced::{
     Background, Color, Element, Event, Length, Padding, Rectangle, Size, Vector, mouse, touch,
     window,
 };
+use std::any::Any;
 
 /// A clickable surface.
 pub struct Pressable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
@@ -47,6 +56,7 @@ pub struct Pressable<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer
     ring: Option<Box<dyn Fn(&Theme, Status, bool) -> Option<Ring> + 'a>>,
     outline: Option<Box<dyn Fn(&Theme, Status, bool) -> Option<Ring> + 'a>>,
     focusable: bool,
+    yield_focus: bool,
     tab_stop: bool,
     enter: bool,
     id: Option<Id>,
@@ -94,6 +104,7 @@ where
             ring: None,
             outline: None,
             focusable: false,
+            yield_focus: false,
             tab_stop: true,
             enter: true,
             id: None,
@@ -208,6 +219,16 @@ where
         self
     }
 
+    /// Leaves the focus to the controls of the content, if it has any: a
+    /// focusable [`Pressable`] around a control (a checkbox, a switch...)
+    /// is then not focusable itself, like the `<label>` of a choice card,
+    /// and focusable without one (around a radio indicator, which is only
+    /// a picture).
+    pub fn yield_focus(mut self, yield_focus: bool) -> Self {
+        self.yield_focus = yield_focus;
+        self
+    }
+
     /// Sets whether a focusable [`Pressable`] is reached with
     /// <kbd>Tab</kbd> (`tabindex="0"`, the default), or only by the arrow
     /// keys of its group and by its label (`tabindex="-1"`), for roving
@@ -234,7 +255,14 @@ where
 
 #[derive(Debug, Default)]
 struct State {
-    is_pressed: bool,
+    /// The press of the pointer, until it is released.
+    press: Option<Press>,
+    /// Whether <kbd>Space</kbd> is held down on the focused pressable: it
+    /// clicks when released.
+    space: bool,
+    /// Whether the content has controls of its own, which take the focus
+    /// instead (see [`Pressable::yield_focus`]).
+    yielded: bool,
     is_hovered: bool,
     status: Option<Status>,
     /// The style the transition to `status` starts from.
@@ -294,8 +322,15 @@ impl<'a, Message, Theme, Renderer> Pressable<'a, Message, Theme, Renderer> {
     fn status(&self, state: &State, cursor: mouse::Cursor, bounds: Rectangle) -> Status {
         if self.disabled {
             Status::Disabled
-        } else if cursor.is_over(bounds) {
-            if state.is_pressed {
+        } else if state.space {
+            // `:active` while <kbd>Space</kbd> is down.
+            Status::Pressed
+        } else if pointer::is_hovered(cursor, bounds) {
+            // A finger that moved away scrolls: the press is over for it.
+            if state
+                .press
+                .is_some_and(|press| !(press.is_touch() && press.moved))
+            {
                 Status::Pressed
             } else {
                 Status::Hovered
@@ -303,6 +338,48 @@ impl<'a, Message, Theme, Renderer> Pressable<'a, Message, Theme, Renderer> {
         } else {
             Status::Active
         }
+    }
+}
+
+impl<'a, Message, Theme, Renderer> Pressable<'a, Message, Theme, Renderer>
+where
+    Renderer: iced::advanced::Renderer,
+{
+    /// Whether the content has a control that takes the focus.
+    fn has_controls(&mut self, tree: &mut Tree, layout: Layout<'_>, renderer: &Renderer) -> bool {
+        struct HasControls(bool);
+
+        impl Operation for HasControls {
+            fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+                if !self.0 {
+                    operate(self);
+                }
+            }
+
+            fn focusable(
+                &mut self,
+                _id: Option<&Id>,
+                _bounds: Rectangle,
+                _state: &mut dyn iced::advanced::widget::operation::Focusable,
+            ) {
+                self.0 = true;
+            }
+
+            fn custom(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn Any) {
+                self.0 |= state.is::<Focus>();
+            }
+        }
+
+        let mut query = HasControls(false);
+
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            &mut query,
+        );
+
+        query.0
     }
 }
 
@@ -400,7 +477,12 @@ where
         renderer: &Renderer,
         operation: &mut dyn Operation,
     ) {
-        if self.focusable && !self.disabled {
+        if self.yield_focus {
+            let yielded = self.has_controls(tree, layout, renderer);
+            tree.state.downcast_mut::<State>().yielded = yielded;
+        }
+
+        if self.focusable && !self.disabled && !tree.state.downcast_ref::<State>().yielded {
             let state = tree.state.downcast_mut::<State>();
             let bounds = layout.bounds();
 
@@ -435,6 +517,8 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         // An activation requested by a label or a roving group.
         if tree.state.downcast_mut::<State>().focus.take_activation()
             && !self.disabled
@@ -456,7 +540,10 @@ where
         );
 
         let bounds = layout.bounds();
-        let is_hovered = cursor.is_over(bounds);
+        // Where the pointer is, for presses, and whether it hovers, for
+        // styles: a lifted finger is still over what it tapped.
+        let is_over = cursor.is_over(bounds);
+        let is_hovered = pointer::is_hovered(cursor, bounds);
 
         {
             let status = self.status(tree.state.downcast_ref::<State>(), cursor, bounds);
@@ -492,6 +579,16 @@ where
             }
         }
 
+        // The controls of the content may have changed since the last
+        // operation: check again before a press focuses the pressable.
+        if self.yield_focus
+            && let Event::Mouse(mouse::Event::ButtonPressed(_))
+            | Event::Touch(touch::Event::FingerPressed { .. }) = event
+        {
+            let yielded = self.has_controls(tree, layout, renderer);
+            tree.state.downcast_mut::<State>().yielded = yielded;
+        }
+
         let state = tree.state.downcast_mut::<State>();
 
         if state.is_hovered != is_hovered {
@@ -500,7 +597,7 @@ where
         }
 
         if self.focusable {
-            if self.disabled {
+            if self.disabled || state.yielded {
                 state.focus.blur();
             } else {
                 match event {
@@ -508,7 +605,7 @@ where
                     // takes the focus away from it.
                     Event::Mouse(mouse::Event::ButtonPressed(_))
                     | Event::Touch(touch::Event::FingerPressed { .. }) => {
-                        if is_hovered {
+                        if is_over {
                             state.focus.focus_with_pointer();
                             shell.request_redraw();
                         } else if state.focus.is_focused() {
@@ -516,7 +613,7 @@ where
                             shell.request_redraw();
                         }
                     }
-                    Event::Keyboard(keyboard::Event::KeyPressed { key, .. })
+                    Event::Keyboard(keyboard::Event::KeyPressed { key, repeat, .. })
                         if state.focus.is_focused() =>
                     {
                         if !state.focus.is_visible() {
@@ -524,13 +621,39 @@ where
                             shell.request_redraw();
                         }
 
-                        let activates = match key {
-                            keyboard::Key::Named(Named::Space) => true,
-                            keyboard::Key::Named(Named::Enter) => self.enter,
-                            _ => false,
-                        };
+                        if !shell.is_event_captured()
+                            && let Some(on_press) = &self.on_press
+                        {
+                            match key {
+                                // Like a `<button>`, Space clicks when it is
+                                // released, and the button looks pressed
+                                // until then.
+                                keyboard::Key::Named(Named::Space) => {
+                                    if !*repeat && !state.space {
+                                        state.space = true;
+                                        shell.request_redraw();
+                                    }
 
-                        if activates
+                                    shell.capture_event();
+                                }
+                                // Enter clicks as it goes down (and again
+                                // while held, like in browsers).
+                                keyboard::Key::Named(Named::Enter) if self.enter => {
+                                    shell.publish(on_press.get());
+                                    shell.capture_event();
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    Event::Keyboard(keyboard::Event::KeyReleased {
+                        key: keyboard::Key::Named(Named::Space),
+                        ..
+                    }) if state.space => {
+                        state.space = false;
+                        shell.request_redraw();
+
+                        if state.focus.is_focused()
                             && !shell.is_event_captured()
                             && let Some(on_press) = &self.on_press
                         {
@@ -543,43 +666,63 @@ where
             }
         }
 
+        // Space held down clicks nothing once the focus moved away.
+        if state.space && (self.disabled || !state.focus.is_focused()) {
+            state.space = false;
+            shell.request_redraw();
+        }
+
         if shell.is_event_captured() || self.disabled {
-            state.is_pressed = false;
+            if state.press.take().is_some() {
+                shell.request_redraw();
+            }
+
             return;
         }
 
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerPressed { .. }) => {
-                if is_hovered {
-                    state.is_pressed = true;
-                    shell.request_redraw();
+        let Some(press) = &mut state.press else {
+            if let Some(press) = Press::start(event, cursor, |_| is_over) {
+                state.press = Some(press);
+                shell.request_redraw();
 
-                    if self.on_press.is_some() {
-                        shell.capture_event();
-                    }
+                // A finger may scroll a scrollable around instead: its press
+                // is left to it, and its tap is captured when it lifts.
+                if self.on_press.is_some() && !press.is_touch() {
+                    shell.capture_event();
                 }
             }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerLifted { .. }) => {
-                if state.is_pressed {
-                    state.is_pressed = false;
-                    shell.request_redraw();
 
-                    if let Some(on_press) = &self.on_press {
-                        if is_hovered {
-                            shell.publish(on_press.get());
-                        }
+            return;
+        };
 
-                        shell.capture_event();
+        match press.update(event, cursor) {
+            Some(Gesture::Tapped(position)) => {
+                // A mouse clicks where it is released, a finger where it
+                // lifts.
+                let inside = if press.is_touch() {
+                    bounds.contains(position)
+                } else {
+                    is_over
+                };
+
+                state.press = None;
+                shell.request_redraw();
+
+                if let Some(on_press) = &self.on_press {
+                    if inside {
+                        shell.publish(on_press.get());
                     }
+
+                    shell.capture_event();
                 }
             }
-            Event::Touch(touch::Event::FingerLost { .. })
-            | Event::Mouse(mouse::Event::CursorLeft) => {
-                state.is_pressed = false;
+            Some(Gesture::Released) => {
+                state.press = None;
+                shell.request_redraw();
             }
-            _ => {}
+            // The finger scrolls: the pressable stops looking pressed.
+            Some(Gesture::Cancelled) => shell.request_redraw(),
+            Some(Gesture::Pressed(_) | Gesture::Moved(_)) | None => {}
         }
     }
 

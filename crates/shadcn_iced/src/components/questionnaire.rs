@@ -307,18 +307,28 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
             let invalid = state.is_invalid();
 
             // `px-3 py-2.5`, inside the border
-            Pressable::new(container(content).center_y(Length::Shrink))
+            let choice = Pressable::new(container(content).center_y(Length::Shrink))
                 .on_press(on_event(Event::Toggle(choice)))
                 .width(Length::Fill)
                 .padding([11, 13])
-                .style(move |theme, status| {
-                    if invalid {
+                .focus_style(move |theme, status, focused| {
+                    let mut style = if invalid {
                         invalid_choice_style(theme, status, checked)
                     } else {
                         choice_style(theme, status, checked)
+                    };
+
+                    // `has-[>input:focus-visible]:border-ring`
+                    if focused {
+                        style.border.color = tokens(theme).palette.ring;
                     }
-                })
-                .into()
+
+                    style
+                });
+
+            // The choice is the label of its input, which takes the focus:
+            // `has-[>input:focus-visible]:ring-3 ring-ring/50`.
+            Element::from(super::button::focus_ring(choice, |t| t.radius_lg()))
         });
 
         let input = question.input.as_ref().map(|placeholder| {

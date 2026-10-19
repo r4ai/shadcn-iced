@@ -7,11 +7,12 @@
 //! control (a focusable [`Pressable`](super::Pressable), a text input, ...)
 //! and presses it.
 use super::focus::Focus;
+use super::pointer::{Gesture, Press};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Id, Operation, Tree, Widget, operation, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
-use iced::{Element, Event, Length, Rectangle, Size, Vector, mouse, touch};
+use iced::{Element, Event, Length, Rectangle, Size, Vector, mouse};
 
 use std::any::Any;
 
@@ -53,7 +54,8 @@ where
 
 #[derive(Debug, Default)]
 struct State {
-    pressed: bool,
+    /// The press of the pointer on the label, until it is released.
+    press: Option<Press>,
 }
 
 /// Focuses the first control it finds and, if `activate`, asks it to
@@ -183,34 +185,41 @@ where
             viewport,
         );
 
-        let over = cursor.is_over(layout.bounds());
-        let pressed = tree.state.downcast_ref::<State>().pressed;
+        let bounds = layout.bounds();
+        let over = cursor.is_over(bounds);
+        let state = tree.state.downcast_mut::<State>();
 
-        let activate = match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerPressed { .. })
-                if over && !shell.is_event_captured() =>
-            {
-                false
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerLifted { .. })
-                if pressed =>
-            {
-                tree.state.downcast_mut::<State>().pressed = false;
+        // Only the finger (or the mouse button) that pressed the label
+        // clicks it; other fingers are ignored.
+        let (activate, started) = match &mut state.press {
+            None => match Press::start(event, cursor, |_| over) {
+                Some(press) if !shell.is_event_captured() => (false, Some(press)),
+                _ => return,
+            },
+            Some(press) => match press.update(event, cursor) {
+                Some(Gesture::Tapped(position)) => {
+                    // A mouse clicks where it is released, a finger where it
+                    // lifts.
+                    let inside = if press.is_touch() {
+                        bounds.contains(position)
+                    } else {
+                        over
+                    };
 
-                if !over || shell.is_event_captured() {
+                    state.press = None;
+
+                    if !inside || shell.is_event_captured() {
+                        return;
+                    }
+
+                    (true, None)
+                }
+                Some(Gesture::Released) => {
+                    state.press = None;
                     return;
                 }
-
-                true
-            }
-            Event::Touch(touch::Event::FingerLost { .. })
-            | Event::Mouse(mouse::Event::CursorLeft) => {
-                tree.state.downcast_mut::<State>().pressed = false;
-                return;
-            }
-            _ => return,
+                _ => return,
+            },
         };
 
         // A press focuses the control (and keeps it focused, since the
@@ -228,8 +237,14 @@ where
         );
 
         if operation.found {
-            tree.state.downcast_mut::<State>().pressed = !activate;
-            shell.capture_event();
+            tree.state.downcast_mut::<State>().press = started;
+
+            // A finger may scroll a scrollable around instead: its press is
+            // left to it, and its tap is captured when it lifts.
+            if !started.is_some_and(|press| press.is_touch()) {
+                shell.capture_event();
+            }
+
             shell.request_redraw();
         }
     }

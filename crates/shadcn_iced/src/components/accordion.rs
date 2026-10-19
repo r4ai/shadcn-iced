@@ -17,13 +17,14 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::{Disclosure, Pressable};
+use shadcn_iced_core::primitive::roving::Keys;
+use shadcn_iced_core::primitive::{Disclosure, Pressable, pointer, roving};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::widget::{Id, Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell};
 use iced::widget::{Column, Row, container, space, text};
 use iced::{Alignment, Background, Color, Event, Length, Rectangle, Size, Theme, mouse};
@@ -119,6 +120,11 @@ impl<'a, Message: Clone + 'a> Accordion<'a, Message> {
     }
 }
 
+/// The id of the triggers, so that the arrow keys move between them only.
+fn trigger_id() -> Id {
+    Id::new("shadcn-accordion-trigger")
+}
+
 /// `AccordionTrigger`: `rounded-lg py-2.5 text-left text-sm font-medium
 /// hover:underline`, with a muted `size-4` chevron.
 fn trigger<'a, Message: Clone + 'a>(
@@ -171,6 +177,7 @@ fn trigger<'a, Message: Clone + 'a>(
     // `focus-visible:border-ring focus-visible:ring-3
     // focus-visible:ring-ring/50`
     Pressable::new(row)
+        .id(trigger_id())
         .disabled(disabled)
         .focusable(true)
         .width(Length::Fill)
@@ -249,7 +256,12 @@ impl<'a, Message: Clone + 'a> From<Accordion<'a, Message>> for Element<'a, Messa
                 }
             });
 
-        let column = Column::with_children(items).width(accordion.width);
+        // Like Radix's accordion, every trigger is in the Tab order, and the
+        // arrow keys move between them (wrapping around), Home and End to
+        // the first and the last ones, skipping the disabled ones.
+        let column = roving(Column::with_children(items).width(accordion.width))
+            .keys(Keys::Vertical)
+            .only(trigger_id());
 
         if bordered {
             // The items sit inside the border.
@@ -334,8 +346,12 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for HoverUnderline<'_, Mess
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        if let Event::Mouse(mouse::Event::CursorMoved { .. }) = event
-            && cursor.is_over(layout.bounds()) != self.underlined.get()
+        pointer::observe(event);
+
+        // A finger underlines the trigger only while it touches the screen.
+        if let Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft)
+        | Event::Touch(_) = event
+            && pointer::is_hovered(cursor, layout.bounds()) != self.underlined.get()
         {
             shell.request_redraw();
         }
@@ -361,7 +377,7 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for HoverUnderline<'_, Mess
             .as_widget()
             .draw(tree, renderer, theme, style, layout, cursor, viewport);
 
-        let underlined = cursor.is_over(layout.bounds());
+        let underlined = pointer::is_hovered(cursor, layout.bounds());
         self.underlined.set(underlined);
 
         if !underlined {
