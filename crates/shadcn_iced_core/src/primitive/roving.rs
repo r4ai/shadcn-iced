@@ -12,7 +12,7 @@
 use super::focus;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::widget::{Id, Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key::Named};
 use iced::{Element, Event, Length, Rectangle, Size, Vector, mouse};
@@ -35,6 +35,7 @@ pub struct Roving<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     keys: Keys,
     activate: bool,
     home_end: bool,
+    only: Option<Id>,
 }
 
 impl<'a, Message, Theme, Renderer> Roving<'a, Message, Theme, Renderer>
@@ -48,6 +49,7 @@ where
             keys: Keys::Horizontal,
             activate: false,
             home_end: true,
+            only: None,
         }
     }
 
@@ -62,6 +64,14 @@ where
     /// groups ignore them.
     pub fn home_end(mut self, home_end: bool) -> Self {
         self.home_end = home_end;
+        self
+    }
+
+    /// Only moves the focus between the controls reported with this [`Id`]
+    /// (e.g. the triggers of an accordion, and not the buttons of its
+    /// panels), and only while one of them has the focus.
+    pub fn only(mut self, id: impl Into<Id>) -> Self {
+        self.only = Some(id.into());
         self
     }
 
@@ -171,13 +181,22 @@ where
             let mut count = 0;
             let mut focused = None;
 
-            focus::for_each_control(&mut self.content, tree, layout, renderer, |index, focus| {
-                count += 1;
+            let only = self.only.as_ref();
 
-                if focus.is_focused() {
-                    focused = Some(index);
-                }
-            });
+            for_each_control(
+                &mut self.content,
+                tree,
+                layout,
+                renderer,
+                only,
+                |index, focus| {
+                    count += 1;
+
+                    if focus.is_focused() {
+                        focused = Some(index);
+                    }
+                },
+            );
 
             if let Some(current) = focused {
                 let target = match step {
@@ -188,11 +207,12 @@ where
 
                 let activate = self.activate;
 
-                focus::for_each_control(
+                for_each_control(
                     &mut self.content,
                     tree,
                     layout,
                     renderer,
+                    only,
                     |index, focus| {
                         if index == target {
                             focus.focus_with_keyboard();
@@ -268,6 +288,55 @@ where
     fn from(widget: Roving<'a, Message, Theme, Renderer>) -> Self {
         Element::new(widget)
     }
+}
+
+/// Calls `f` with the index and [`Focus`](focus::Focus) of every control of
+/// a widget reported with the id `only` (of all of them without), in order.
+fn for_each_control<Message, Theme, Renderer>(
+    element: &mut Element<'_, Message, Theme, Renderer>,
+    tree: &mut Tree,
+    layout: Layout<'_>,
+    renderer: &Renderer,
+    only: Option<&Id>,
+    mut f: impl FnMut(usize, &mut focus::Focus) + Send,
+) where
+    Renderer: iced::advanced::Renderer,
+{
+    struct Only<'a, F> {
+        id: &'a Id,
+        index: usize,
+        f: F,
+    }
+
+    impl<F: FnMut(usize, &mut focus::Focus) + Send> Operation for Only<'_, F> {
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+            operate(self);
+        }
+
+        fn custom(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
+            if id == Some(self.id)
+                && let Some(focus) = state.downcast_mut::<focus::Focus>()
+            {
+                (self.f)(self.index, focus);
+                self.index += 1;
+            }
+        }
+    }
+
+    let Some(id) = only else {
+        return focus::for_each_control(element, tree, layout, renderer, f);
+    };
+
+    element.as_widget_mut().operate(
+        tree,
+        layout,
+        renderer,
+        &mut Only {
+            id,
+            index: 0,
+            f: &mut f,
+        },
+    );
 }
 
 /// Creates a new [`Roving`] group.
