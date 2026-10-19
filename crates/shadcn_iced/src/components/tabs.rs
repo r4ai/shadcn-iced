@@ -148,6 +148,15 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
             Vec::new()
         };
 
+        // Roving focus: only the active tab, or else the first enabled one,
+        // is in the tab order.
+        let tab_stop = tabs
+            .tabs
+            .iter()
+            .find(|(value, _, _, disabled)| !disabled && *value == tabs.selected)
+            .or_else(|| tabs.tabs.iter().find(|(_, _, _, disabled)| !disabled))
+            .map(|(value, ..)| *value);
+
         let triggers = tabs.tabs.into_iter().map(|(value, icon, label, disabled)| {
             let active = value == tabs.selected;
 
@@ -174,12 +183,11 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
                 container(content).center(Length::Fill).into()
             };
 
-            // Roving focus: the active tab is the one in the tab order.
             let trigger = Pressable::new(content)
                 .on_press_maybe((!disabled && !active).then(|| (tabs.on_select)(value)))
                 .disabled(disabled)
                 .focusable(true)
-                .tab_stop(active)
+                .tab_stop(tab_stop == Some(value))
                 .width(if fill { Length::Fill } else { Length::Shrink })
                 .height(if vertical { 26.0 } else { TRIGGER_HEIGHT })
                 // `px-1.5 py-0.5` inside a `border`

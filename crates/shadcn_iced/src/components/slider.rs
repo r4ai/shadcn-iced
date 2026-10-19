@@ -188,13 +188,73 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
         .clamp(0.0, 1.0);
 
         let (start, end) = (*self.range.start(), *self.range.end());
-        let value = start + ratio * (end - start);
 
-        if self.step > 0.0 {
-            (start + ((value - start) / self.step).round() * self.step).clamp(start, end)
+        self.snap(start + ratio * (end - start))
+    }
+
+    /// Snaps `value` to the closest step of the range, rounded to the
+    /// decimals of the step so that steps do not drift (`0.1 + 0.2`), and
+    /// keeps it in the range.
+    fn snap(&self, value: f32) -> f32 {
+        let (start, end) = (*self.range.start(), *self.range.end());
+
+        let value = if self.step > 0.0 {
+            let (start, step) = (f64::from(start), f64::from(self.step));
+            let snapped = start + ((f64::from(value) - start) / step).round() * step;
+            let decimals = decimals(self.step).max(decimals(*self.range.start()));
+            let factor = 10f64.powi(decimals.min(9));
+
+            ((snapped * factor).round() / factor) as f32
         } else {
             value
+        };
+
+        value.clamp(start.min(end), end.max(start))
+    }
+
+    /// The values the thumb at `index` can take: thumbs cannot cross their
+    /// neighbors.
+    fn limits(&self, index: usize) -> (f32, f32) {
+        let (start, end) = (*self.range.start(), *self.range.end());
+        let low = index
+            .checked_sub(1)
+            .map_or(start, |previous| self.values[previous]);
+        let high = self.values.get(index + 1).copied().unwrap_or(end);
+
+        (low.min(high), high.max(low))
+    }
+
+    /// The thumb that moves when the thumb at `index` is moved to `value`:
+    /// thumbs stacked on it (with the same value) part in the direction of
+    /// the move, the one on that side going.
+    fn moving(&self, mut index: usize, value: f32) -> usize {
+        let current = self.values[index];
+
+        if value < current {
+            while index > 0 && self.values[index - 1] == current {
+                index -= 1;
+            }
+        } else if value > current {
+            while self.values.get(index + 1) == Some(&current) {
+                index += 1;
+            }
         }
+
+        index
+    }
+
+    /// Moves the thumb at `index` towards `value`, snapped to the steps and
+    /// kept between its neighbors. Returns the thumb that moved, and its new
+    /// value if it changed.
+    fn move_to(&self, index: usize, value: f32) -> (usize, Option<f32>) {
+        let index = self.moving(index, value);
+        let (low, high) = self.limits(index);
+        let value = self.snap(value).clamp(low, high);
+
+        (
+            index,
+            ((value - self.values[index]).abs() > f32::EPSILON).then_some(value),
+        )
     }
 
     fn hovered_thumb(&self, bounds: Rectangle, cursor: mouse::Cursor) -> Option<usize> {
@@ -206,6 +266,14 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
                 .contains(position)
         })
     }
+}
+
+/// The number of decimals of `value`, as written.
+fn decimals(value: f32) -> i32 {
+    value
+        .to_string()
+        .split_once('.')
+        .map_or(0, |(_, decimals)| decimals.len() as i32)
 }
 
 #[derive(Debug, Default)]
@@ -311,12 +379,16 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
         let bounds = layout.bounds();
         let count = self.values.len();
 
+        // Returns the thumb being dragged, which changes when it parts from
+        // thumbs stacked on it.
         let change = |index: usize, position, shell: &mut Shell<'_, Message>| {
-            let value = self.value_at(bounds, position);
+            let (index, value) = self.move_to(index, self.value_at(bounds, position));
 
-            if (value - self.values[index]).abs() > f32::EPSILON {
+            if let Some(value) = value {
                 shell.publish(on_change(index, value));
             }
+
+            index
         };
 
         // The keyboard moves the focused thumb: the arrow keys by a step
@@ -353,17 +425,17 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
             };
 
             if let Some(target) = target {
-                // Thumbs cannot cross their neighbors.
-                let low = if index > 0 {
-                    self.values[index - 1]
-                } else {
-                    start
-                };
-                let high = self.values.get(index + 1).copied().unwrap_or(end);
-                let target = target.clamp(low.min(high), high.max(low));
+                let (moved, target) = self.move_to(index, target);
 
-                if (target - value).abs() > f32::EPSILON {
-                    shell.publish(on_change(index, target));
+                if let Some(target) = target {
+                    shell.publish(on_change(moved, target));
+                }
+
+                // The focus follows a thumb parting from the ones stacked
+                // on it.
+                if moved != index {
+                    state.focus[index].blur();
+                    state.focus[moved].focus_with_keyboard();
                 }
 
                 shell.capture_event();
@@ -405,16 +477,15 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
                         .unwrap_or(0)
                 });
 
-                state.dragging = Some(index);
                 state.focus(count)[index].focus_with_pointer();
-                change(index, position, shell);
+                state.dragging = Some(change(index, position, shell));
                 shell.capture_event();
                 shell.request_redraw();
             }
             Event::Mouse(mouse::Event::CursorMoved { .. })
             | Event::Touch(touch::Event::FingerMoved { .. }) => {
                 if let (Some(index), Some(position)) = (state.dragging, cursor.position()) {
-                    change(index, position, shell);
+                    state.dragging = Some(change(index, position, shell));
                     shell.capture_event();
                     shell.request_redraw();
                 }
@@ -597,5 +668,47 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
 impl<'a, Message: Clone + 'a> From<Slider<'a, Message>> for Element<'a, Message> {
     fn from(slider: Slider<'a, Message>) -> Self {
         Element::new(slider)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Slider;
+
+    #[test]
+    fn steps_do_not_drift() {
+        let slider = Slider::<()>::new(0.0..=1.0, vec![0.3]).step(0.1);
+
+        assert_eq!(slider.move_to(0, 0.3 + 0.1), (0, Some(0.4)));
+        assert_eq!(slider.snap(0.1 + 0.2), 0.3);
+        assert_eq!(slider.snap(0.66), 0.7);
+        assert_eq!(slider.snap(1.2), 1.0);
+    }
+
+    #[test]
+    fn steps_snap_to_the_grid_of_the_range() {
+        let slider = Slider::<()>::new(1.0..=11.0, vec![3.0]).step(2.0);
+
+        // From a value off the grid, the next step lands on it.
+        assert_eq!(slider.snap(4.0 + 2.0), 7.0);
+        assert_eq!(slider.snap(5.9), 5.0);
+    }
+
+    #[test]
+    fn thumbs_do_not_cross() {
+        let slider = Slider::<()>::new(0.0..=100.0, vec![20.0, 50.0]);
+
+        assert_eq!(slider.move_to(0, 70.0), (0, Some(50.0)));
+        assert_eq!(slider.move_to(1, 10.0), (1, Some(20.0)));
+        assert_eq!(slider.move_to(1, 100.0), (1, Some(100.0)));
+    }
+
+    #[test]
+    fn stacked_thumbs_part_in_the_direction_of_the_move() {
+        let slider = Slider::<()>::new(0.0..=100.0, vec![50.0, 50.0]);
+
+        assert_eq!(slider.move_to(0, 70.0), (1, Some(70.0)));
+        assert_eq!(slider.move_to(1, 30.0), (0, Some(30.0)));
+        assert_eq!(slider.move_to(0, 50.0), (0, None));
     }
 }

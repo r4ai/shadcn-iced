@@ -2,10 +2,11 @@
 //!
 //! On the web, a region handles the keys pressed while the focus is within
 //! it (`onKeyDownCapture` on a container), e.g. the arrow keys of a
-//! carousel. iced has no focus within a region: [`Keys`] stands a press
-//! inside of its content for the focus of its controls and a press outside
-//! of it for their blur, and turns the keys pressed in between into
-//! messages, before the content sees them.
+//! carousel. [`Keys`] handles the keys pressed while one of the controls of
+//! its content is focused, and also stands a press inside of its content
+//! for the focus of its controls (most of its content is not focusable in
+//! iced) and a press outside of it, or <kbd>Tab</kbd>, for their blur. It
+//! turns those keys into messages, before the content sees them.
 //!
 //! ```no_run
 //! # use shadcn_iced_core::primitive::keys;
@@ -20,6 +21,7 @@
 //! .into()
 //! # }
 //! ```
+use super::focus;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
@@ -27,8 +29,8 @@ use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard;
 use iced::{Element, Event, Length, Rectangle, Size, Vector, mouse};
 
-/// A region turning the keys pressed once it was clicked into messages.
-/// See the [module documentation](self).
+/// A region turning the keys pressed once it was clicked, or while the focus
+/// is within it, into messages. See the [module documentation](self).
 pub struct Keys<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
     on_key: Box<dyn Fn(&keyboard::Key, keyboard::Modifiers) -> Option<Message> + 'a>,
@@ -117,14 +119,28 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        let state = tree.state.downcast_mut::<State>();
+        let content = layout.children().next().unwrap();
 
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(_)) => {
-                state.active = cursor.is_over(layout.bounds());
+                tree.state.downcast_mut::<State>().active = cursor.is_over(layout.bounds());
             }
-            Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) if state.active => {
-                if let Some(message) = (self.on_key)(key, *modifiers) {
+            Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) => {
+                let active = tree.state.downcast_ref::<State>().active
+                    || focus::is_focus_within(
+                        &mut self.content,
+                        &mut tree.children[0],
+                        content,
+                        renderer,
+                    );
+
+                // The focus moves on with the keyboard: from now on, it
+                // tells whether the region is active.
+                if let keyboard::Key::Named(keyboard::key::Named::Tab) = key {
+                    tree.state.downcast_mut::<State>().active = false;
+                }
+
+                if active && let Some(message) = (self.on_key)(key, *modifiers) {
                     shell.publish(message);
                     shell.capture_event();
                     return;
@@ -136,7 +152,7 @@ where
         self.content.as_widget_mut().update(
             &mut tree.children[0],
             event,
-            layout.children().next().unwrap(),
+            content,
             cursor,
             renderer,
             clipboard,
