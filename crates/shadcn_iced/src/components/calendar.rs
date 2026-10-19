@@ -860,7 +860,7 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
                 Ring {
                     color: alpha(t.palette.ring, 0.5),
                     width: 3.0,
-                    radius: t.radius_md(),
+                    radius: t.radius_md().into(),
                 }
             })
             .into()

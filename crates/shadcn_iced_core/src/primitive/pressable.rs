@@ -27,8 +27,8 @@ use iced::keyboard::{self, key::Named};
 use iced::time::Instant;
 use iced::widget::button::{Status, Style};
 use iced::{
-    Background, Color, Element, Event, Length, Padding, Rectangle, Size, Vector, border, mouse,
-    touch, window,
+    Background, Color, Element, Event, Length, Padding, Rectangle, Size, Vector, mouse, touch,
+    window,
 };
 
 /// A clickable surface.
@@ -575,11 +575,7 @@ where
                 renderer.fill_quad(
                     renderer::Quad {
                         bounds: bounds.expand(ring.width),
-                        border: iced::Border {
-                            color: ring.color,
-                            width: ring.width,
-                            radius: border::radius(ring.radius + ring.width),
-                        },
+                        border: ring.border(),
                         snap: style.snap,
                         ..renderer::Quad::default()
                     },
@@ -657,10 +653,25 @@ where
             );
         };
 
-        if status == Status::Pressed && self.press_offset != 0.0 {
-            renderer.with_translation(Vector::new(0.0, self.press_offset), draw);
-        } else {
-            draw(renderer);
+        let draw = |renderer: &mut Renderer| {
+            if status == Status::Pressed && self.press_offset != 0.0 {
+                renderer.with_translation(Vector::new(0.0, self.press_offset), draw);
+            } else {
+                draw(renderer);
+            }
+        };
+
+        // With a ring, the widget is drawn in a layer of its own, above the
+        // siblings drawn later, like the `focus-visible:z-10` of grouped
+        // items (button groups, toggle groups), which overlap their borders.
+        let spread = rings.iter().map(|ring| ring.width).fold(0.0, f32::max);
+
+        match bounds
+            .expand(spread + self.press_offset.abs())
+            .intersection(&viewport)
+        {
+            Some(clip) if !rings.is_empty() => renderer.with_layer(clip, draw),
+            _ => draw(renderer),
         }
     }
 

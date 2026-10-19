@@ -34,8 +34,28 @@ pub struct Ring {
     pub color: Color,
     /// The width of the ring.
     pub width: f32,
-    /// The corner radius of the widget the ring surrounds.
-    pub radius: f32,
+    /// The corner radii of the widget the ring surrounds.
+    pub radius: border::Radius,
+}
+
+impl Ring {
+    /// The border drawn around the bounds expanded by the width of the
+    /// ring, following the radius of each corner.
+    pub fn border(&self) -> Border {
+        let radius = self.radius;
+        let width = self.width;
+
+        Border {
+            color: self.color,
+            width,
+            radius: border::Radius {
+                top_left: radius.top_left + width,
+                top_right: radius.top_right + width,
+                bottom_right: radius.bottom_right + width,
+                bottom_left: radius.bottom_left + width,
+            },
+        }
+    }
 }
 
 /// The interaction status of a [`FocusWithin`].
@@ -251,11 +271,7 @@ where
             renderer.fill_quad(
                 renderer::Quad {
                     bounds: bounds.expand(ring.width),
-                    border: Border {
-                        color: ring.color,
-                        width: ring.width,
-                        radius: border::radius(ring.radius + ring.width),
-                    },
+                    border: ring.border(),
                     ..renderer::Quad::default()
                 },
                 Background::Color(Color::TRANSPARENT),

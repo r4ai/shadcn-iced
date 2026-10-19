@@ -183,11 +183,14 @@ pub fn focus_ring(tokens: &Tokens) -> Shadow {
 
 /// The focus ring as an outset [`Ring`](crate::primitive::focus::Ring)
 /// (`ring-[3px] ring-ring/50`) around a control of the given radius.
-pub fn ring(tokens: &Tokens, radius: f32) -> crate::primitive::focus::Ring {
+pub fn ring(
+    tokens: &Tokens,
+    radius: impl Into<iced::border::Radius>,
+) -> crate::primitive::focus::Ring {
     crate::primitive::focus::Ring {
         color: alpha(tokens.palette.ring, 0.5),
         width: 3.0,
-        radius,
+        radius: radius.into(),
     }
 }
 
@@ -212,7 +215,7 @@ pub fn invalid_outset_ring(tokens: &Tokens, radius: f32) -> crate::primitive::fo
             if tokens.is_dark() { 0.4 } else { 0.2 },
         ),
         width: 3.0,
-        radius,
+        radius: radius.into(),
     }
 }
 

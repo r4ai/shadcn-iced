@@ -24,8 +24,8 @@ use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
 use iced::time::{Duration, Instant};
 use iced::{
-    Background, Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector, border,
-    mouse, touch, window,
+    Background, Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector, mouse,
+    touch, window,
 };
 
 use std::sync::atomic::{self, AtomicU64};
@@ -773,11 +773,7 @@ where
             renderer.fill_quad(
                 renderer::Quad {
                     bounds: layout.bounds().expand(ring.width),
-                    border: Border {
-                        color: ring.color,
-                        width: ring.width,
-                        radius: border::radius(ring.radius + ring.width),
-                    },
+                    border: ring.border(),
                     ..renderer::Quad::default()
                 },
                 Background::Color(Color::TRANSPARENT),

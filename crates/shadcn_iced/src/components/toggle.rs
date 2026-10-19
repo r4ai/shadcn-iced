@@ -301,13 +301,15 @@ impl<'a, Message: Clone + 'a> From<Toggle<'a, Message>> for Element<'a, Message>
             .ring(move |theme, _status, focused| {
                 focused.then(|| {
                     let t = tokens(theme);
+                    let radius = radius(&t);
 
+                    // The ring follows the radius of each corner.
                     style::ring(
                         &t,
-                        if position == Position::Middle {
-                            0.0
+                        if vertical {
+                            position.vertical_radius(radius)
                         } else {
-                            radius(&t)
+                            position.radius(radius)
                         },
                     )
                 })

@@ -210,7 +210,7 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
                         Ring {
                             color: t.palette.ring,
                             width: 1.0,
-                            radius: t.radius_md(),
+                            radius: t.radius_md().into(),
                         }
                     })
                 });

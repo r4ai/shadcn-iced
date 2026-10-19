@@ -18,7 +18,6 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::focus::Ring;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -449,12 +448,7 @@ where
             None
         };
 
-        if let Some(Ring {
-            color,
-            width,
-            radius,
-        }) = ring
-        {
+        if let Some(ring) = ring {
             let opacity = if self.disabled {
                 style::DISABLED_OPACITY
             } else {
@@ -463,11 +457,10 @@ where
 
             renderer.fill_quad(
                 renderer::Quad {
-                    bounds: bounds.expand(width),
+                    bounds: bounds.expand(ring.width),
                     border: Border {
-                        color: alpha(color, opacity),
-                        width,
-                        radius: border::radius(radius + width),
+                        color: alpha(ring.color, opacity),
+                        ..ring.border()
                     },
                     ..renderer::Quad::default()
                 },
