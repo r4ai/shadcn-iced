@@ -94,7 +94,8 @@ impl Animation {
         match self {
             Animation::Slide(_) => drawer_ease,
             Animation::SlideFade(_) => animation::ease_in_out,
-            _ => animation::ease_out,
+            // `animate-in` / `animate-out`: `var(--tw-ease, ease)`
+            _ => animation::ease,
         }
     }
 

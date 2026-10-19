@@ -4,9 +4,13 @@
 //! `loader-circle` icon.
 use shadcn_iced_core::{Element, animation, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Tree, Widget, tree};
+use iced::advanced::{Clipboard, Shell};
 use iced::time::Instant;
 use iced::widget::canvas::{self, Canvas, Path, Stroke, path::Arc};
-use iced::{Color, Event, Length, Point, Radians, Rectangle, Renderer, Theme, mouse, window};
+use iced::{Color, Event, Length, Point, Radians, Rectangle, Renderer, Size, Theme, mouse, window};
 
 use std::sync::LazyLock;
 
@@ -113,6 +117,81 @@ impl<'a, Message: 'a> From<Spinner> for Element<'a, Message> {
     fn from(spinner: Spinner) -> Self {
         let size = Length::Fixed(spinner.size);
 
-        Canvas::new(spinner).width(size).height(size).into()
+        Element::new(OnScreen(
+            Canvas::new(spinner).width(size).height(size).into(),
+        ))
+    }
+}
+
+/// Spins only while the spinner is visible: the frames of an off-screen
+/// spinner do not reach its canvas, and the redraw of a scroll brings it
+/// back into view.
+struct OnScreen<'a, Message>(Element<'a, Message>);
+
+impl<Message> Widget<Message, Theme, Renderer> for OnScreen<'_, Message> {
+    fn tag(&self) -> tree::Tag {
+        self.0.as_widget().tag()
+    }
+
+    fn state(&self) -> tree::State {
+        self.0.as_widget().state()
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        self.0.as_widget().children()
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        self.0.as_widget().diff(tree);
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.0.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.0.as_widget_mut().layout(tree, renderer, limits)
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        if let Event::Window(window::Event::RedrawRequested(_)) = event
+            && !layout.bounds().intersects(viewport)
+        {
+            return;
+        }
+
+        self.0.as_widget_mut().update(
+            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.0
+            .as_widget()
+            .draw(tree, renderer, theme, style, layout, cursor, viewport);
     }
 }

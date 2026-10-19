@@ -10,19 +10,23 @@
 //! tooltip(button("Hover").variant(Variant::Outline), "Add to library").into()
 //! # }
 //! ```
+use shadcn_iced_core::primitive::anchored::AnchorTracker;
 use shadcn_iced_core::primitive::{Align, Anchored, Side};
 use shadcn_iced_core::{Element, style, tokens};
 
 use iced::time::Duration;
 use iced::widget::canvas::{self, Canvas, Frame, Path};
 use iced::widget::{Column, Row, container, text};
-use iced::{Alignment, Background, Point, Rectangle, Renderer, Theme, border, mouse};
+use iced::{Alignment, Background, Length, Point, Rectangle, Renderer, Theme, border, mouse};
 
 /// The width of the visible part of the arrow: a `size-2.5` square turned
 /// by 45° whose center sits 2px inside the bubble.
 const ARROW_WIDTH: f32 = 10.0;
 /// How far the arrow pokes out of the bubble.
 const ARROW_HEIGHT: f32 = 5.0;
+/// How close the `size-2.5` square of the arrow gets to the edges of the
+/// bubble (`arrowPadding` of Base UI).
+const ARROW_PADDING: f32 = 5.0;
 
 /// A tooltip. See the [module documentation](self).
 pub struct Tooltip<'a, Message> {
@@ -105,9 +109,12 @@ pub fn style(theme: &Theme) -> container::Style {
     }
 }
 
-/// The arrow of a tooltip, pointing at the trigger.
+/// The arrow of a tooltip, pointing at the trigger. It spans the side of
+/// the bubble, to follow the trigger when the bubble is shifted to stay
+/// inside the window.
 struct Arrow {
     side: Side,
+    tracker: AnchorTracker,
 }
 
 impl<Message> canvas::Program<Message> for Arrow {
@@ -136,11 +143,35 @@ impl<Message> canvas::Program<Message> for Arrow {
         ];
 
         let size = bounds.size();
+        let vertical = matches!(self.side, Side::Top | Side::Bottom);
+        let length = if vertical { size.width } else { size.height };
+
+        // The center of the arrow faces the center of the trigger, as far
+        // as the padding of the arrow allows.
+        let center = self
+            .tracker
+            .anchor()
+            .map(|anchor| {
+                if vertical {
+                    anchor.center_x() - bounds.x
+                } else {
+                    anchor.center_y() - bounds.y
+                }
+            })
+            .unwrap_or(length / 2.0);
+        let min = ARROW_PADDING + ARROW_WIDTH / 2.0;
+        let center = if length >= min * 2.0 {
+            center.clamp(min, length - min)
+        } else {
+            length / 2.0
+        };
+        let start = center - half;
+
         let map = |(along, out): (f32, f32)| match self.side {
-            Side::Top => Point::new(along, out),
-            Side::Bottom => Point::new(along, size.height - out),
-            Side::Left => Point::new(out, along),
-            Side::Right => Point::new(size.width - out, along),
+            Side::Top => Point::new(start + along, out),
+            Side::Bottom => Point::new(start + along, size.height - out),
+            Side::Left => Point::new(out, start + along),
+            Side::Right => Point::new(size.width - out, start + along),
         };
 
         let path = Path::new(|builder| {
@@ -168,35 +199,57 @@ impl<'a, Message: Clone + 'a> From<Tooltip<'a, Message>> for Element<'a, Message
         let side = tooltip.side;
         let vertical = matches!(side, Side::Top | Side::Bottom);
 
-        let arrow = Canvas::new(Arrow { side })
-            .width(if vertical { ARROW_WIDTH } else { ARROW_HEIGHT })
-            .height(if vertical { ARROW_HEIGHT } else { ARROW_WIDTH });
+        let tracker = AnchorTracker::new();
+
+        let arrow = Canvas::new(Arrow {
+            side,
+            tracker: tracker.clone(),
+        })
+        .width(if vertical {
+            Length::Fill
+        } else {
+            Length::Fixed(ARROW_HEIGHT)
+        })
+        .height(if vertical {
+            Length::Fixed(ARROW_HEIGHT)
+        } else {
+            Length::Fill
+        });
 
         let content: Element<'a, Message> = match side {
             Side::Top => Column::new()
                 .push(bubble)
                 .push(arrow)
                 .align_x(Alignment::Center)
+                // The arrow fills the side of the bubble only.
+                .width(Length::Shrink)
                 .into(),
             Side::Bottom => Column::new()
                 .push(arrow)
                 .push(bubble)
                 .align_x(Alignment::Center)
+                // The arrow fills the side of the bubble only.
+                .width(Length::Shrink)
                 .into(),
             Side::Left => Row::new()
                 .push(bubble)
                 .push(arrow)
                 .align_y(Alignment::Center)
+                // The arrow fills the side of the bubble only.
+                .height(Length::Shrink)
                 .into(),
             Side::Right => Row::new()
                 .push(arrow)
                 .push(bubble)
                 .align_y(Alignment::Center)
+                // The arrow fills the side of the bubble only.
+                .height(Length::Shrink)
                 .into(),
         };
 
         Anchored::new(tooltip.trigger, content)
             .hover(tooltip.delay, Duration::ZERO)
+            .track_anchor(tracker)
             .side(side)
             .align(tooltip.align)
             // The arrow is part of the content.

@@ -226,10 +226,12 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
         .height(command.input_height.max(32.0) + 4.0)
         .center_y(command.input_height.max(32.0) + 4.0);
 
+        // The first item is highlighted again whenever the query changes.
         let mut list = listbox::Listbox::new(highlight)
             .width(Length::Fill)
             .highlight_first(true)
-            .clear_on_leave(false);
+            .clear_on_leave(false)
+            .key(&query);
 
         let mut visible_groups = 0;
 
@@ -361,8 +363,13 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
 
         let bordered = command.bordered;
 
+        // The keys move the highlight while the search field is focused, and
+        // the highlighted item scrolls into view.
+        let content = listbox::region(Column::new().push(input).push(body).width(Length::Fill))
+            .focus_within(true);
+
         // `rounded-xl bg-popover p-1`, inside the border.
-        container(Column::new().push(input).push(body).width(Length::Fill))
+        container(content)
             .padding(if bordered { 5 } else { 4 })
             .width(command.width)
             .style(move |theme: &Theme| {

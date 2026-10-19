@@ -141,6 +141,11 @@ pub fn bold() -> Font {
     weight(sans(), Weight::Bold)
 }
 
+/// `font-extrabold` (800).
+pub fn extrabold() -> Font {
+    weight(sans(), Weight::ExtraBold)
+}
+
 /// The heading font (`cn-font-heading`) with the given weight.
 pub fn heading(weight: Weight) -> Font {
     Font {
@@ -175,8 +180,10 @@ pub fn all() -> Vec<Cow<'static, [u8]>> {
         include_bytes!("../assets/fonts/Geist-Medium.ttf").as_slice(),
         include_bytes!("../assets/fonts/Geist-SemiBold.ttf").as_slice(),
         include_bytes!("../assets/fonts/Geist-Bold.ttf").as_slice(),
+        include_bytes!("../assets/fonts/Geist-ExtraBold.ttf").as_slice(),
         include_bytes!("../assets/fonts/GeistMono-Regular.ttf").as_slice(),
         include_bytes!("../assets/fonts/GeistMono-Medium.ttf").as_slice(),
+        include_bytes!("../assets/fonts/GeistMono-SemiBold.ttf").as_slice(),
     ]);
 
     #[cfg(feature = "symbols")]

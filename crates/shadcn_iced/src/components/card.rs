@@ -299,7 +299,7 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
                 ring: Some(focus::Ring {
                     color: alpha(t.palette.foreground, 0.1),
                     width: 1.0,
-                    radius: t.radius_xl(),
+                    radius: t.radius_xl().into(),
                 }),
                 ..focus::Style::default()
             }

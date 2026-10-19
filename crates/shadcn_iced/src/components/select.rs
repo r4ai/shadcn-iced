@@ -313,14 +313,14 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
         // `w-(--anchor-width) min-w-36 rounded-lg shadow-md ring-1`, `p-1`
         // groups.
         let content = menu::shadow(
-            container(
+            container(listbox::region(
                 scrollable(list.padding(4).width(Length::Fill))
                     .width(Length::Fill)
                     .direction(scrollable::Direction::Vertical(
                         super::scroll_area::scrollbar(),
                     ))
                     .style(super::scroll_area::style),
-            )
+            ))
             .padding(1)
             .max_height(600)
             .style(menu::panel),

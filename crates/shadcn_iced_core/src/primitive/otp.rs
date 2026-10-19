@@ -295,9 +295,7 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, Renderer> for Otp<'a, Messa
         };
 
         let state = tree.state.downcast_ref::<State>();
-        let active = state
-            .focused
-            .then(|| self.value.len().min(self.length.saturating_sub(1)));
+        let active = active_slot(state.focused, self.value.len(), self.length);
         let caret = active.is_some()
             && (state.since.elapsed().as_millis() / BLINK.as_millis()).is_multiple_of(2);
 
@@ -333,5 +331,29 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, Renderer> for Otp<'a, Messa
 impl<'a, Message: Clone + 'a> From<Otp<'a, Message>> for Element<'a, Message> {
     fn from(otp: Otp<'a, Message>) -> Self {
         Element::new(otp)
+    }
+}
+
+/// The slot the next character goes to (the last one when they are all
+/// filled), while focused; none without any slot.
+fn active_slot(focused: bool, filled: usize, length: usize) -> Option<usize> {
+    (focused && length > 0).then(|| filled.min(length - 1))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::active_slot;
+
+    #[test]
+    fn the_active_slot_follows_the_value() {
+        assert_eq!(active_slot(false, 2, 6), None);
+        assert_eq!(active_slot(true, 0, 6), Some(0));
+        assert_eq!(active_slot(true, 2, 6), Some(2));
+        assert_eq!(active_slot(true, 6, 6), Some(5));
+    }
+
+    #[test]
+    fn no_slot_is_active_without_slots() {
+        assert_eq!(active_slot(true, 0, 0), None);
     }
 }

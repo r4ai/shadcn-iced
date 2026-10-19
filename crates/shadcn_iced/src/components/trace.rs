@@ -18,6 +18,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
+use shadcn_iced_core::primitive::typeset::{TABULAR_NUMS, typeset};
 use shadcn_iced_core::primitive::{Pressable, disclosure};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
@@ -154,10 +155,11 @@ fn view<'a, Message: Clone + 'a>(line: &TraceLine<Message>) -> Row<'a, Message> 
                 .align_y(Alignment::Center),
         )
         .push(line.description.clone().map(|description| {
-            text(description)
+            typeset(description)
                 .size(style::text::SM)
                 .line_height(style::text::leading(style::text::SM))
                 .font(if mono { font::mono() } else { font::sans() })
+                .feature(TABULAR_NUMS)
                 .style(move |theme: &Theme| text::Style {
                     color: Some(alpha(
                         tokens(theme).palette.muted_foreground,

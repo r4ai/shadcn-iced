@@ -24,6 +24,7 @@ pub use shadcn_iced_core::primitive::questionnaire::{Choice, Event, Question, St
 
 use shadcn_iced_core::icon::lucide;
 use shadcn_iced_core::primitive::Pressable;
+use shadcn_iced_core::primitive::typeset::{TABULAR_NUMS, typeset};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -229,9 +230,10 @@ impl<'a, Message: Clone + 'a> From<Questionnaire<'a, Message>> for Element<'a, M
 
         // `text-xs font-medium text-muted-foreground tabular-nums`
         let progress = questionnaire.progress.then(|| {
-            text(format!("Question {} of {total}", index + 1))
+            typeset(format!("Question {} of {total}", index + 1))
                 .size(style::text::XS)
                 .font(font::medium())
+                .feature(TABULAR_NUMS)
                 .style(|theme: &Theme| text::Style {
                     color: Some(tokens(theme).palette.muted_foreground),
                 })

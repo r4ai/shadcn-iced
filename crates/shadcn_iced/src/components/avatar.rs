@@ -252,7 +252,7 @@ fn ring<'a, Message: 'a>(
         ring: Some(focus::Ring {
             color: tokens(theme).palette.background,
             width: 2.0,
-            radius: diameter / 2.0,
+            radius: (diameter / 2.0).into(),
         }),
         ..focus::Style::default()
     })

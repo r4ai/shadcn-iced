@@ -22,7 +22,7 @@
 //!
 //! focus_grid(days, cells)
 //!     .fallback(Some(0))
-//!     .ring(|_theme| Ring { color: Color::BLACK, width: 3.0, radius: 6.0 })
+//!     .ring(|_theme| Ring { color: Color::BLACK, width: 3.0, radius: 6.0.into() })
 //!     .into()
 //! # }
 //! ```
@@ -32,7 +32,7 @@ use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
-use iced::{Border, Color, Element, Event, Length, Rectangle, Size, Vector, mouse};
+use iced::{Color, Element, Event, Length, Rectangle, Size, Vector, mouse};
 
 /// A cell of a [`FocusGrid`].
 #[derive(Debug, Clone, PartialEq)]
@@ -240,11 +240,7 @@ where
             renderer.fill_quad(
                 renderer::Quad {
                     bounds: outer,
-                    border: Border {
-                        color: ring.color,
-                        width: ring.width,
-                        radius: (ring.radius + ring.width).into(),
-                    },
+                    border: ring.border(),
                     ..renderer::Quad::default()
                 },
                 Color::TRANSPARENT,
