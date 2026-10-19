@@ -320,9 +320,10 @@ impl Previews {
             shadcn_iced::primitive::wheel(container(example).padding(PADDING).center(Fill))
                 .smooth(true);
 
-        wheel::wheel(example, |captured| {
+        // `tab_order` moves the focus with Tab, like in the page around.
+        shadcn_iced::primitive::tab_order(wheel::wheel(example, |captured| {
             let _ = preview_wheel(captured);
-        })
+        }))
         .into()
     }
 
