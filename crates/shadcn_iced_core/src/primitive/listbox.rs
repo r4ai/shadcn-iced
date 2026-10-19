@@ -9,7 +9,9 @@
 //! switches their text color.
 //!
 //! A listbox in a scrollable is wrapped in a [`Region`], which scrolls the
-//! highlighted item into view when it is moved with the keyboard.
+//! highlighted item into view when it is moved with the keyboard, and can
+//! hand the keyboard to the listbox only while the focus is within it.
+use super::focus;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::operation::scrollable::{AbsoluteOffset, Scrollable};
@@ -696,9 +698,11 @@ fn reveal(layout: Layout<'_>, index: Option<usize>, viewport: &Rectangle) {
 }
 
 /// The region of a [`Listbox`]: scrolls the item highlighted with the
-/// keyboard into view, in the first scrollable within it.
+/// keyboard into view, in the first scrollable within it, and can hand the
+/// navigation keys to the listbox only while the focus is within it.
 pub struct Region<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
+    focus_within: bool,
 }
 
 /// Creates a [`Region`] around `content`, a scrollable [`Listbox`] or
@@ -708,6 +712,20 @@ pub fn region<'a, Message, Theme, Renderer>(
 ) -> Region<'a, Message, Theme, Renderer> {
     Region {
         content: content.into(),
+        focus_within: false,
+    }
+}
+
+impl<Message, Theme, Renderer> Region<'_, Message, Theme, Renderer> {
+    /// Hands the navigation keys (<kbd>↑</kbd>, <kbd>↓</kbd>,
+    /// <kbd>Home</kbd>, <kbd>End</kbd> and <kbd>Enter</kbd>) to the listbox
+    /// only while a control of the region (its search field) is focused,
+    /// like the root of cmdk; otherwise, the listbox reacts to them
+    /// anywhere in the window. Defaults to `false`, for listboxes in
+    /// popups, which own the keyboard while they are open.
+    pub fn focus_within(mut self, focus_within: bool) -> Self {
+        self.focus_within = focus_within;
+        self
     }
 }
 
@@ -801,6 +819,23 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        if self.focus_within
+            && let Event::Keyboard(keyboard::Event::KeyPressed {
+                key:
+                    keyboard::Key::Named(
+                        key::Named::ArrowDown
+                        | key::Named::ArrowUp
+                        | key::Named::Home
+                        | key::Named::End
+                        | key::Named::Enter,
+                    ),
+                ..
+            }) = event
+            && !focus::is_focus_within(&mut self.content, &mut tree.children[0], layout, renderer)
+        {
+            return;
+        }
+
         // A listbox outside of the region may still be waiting for its own.
         let outer = REVEAL.take();
 

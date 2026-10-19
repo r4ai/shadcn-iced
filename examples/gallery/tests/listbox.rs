@@ -168,6 +168,21 @@ fn the_highlight_starts_over_when_the_query_changes() {
 }
 
 #[test]
+fn the_keys_need_the_focus_within_the_command() {
+    shadcn_iced::animation::set_enabled(false);
+
+    let mut app = App::new(&["Alpha", "Beta"]);
+    app.press(Named::ArrowDown);
+    app.press(Named::Enter);
+    assert!(app.picked.is_empty(), "{:?}", app.picked);
+
+    app.focus();
+    app.press(Named::ArrowDown);
+    app.press(Named::Enter);
+    assert_eq!(app.picked, ["Beta"]);
+}
+
+#[test]
 fn the_highlighted_item_scrolls_into_view() {
     shadcn_iced::animation::set_enabled(false);
 

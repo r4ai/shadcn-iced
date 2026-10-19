@@ -363,8 +363,10 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
 
         let bordered = command.bordered;
 
-        // The highlighted item scrolls into view.
-        let content = listbox::region(Column::new().push(input).push(body).width(Length::Fill));
+        // The keys move the highlight while the search field is focused, and
+        // the highlighted item scrolls into view.
+        let content = listbox::region(Column::new().push(input).push(body).width(Length::Fill))
+            .focus_within(true);
 
         // `rounded-xl bg-popover p-1`, inside the border.
         container(content)
