@@ -428,6 +428,20 @@ impl State {
             }
         }
     }
+
+    /// Keeps an entry for each of the `ids`, and only for them.
+    ///
+    /// The timers are advanced to `now` first, so that the new toasts start
+    /// their timers at `now` rather than at the last frame, which may be long
+    /// ago when no toast was shown.
+    fn sync(&mut self, ids: &[u64], now: Instant) {
+        self.tick(now);
+        self.entries.retain(|id, _| ids.contains(id));
+
+        for id in ids {
+            self.entries.entry(*id).or_insert_with(Entry::new);
+        }
+    }
 }
 
 /// Where a toast is drawn at some point in time.
@@ -920,11 +934,7 @@ where
                 })
                 .collect();
 
-            state.entries.retain(|id, _| ids.contains(id));
-
-            for id in &ids {
-                state.entries.entry(*id).or_insert_with(Entry::new);
-            }
+            state.sync(&ids, Instant::now());
 
             // sonner collapses the toasts when at most one is left.
             if ids.len() <= 1 {
@@ -1416,5 +1426,40 @@ where
 {
     fn from(toaster: Toaster<'a, Message, Theme, Renderer>) -> Self {
         Element::new(toaster)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_toasts_start_their_timers_when_they_are_pushed() {
+        let start = Instant::now();
+        let mut state = State::default();
+
+        state.sync(&[1], start);
+        state.tick(start + Duration::from_millis(100));
+        state.sync(&[], start + Duration::from_millis(100));
+
+        // No frame reaches the toaster while no toast is shown.
+        let pushed = start + Duration::from_secs(30);
+        state.sync(&[2], pushed);
+        state.tick(pushed + Duration::from_millis(16));
+
+        assert_eq!(state.entries[&2].elapsed, Duration::from_millis(16));
+    }
+
+    #[test]
+    fn existing_toasts_keep_running_when_a_toast_is_pushed() {
+        let start = Instant::now();
+        let mut state = State::default();
+
+        state.sync(&[1], start);
+        state.sync(&[1, 2], start + Duration::from_secs(1));
+        state.tick(start + Duration::from_millis(1100));
+
+        assert_eq!(state.entries[&1].elapsed, Duration::from_millis(1100));
+        assert_eq!(state.entries[&2].elapsed, Duration::from_millis(100));
     }
 }
