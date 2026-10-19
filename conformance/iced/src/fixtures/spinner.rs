@@ -2,10 +2,11 @@ use super::Fixture;
 use crate::store::Msg;
 
 use shadcn_iced::item::{Variant, item};
+use shadcn_iced::primitive::typeset::{TABULAR_NUMS, typeset};
 use shadcn_iced::spinner::spinner;
 
 use iced::Center;
-use iced::widget::{container, row, text};
+use iced::widget::{container, row};
 
 pub fn get(id: &str) -> Option<Fixture> {
     Some(match id {
@@ -24,7 +25,13 @@ pub fn get(id: &str) -> Option<Fixture> {
             container(
                 item::<Msg>("Processing payment...")
                     .media(spinner())
-                    .action(text("$100.00").size(14).line_height(iced::Pixels(20.0)))
+                    .action(
+                        // `text-sm tabular-nums`
+                        typeset("$100.00")
+                            .size(14)
+                            .line_height(iced::Pixels(20.0))
+                            .feature(TABULAR_NUMS),
+                    )
                     .variant(Variant::Muted),
             )
             .max_width(320)

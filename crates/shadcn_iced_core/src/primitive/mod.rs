@@ -23,6 +23,7 @@ pub mod split;
 pub mod toaster;
 pub mod track;
 pub mod tracked;
+pub mod typeset;
 pub mod underline;
 pub mod wheel;
 
@@ -46,5 +47,6 @@ pub use scrollbars::{Scrollbars, scrollbars};
 pub use split::Split;
 pub use track::{Track, track};
 pub use tracked::{Tracked, tracked};
+pub use typeset::{Typeset, typeset};
 pub use underline::{Underline, underline};
 pub use wheel::{Wheel, smooth_scroll, wheel};
