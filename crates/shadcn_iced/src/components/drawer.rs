@@ -24,6 +24,10 @@ use iced::{Alignment, Background, Border, Length, Padding, Theme, border};
 
 /// The direction a [`Drawer`] is swiped to close it, i.e. the edge of the
 /// window it is attached to (`swipeDirection`).
+///
+/// A drag of the drawer in this direction moves it with the pointer; it
+/// closes when released past a quarter of its size or flung, and comes back
+/// otherwise (see [`Layer::swipe_to_dismiss`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Direction {
     /// Attached to the bottom edge.
@@ -115,7 +119,8 @@ impl<'a, Message: Clone + 'a> Drawer<'a, Message> {
         self
     }
 
-    /// Sets the message produced when the user closes the drawer.
+    /// Sets the message produced when the user closes the drawer
+    /// (<kbd>Escape</kbd>, a tap on the backdrop or a swipe).
     pub fn on_close(mut self, message: Message) -> Self {
         self.on_close = Some(message);
         self
@@ -306,7 +311,10 @@ impl<'a, Message: Clone + 'a> From<Drawer<'a, Message>> for Element<'a, Message>
             ),
         };
 
+        // Like Vaul, the drawer follows a finger (or the mouse) dragging it
+        // towards its edge, and closes when released far or fast enough.
         Layer::new(drawer.base, panel, drawer.open)
+            .swipe_to_dismiss(edge)
             .animation(Animation::Slide(edge))
             .align_x(align_x)
             .align_y(align_y)
