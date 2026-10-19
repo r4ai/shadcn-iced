@@ -20,6 +20,7 @@ use iced::{
 std::thread_local! {
     /// Whether the item being drawn is highlighted, for [`ItemRow::trailing_color`].
     static HIGHLIGHTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+
 }
 
 /// The look of the highlighted item of a [`Listbox`].
@@ -51,6 +52,7 @@ pub struct Listbox<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> 
     highlight_first: bool,
     initial: Option<usize>,
     clear_on_leave: bool,
+    key: u64,
     style: Box<dyn Fn(&Theme) -> Style + 'a>,
 }
 
@@ -70,6 +72,7 @@ where
             highlight_first: false,
             initial: None,
             clear_on_leave: true,
+            key: 0,
             style: Box::new(style),
         }
     }
@@ -184,6 +187,18 @@ where
         self
     }
 
+    /// Identifies the items, e.g. by the query filtering them. When it
+    /// changes, or when the items do (their number, or which ones are
+    /// selectable), the highlight goes back to where it starts: the
+    /// [`highlighted`](Self::highlighted) item, or the first one with
+    /// [`highlight_first`](Self::highlight_first), like cmdk.
+    pub fn key(mut self, key: impl std::hash::Hash) -> Self {
+        use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher};
+
+        self.key = BuildHasherDefault::<DefaultHasher>::default().hash_one(key);
+        self
+    }
+
     /// Returns whether the listbox has no children.
     pub fn is_empty(&self) -> bool {
         self.children.is_empty()
@@ -195,9 +210,27 @@ struct State {
     active: Option<usize>,
     touched: bool,
     pressed: Option<usize>,
+    /// The [`Listbox::items`] the highlight is about.
+    items: u64,
 }
 
 impl<Message, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
+    /// Identifies the items: their key, their number and which ones are
+    /// selectable. The highlight, a child index, is only valid for them.
+    fn items(&self) -> u64 {
+        use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher, Hasher};
+
+        let mut hasher = BuildHasherDefault::<DefaultHasher>::default().build_hasher();
+        hasher.write_u64(self.key);
+        hasher.write_usize(self.children.len());
+
+        for child in &self.children {
+            hasher.write_u8(u8::from(child.selectable));
+        }
+
+        hasher.finish()
+    }
+
     fn active(&self, state: &State) -> Option<usize> {
         let active = state.active.filter(|index| {
             self.children
@@ -260,7 +293,10 @@ where
     }
 
     fn state(&self) -> tree::State {
-        tree::State::new(State::default())
+        tree::State::new(State {
+            items: self.items(),
+            ..State::default()
+        })
     }
 
     fn children(&self) -> Vec<Tree> {
@@ -271,6 +307,18 @@ where
     }
 
     fn diff(&self, tree: &mut Tree) {
+        // Other items (a query typed in a command): the highlight starts
+        // over rather than pointing at whatever took the place of the item.
+        let items = self.items();
+        let state = tree.state.downcast_mut::<State>();
+
+        if state.items != items {
+            *state = State {
+                items,
+                ..State::default()
+            };
+        }
+
         tree.diff_children(
             &self
                 .children

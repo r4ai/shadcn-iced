@@ -181,7 +181,10 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
         let on_select = &combobox.on_select;
         let selected = combobox.selected.clone();
 
-        let mut list = listbox::Listbox::new(menu::highlight).highlight_first(filter.is_some());
+        // The first match is highlighted again whenever the filter changes.
+        let mut list = listbox::Listbox::new(menu::highlight)
+            .highlight_first(filter.is_some())
+            .key(&filter);
         let mut count = 0;
 
         for (value, label) in combobox.options {

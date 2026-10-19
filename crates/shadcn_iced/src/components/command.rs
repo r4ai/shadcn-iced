@@ -226,10 +226,12 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
         .height(command.input_height.max(32.0) + 4.0)
         .center_y(command.input_height.max(32.0) + 4.0);
 
+        // The first item is highlighted again whenever the query changes.
         let mut list = listbox::Listbox::new(highlight)
             .width(Length::Fill)
             .highlight_first(true)
-            .clear_on_leave(false);
+            .clear_on_leave(false)
+            .key(&query);
 
         let mut visible_groups = 0;
 
