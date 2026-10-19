@@ -2,6 +2,14 @@
 //!
 //! Port of <https://ui.shadcn.com/docs/components/navigation-menu>.
 //!
+//! A trigger reveals its panel on hover, or with a tap on a touch screen
+//! (a second tap, a tap outside or on another trigger closes it). Its
+//! triggers and links take the keyboard focus, like Radix: <kbd>←</kbd> /
+//! <kbd>→</kbd> move it between them, <kbd>Enter</kbd>, <kbd>Space</kbd>
+//! or <kbd>↓</kbd> open the panel of a trigger and focus its first link,
+//! <kbd>Tab</kbd> cycles through the links of the open panel, and
+//! <kbd>Escape</kbd> closes it, the focus back on the trigger.
+//!
 //! ```no_run
 //! # use shadcn_iced::navigation_menu::{navigation_menu, link};
 //! # #[derive(Clone)] enum Message { Docs, Intro }
@@ -13,7 +21,9 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::{Align, Anchored, Pressable, Side};
+use shadcn_iced_core::primitive::anchored::TouchOpen;
+use shadcn_iced_core::primitive::focus::Ring;
+use shadcn_iced_core::primitive::{Align, Anchored, Pressable, Side, roving};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -40,7 +50,8 @@ pub fn navigation_menu<'a, Message: Clone + 'a>() -> NavigationMenu<'a, Message>
 }
 
 impl<'a, Message: Clone + 'a> NavigationMenu<'a, Message> {
-    /// Appends a trigger revealing `content` on hover.
+    /// Appends a trigger revealing `content` on hover (or a tap, or the
+    /// keyboard).
     pub fn menu(
         mut self,
         label: impl Into<String>,
@@ -69,6 +80,19 @@ pub fn trigger_style(theme: &Theme, status: Status) -> Style {
         border: border::rounded(t.radius_lg()),
         ..Style::default()
     }
+}
+
+/// The focus ring of triggers and links (`focus-visible:ring-[3px]
+/// focus-visible:ring-ring/50`), around a control of the given radius.
+fn focus_ring(
+    theme: &Theme,
+    focused: bool,
+    radius: fn(&shadcn_iced_core::Tokens) -> f32,
+) -> Option<Ring> {
+    focused.then(|| {
+        let t = tokens(theme);
+        style::ring(&t, radius(&t))
+    })
 }
 
 /// The style of a link in the content of a navigation menu
@@ -121,6 +145,8 @@ pub fn link<'a, Message: Clone + 'a>(
     .padding(8)
     .width(Length::Fill)
     .style(link_style)
+    .focusable(true)
+    .ring(|theme, _, focused| focus_ring(theme, focused, |t| t.radius_md()))
     .into()
 }
 
@@ -146,6 +172,8 @@ pub fn icon_link<'a, Message: Clone + 'a>(
     .padding(8)
     .width(Length::Fill)
     .style(link_style)
+    .focusable(true)
+    .ring(|theme, _, focused| focus_ring(theme, focused, |t| t.radius_md()))
     .into()
 }
 
@@ -186,13 +214,18 @@ impl<'a, Message: Clone + 'a> From<NavigationMenu<'a, Message>> for Element<'a, 
                 )
                 .padding([8, 10])
                 .height(36)
-                .style(trigger_style);
+                .style(trigger_style)
+                .focusable(true)
+                .ring(|theme, _, focused| focus_ring(theme, focused, |t| t.radius_lg()));
 
                 // `p-1` inside the 1px ring.
                 let panel = container(content).padding(5).style(popup_style);
 
                 Anchored::new(trigger, panel)
                     .hover(Duration::from_millis(50), Duration::from_millis(50))
+                    // A tap on the trigger toggles the panel, like a click
+                    // in Radix.
+                    .touch_open(TouchOpen::Tap)
                     .side(Side::Bottom)
                     .align(Align::Start)
                     .offset(8.0)
@@ -213,10 +246,12 @@ impl<'a, Message: Clone + 'a> From<NavigationMenu<'a, Message>> for Element<'a, 
                 .padding([8, 10])
                 .height(36)
                 .style(trigger_style)
+                .focusable(true)
+                .ring(|theme, _, focused| focus_ring(theme, focused, |t| t.radius_lg()))
                 .into(),
         });
 
-        // `gap-0`
-        Row::with_children(items).align_y(Alignment::Center).into()
+        // `gap-0`; the arrow keys move the focus between the items.
+        roving(Row::with_children(items).align_y(Alignment::Center)).into()
     }
 }

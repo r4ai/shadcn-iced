@@ -20,8 +20,10 @@ use super::menu::{Kind, Menu};
 use shadcn_iced_core::Element;
 use shadcn_iced_core::primitive::Anchored;
 
-/// Shows `menu` at the cursor when `area` is right clicked
-/// (`side="right" align="start" alignOffset={4}`: just below the cursor).
+/// Shows `menu` at the cursor when `area` is right clicked, or long pressed
+/// on a touch screen (`side="right" align="start" alignOffset={4}`: just
+/// below the cursor). <kbd>Shift</kbd> + <kbd>F10</kbd> and the context menu
+/// key open it at the area while the focus is within it.
 pub fn context_menu<'a, Message: Clone + 'a>(
     area: impl Into<Element<'a, Message>>,
     menu: Menu<'a, Message>,

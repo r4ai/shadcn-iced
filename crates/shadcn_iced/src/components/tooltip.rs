@@ -1,6 +1,11 @@
 //! A popup that displays information related to an element when the
 //! element is hovered.
 //!
+//! Like Radix, it also opens when the element receives the keyboard focus
+//! (`:focus-visible`), and closes on <kbd>Escape</kbd>. Touch screens have
+//! no hover: a long press shows it, while the finger rests and a little
+//! longer; a tap still presses the element.
+//!
 //! Port of <https://ui.shadcn.com/docs/components/tooltip>.
 //!
 //! ```no_run
