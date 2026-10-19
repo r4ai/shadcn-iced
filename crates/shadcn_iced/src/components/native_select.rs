@@ -5,8 +5,18 @@
 //! [`select`](super::select).
 //!
 //! Like a native `<select>`, it can be focused (with <kbd>Tab</kbd>), shows
-//! a focus ring when focused with the keyboard, and <kbd>↑</kbd> /
-//! <kbd>↓</kbd> pick the previous or next option while it is focused.
+//! a focus ring when focused with the keyboard, and while it is focused:
+//!
+//! - <kbd>↑</kbd> / <kbd>↓</kbd> pick the previous or next option, and
+//!   <kbd>Home</kbd> / <kbd>End</kbd> the first or the last one;
+//! - typing picks the next option starting with what was typed (characters
+//!   typed less than a second apart make up one search);
+//! - <kbd>Alt</kbd>+<kbd>↓</kbd>, <kbd>F4</kbd>, <kbd>Space</kbd> and
+//!   <kbd>Enter</kbd> open the list, and close it again, like
+//!   <kbd>Escape</kbd>.
+//!
+//! The list of [`PickList`] has no keyboard navigation of its own: while it
+//! is open, the keys above still pick an option, and the list follows.
 //!
 //! ```no_run
 //! # use shadcn_iced::native_select::native_select;
@@ -18,6 +28,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::lucide;
+use shadcn_iced_core::primitive::listbox;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -26,6 +37,7 @@ use iced::advanced::widget::{Operation, Tree, operation, tree};
 use iced::advanced::{Clipboard, Shell, Widget, overlay, renderer};
 use iced::keyboard::{self, key};
 use iced::overlay::menu;
+use iced::time::Instant;
 use iced::widget::pick_list::{Handle, Icon, PickList, Status, Style};
 use iced::widget::text;
 use iced::{
@@ -282,6 +294,10 @@ struct State {
     focused: bool,
     /// Focused with the keyboard (`focus-visible`).
     visible: bool,
+    typeahead: listbox::Typeahead,
+    /// The option picked with the keyboard while the list is open: once it
+    /// is selected, the list opens again to highlight it.
+    picked: Option<usize>,
 }
 
 impl operation::Focusable for State {
@@ -300,9 +316,111 @@ impl operation::Focusable for State {
     }
 }
 
+impl<T, Message> Field<'_, T, Message>
+where
+    T: ToString + PartialEq + Clone,
+    Message: Clone,
+{
+    /// Whether the list of the [`PickList`] is open.
+    fn is_open(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+    ) -> bool {
+        self.pick
+            .as_widget_mut()
+            .overlay(
+                &mut tree.children[0],
+                layout,
+                renderer,
+                viewport,
+                Vector::ZERO,
+            )
+            .is_some()
+    }
+
+    /// Opens or closes the list, by clicking the [`PickList`] where the
+    /// pointer would, as it has no other way to be toggled.
+    fn toggle(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        viewport: &Rectangle,
+        open: bool,
+    ) {
+        if self.is_open(tree, layout, renderer, viewport) == open {
+            return;
+        }
+
+        // The click is for the pick list alone: its own shell.
+        let mut messages = Vec::new();
+        let mut shell = Shell::new(&mut messages);
+
+        self.pick.as_widget_mut().update(
+            &mut tree.children[0],
+            &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            layout,
+            mouse::Cursor::Available(layout.bounds().center()),
+            renderer,
+            clipboard,
+            &mut shell,
+            viewport,
+        );
+    }
+
+    /// Adds `text` to the search typed ahead, and returns the option it
+    /// leads to.
+    fn type_ahead(
+        &self,
+        tree: &mut Tree,
+        text: &str,
+        now: Instant,
+        current: Option<usize>,
+    ) -> Option<usize> {
+        let labels: Vec<_> = self.options.iter().map(ToString::to_string).collect();
+        let search = tree.state.downcast_mut::<State>().typeahead.push(text, now);
+
+        listbox::next_match(
+            search,
+            labels
+                .iter()
+                .enumerate()
+                .map(|(index, label)| (index, label.as_str())),
+            current,
+        )
+    }
+
+    fn forward(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        self.pick.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+}
+
 impl<'a, T, Message> Widget<Message, Theme, iced::Renderer> for Field<'a, T, Message>
 where
-    T: PartialEq + Clone + 'a,
+    T: ToString + PartialEq + Clone + 'a,
     Message: Clone + 'a,
 {
     fn tag(&self) -> tree::Tag {
@@ -364,11 +482,28 @@ where
             return;
         }
 
-        let state = tree.state.downcast_mut::<State>();
+        let current = self
+            .selected
+            .as_ref()
+            .and_then(|selected| self.options.iter().position(|option| option == selected));
+        let is_open = self.is_open(tree, layout, renderer, viewport);
+
+        // The option picked while the list is open is now selected: the
+        // list opens again, highlighting it.
+        if is_open
+            && let Some(picked) = tree.state.downcast_ref::<State>().picked
+            && Some(picked) == current
+        {
+            tree.state.downcast_mut::<State>().picked = None;
+            self.toggle(tree, layout, renderer, clipboard, viewport, false);
+            self.toggle(tree, layout, renderer, clipboard, viewport, true);
+            shell.request_redraw();
+        }
 
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(_))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                let state = tree.state.downcast_mut::<State>();
                 let focused = cursor.is_over(layout.bounds());
 
                 if focused != state.focused || state.visible {
@@ -377,46 +512,81 @@ where
                     shell.request_redraw();
                 }
             }
-            Event::Keyboard(keyboard::Event::KeyPressed {
-                key: keyboard::Key::Named(named @ (key::Named::ArrowDown | key::Named::ArrowUp)),
-                ..
-            }) if state.focused => {
-                // Like a closed native `<select>`: the next or previous
-                // option, without wrapping around.
-                let current = self
-                    .selected
-                    .as_ref()
-                    .and_then(|selected| self.options.iter().position(|option| option == selected));
-                let last = self.options.len().saturating_sub(1);
+            Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
+                if tree.state.downcast_ref::<State>().focused =>
+            {
+                let now = Instant::now();
+                let last = self.options.len().checked_sub(1);
+                let plain = !modifiers.control() && !modifiers.alt() && !modifiers.logo();
+                let typing = tree.state.downcast_ref::<State>().typeahead.is_typing(now);
 
-                let next = match (current, *named == key::Named::ArrowDown) {
-                    (None, true) => Some(0),
-                    (None, false) => None,
-                    (Some(index), true) => Some((index + 1).min(last)),
-                    (Some(index), false) => Some(index.saturating_sub(1)),
+                let next = match key.as_ref() {
+                    // `Alt+ArrowDown`, `F4`, `Enter` and `Space` (unless it
+                    // is part of a search) toggle the list.
+                    keyboard::Key::Named(key::Named::ArrowDown | key::Named::ArrowUp)
+                        if modifiers.alt() =>
+                    {
+                        self.toggle(tree, layout, renderer, clipboard, viewport, !is_open);
+                        None
+                    }
+                    keyboard::Key::Named(key::Named::F4 | key::Named::Enter) => {
+                        self.toggle(tree, layout, renderer, clipboard, viewport, !is_open);
+                        None
+                    }
+                    keyboard::Key::Named(key::Named::Space) if !typing => {
+                        self.toggle(tree, layout, renderer, clipboard, viewport, !is_open);
+                        None
+                    }
+                    keyboard::Key::Named(key::Named::Escape) if is_open => {
+                        self.toggle(tree, layout, renderer, clipboard, viewport, false);
+                        None
+                    }
+                    // Like a closed native `<select>`: the next or previous
+                    // option, without wrapping around.
+                    keyboard::Key::Named(named @ (key::Named::ArrowDown | key::Named::ArrowUp))
+                        if plain =>
+                    {
+                        match (current, named == key::Named::ArrowDown) {
+                            (None, true) => last.map(|_| 0),
+                            (None, false) => None,
+                            (Some(index), true) => last.map(|last| (index + 1).min(last)),
+                            (Some(index), false) => Some(index.saturating_sub(1)),
+                        }
+                    }
+                    keyboard::Key::Named(key::Named::Home) if plain => last.map(|_| 0),
+                    keyboard::Key::Named(key::Named::End) if plain => last,
+                    keyboard::Key::Named(key::Named::Space) => {
+                        self.type_ahead(tree, " ", now, current)
+                    }
+                    keyboard::Key::Character(c) if plain => self.type_ahead(tree, c, now, current),
+                    _ => {
+                        self.forward(
+                            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+                        );
+                        return;
+                    }
                 };
 
                 if next != current
-                    && let Some(option) = next.and_then(|index| self.options.get(index))
+                    && let Some(index) = next
+                    && let Some(option) = self.options.get(index)
                 {
                     shell.publish((self.on_select)(option.clone()));
+
+                    if is_open {
+                        tree.state.downcast_mut::<State>().picked = Some(index);
+                    }
                 }
 
+                shell.request_redraw();
                 shell.capture_event();
                 return;
             }
             _ => {}
         }
 
-        self.pick.as_widget_mut().update(
-            &mut tree.children[0],
-            event,
-            layout,
-            cursor,
-            renderer,
-            clipboard,
-            shell,
-            viewport,
+        self.forward(
+            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
         );
     }
 

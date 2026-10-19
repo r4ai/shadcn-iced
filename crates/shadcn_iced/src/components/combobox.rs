@@ -4,6 +4,14 @@
 //! combobox): an input with a trigger button, opening a list of the items
 //! matching what has been typed. The query lives in your state.
 //!
+//! Like the Base UI combobox, the input is the only stop of
+//! <kbd>Tab</kbd>: <kbd>↓</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd> open the
+//! list from it, <kbd>↑</kbd>, <kbd>↓</kbd>, <kbd>Home</kbd>,
+//! <kbd>End</kbd>, <kbd>PageUp</kbd> and <kbd>PageDown</kbd> move the
+//! highlight, and <kbd>Space</kbd> types into the input rather than
+//! selecting. A finger selects an option with a tap, and scrolls the list
+//! with a drag.
+//!
 //! ```no_run
 //! # use shadcn_iced::combobox::combobox;
 //! # #[derive(Clone)] enum Message { Query(String), Framework(&'static str) }
@@ -15,13 +23,13 @@
 //!     .into()
 //! # }
 //! ```
-use super::button::{Button, Size, Variant};
+use super::button::{self, Size, Variant};
 use super::menu::{self, menu_tokens};
 
 use shadcn_iced_core::icon::lucide;
 use shadcn_iced_core::primitive::anchored::toggle;
 use shadcn_iced_core::primitive::focus::{self, FocusWithin};
-use shadcn_iced_core::primitive::{Align, Anchored, Side, listbox};
+use shadcn_iced_core::primitive::{Align, Anchored, Pressable, Side, listbox};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, style, tokens};
 
@@ -147,17 +155,40 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
 
         // `InputGroupButton size="icon-xs" variant="ghost"` at `pr-2
         // mr-[-0.3rem]`, its chevron `size-4 text-muted-foreground`.
-        let trigger =
-            Button::new(
-                lucide::CHEVRON_DOWN
-                    .sized(16)
-                    .style(|theme: &Theme| text::Style {
-                        color: Some(tokens(theme).palette.muted_foreground),
-                    }),
+        //
+        // The button of a ghost `Button`, but out of the tab order
+        // (`tabIndex={-1}`, like the trigger of a Base UI combobox): the
+        // keyboard opens the list from the input (`ArrowDown`,
+        // `Alt+ArrowDown`), so the chevron is for the pointer only.
+        let size = Size::IconXs;
+        let trigger = Pressable::new(
+            container(
+                Row::new()
+                    .push(
+                        lucide::CHEVRON_DOWN
+                            .sized(16)
+                            .style(|theme: &Theme| text::Style {
+                                color: Some(tokens(theme).palette.muted_foreground),
+                            }),
+                    )
+                    .align_y(Alignment::Center)
+                    .height(Length::Fill),
             )
-            .variant(Variant::Ghost)
-            .size(Size::IconXs)
-            .disabled(disabled);
+            .center_x(Length::Fill)
+            .height(Length::Fill),
+        )
+        .disabled(disabled)
+        .width(size.height())
+        .height(size.height())
+        // The 1px transparent border.
+        .padding(Padding::ZERO.left(1).right(1))
+        .press_offset(1.0)
+        .clip_background(true)
+        .style(move |theme, status| {
+            let mut style = button::style(theme, status, Variant::Ghost);
+            style.border.radius = iced::border::radius(size.radius(&tokens(theme)));
+            style
+        });
 
         // `InputGroup`: `h-8 rounded-lg border border-input dark:bg-input/30`.
         // `InputGroup`: `h-8 rounded-lg border border-input dark:bg-input/30`,
