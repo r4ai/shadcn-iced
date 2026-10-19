@@ -895,7 +895,8 @@ where
             } else {
                 Duration::ZERO
             },
-            animation::ease_out,
+            // `animate-in` / `animate-out`: `var(--tw-ease, ease)`
+            animation::ease,
             now,
         );
 

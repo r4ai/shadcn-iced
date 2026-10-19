@@ -212,11 +212,12 @@ where
         let (visible, progress) = {
             let state = tree.state.downcast_mut::<State>();
 
-            // `animate-accordion-down` / `animate-accordion-up`
+            // `animate-accordion-down` / `animate-accordion-up`, with the
+            // `ease-out` keyword of CSS (not Tailwind's)
             state.presence.go(
                 if open { 1.0 } else { 0.0 },
                 animation::NORMAL,
-                animation::ease_out,
+                animation::css_ease_out,
                 now,
             );
 
