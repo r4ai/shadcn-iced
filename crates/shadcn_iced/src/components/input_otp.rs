@@ -31,6 +31,7 @@ pub struct InputOtp<'a, Message> {
     groups: Vec<usize>,
     invalid: bool,
     disabled: bool,
+    complete: bool,
 }
 
 /// Creates an [`InputOtp`] with `length` slots. Extra characters are
@@ -46,6 +47,7 @@ pub fn input_otp<'a, Message: Clone + 'a>(
         groups: vec![length],
         invalid: false,
         disabled: false,
+        complete: value.chars().take(length).count() == length,
     }
 }
 
@@ -59,7 +61,10 @@ impl<'a, Message: Clone + 'a> InputOtp<'a, Message> {
     /// Sets the message produced when all the slots are filled and
     /// <kbd>Enter</kbd> is pressed.
     pub fn on_submit(mut self, message: Message) -> Self {
-        self.otp = self.otp.on_submit(message);
+        if self.complete {
+            self.otp = self.otp.on_submit(message);
+        }
+
         self
     }
 
@@ -121,6 +126,7 @@ impl<'a, Message: Clone + 'a> From<InputOtp<'a, Message>> for Element<'a, Messag
             groups: groups_sizes,
             invalid,
             disabled,
+            complete: _,
         } = input;
 
         let slots = slots(length, &groups_sizes);
@@ -384,5 +390,18 @@ fn draw(
             },
             Background::Color(p.foreground),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::input_otp;
+
+    #[test]
+    fn submits_only_once_complete() {
+        assert!(!input_otp(6, "", |_| ()).complete);
+        assert!(!input_otp(6, "123", |_| ()).complete);
+        assert!(input_otp(6, "123456", |_| ()).complete);
+        assert!(input_otp(6, "1234567", |_| ()).complete);
     }
 }
