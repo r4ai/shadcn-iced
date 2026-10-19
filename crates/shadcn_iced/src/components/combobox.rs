@@ -233,11 +233,12 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
             .into()
         } else {
             // `max-h-72 p-1`, no scrollbar.
-            scrollable(list.padding(4).width(Length::Fill))
-                .direction(scrollable::Direction::Vertical(
+            listbox::region(scrollable(list.padding(4).width(Length::Fill)).direction(
+                scrollable::Direction::Vertical(
                     scrollable::Scrollbar::new().width(0).scroller_width(0),
-                ))
-                .into()
+                ),
+            ))
+            .into()
         };
 
         // `min-w-[calc(var(--anchor-width)+--spacing(7))] rounded-lg

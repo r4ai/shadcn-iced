@@ -1,11 +1,13 @@
 //! Keyboard navigation of a listbox (`shadcn_iced::command`), across
 //! rebuilds of the view.
 use iced::keyboard::{self, Key, key::Named};
-use iced::{Element, Event, Point, Size, Theme, mouse, window};
+use iced::{Element, Event, Point, Rectangle, Size, Theme, mouse, window};
 use iced_test::core::clipboard;
 use iced_test::core::renderer::Headless;
+use iced_test::core::widget::operation::{self, Operation, Outcome};
 use iced_test::renderer::Renderer;
 use iced_test::runtime::user_interface::{Cache, UserInterface};
+use iced_test::selector::{Candidate, Selector};
 use shadcn_iced::command::{command, item};
 
 const SIZE: Size = Size::new(400.0, 500.0);
@@ -120,6 +122,26 @@ impl App {
             repeat: false,
         }));
     }
+
+    /// The visible bounds of the text `label`, if any.
+    fn visible(&mut self, label: &str) -> Option<Rectangle> {
+        let label = label.to_owned();
+        let mut interface = self.interface();
+
+        let mut operation = (move |candidate: Candidate<'_>| match &candidate {
+            Candidate::Text { content, .. } if *content == label => candidate.visible_bounds(),
+            _ => None,
+        })
+        .find();
+
+        interface.operate(&self.renderer, &mut operation::black_box(&mut operation));
+        self.cache = Some(interface.into_cache());
+
+        match operation.finish() {
+            Outcome::Some(bounds) => bounds.filter(|bounds| bounds.height > 0.0),
+            _ => None,
+        }
+    }
 }
 
 #[test]
@@ -143,4 +165,40 @@ fn the_highlight_starts_over_when_the_query_changes() {
     app.press(Named::Enter);
 
     assert_eq!(app.picked, ["Alpha", "Beta"]);
+}
+
+#[test]
+fn the_highlighted_item_scrolls_into_view() {
+    shadcn_iced::animation::set_enabled(false);
+
+    let labels: Vec<String> = (0..40).map(|i| format!("Item {i}")).collect();
+    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+    let mut app = App::new(&labels);
+    app.focus();
+
+    assert!(app.visible("Item 0").is_some());
+    assert!(app.visible("Item 20").is_none());
+
+    for _ in 0..20 {
+        app.press(Named::ArrowDown);
+    }
+
+    let item = app
+        .visible("Item 20")
+        .expect("the highlighted item is visible");
+    assert!(item.height >= 20.0, "partly visible: {item:?}");
+    assert!(app.visible("Item 0").is_none());
+
+    // Back up, then around to the end.
+    for _ in 0..20 {
+        app.press(Named::ArrowUp);
+    }
+    assert!(app.visible("Item 0").is_some());
+    assert!(app.visible("Item 20").is_none());
+
+    app.press(Named::ArrowUp);
+    assert!(app.visible("Item 39").is_some());
+
+    app.press(Named::Enter);
+    assert_eq!(app.picked, ["Item 39"]);
 }

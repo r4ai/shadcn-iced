@@ -363,8 +363,11 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
 
         let bordered = command.bordered;
 
+        // The highlighted item scrolls into view.
+        let content = listbox::region(Column::new().push(input).push(body).width(Length::Fill));
+
         // `rounded-xl bg-popover p-1`, inside the border.
-        container(Column::new().push(input).push(body).width(Length::Fill))
+        container(content)
             .padding(if bordered { 5 } else { 4 })
             .width(command.width)
             .style(move |theme: &Theme| {
