@@ -145,8 +145,10 @@ pub struct Motion {
     pub shrink: f32,
     /// The point the toasts behind the front one are scaled around.
     pub origin: Origin,
-    /// How long a dismissed toast stays before `on_dismiss` is published;
-    /// at least as long as `presence` to let it leave.
+    /// How long a dismissed toast stays before `on_dismiss` is published.
+    ///
+    /// Like sonner (`TIME_BEFORE_UNMOUNT`), the default is shorter than
+    /// `presence`, so a toast is unmounted before its exit transition ends.
     pub unmount: Duration,
 }
 
