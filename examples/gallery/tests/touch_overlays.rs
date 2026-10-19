@@ -2,8 +2,8 @@
 //! hover cards open with taps, long presses and keys.
 use iced::keyboard::{Key, key::Named};
 use iced::time::{Duration, Instant};
-use iced::widget::{column, container, text};
-use iced::{Element, Event, Point, Theme, keyboard, touch, window};
+use iced::widget::{column, container, scrollable, text};
+use iced::{Element, Event, Point, Theme, keyboard, mouse, touch, window};
 use iced_test::simulator::Simulator;
 use shadcn_iced::button::{Variant, button};
 use shadcn_iced::menu::{item, menu};
@@ -533,4 +533,239 @@ fn the_keyboard_opens_a_navigation_menu() {
         ui.into_messages().collect::<Vec<_>>(),
         [Message::Picked("Alert")]
     );
+}
+
+fn mouse(ui: &mut Simulator<'_, Message>, position: Point, events: &[mouse::Event]) {
+    ui.point_at(position);
+    let _ = ui.simulate(
+        std::iter::once(Event::Mouse(mouse::Event::CursorMoved { position }))
+            .chain(events.iter().cloned().map(Event::Mouse)),
+    );
+}
+
+fn click(ui: &mut Simulator<'_, Message>, position: Point) {
+    mouse(
+        ui,
+        position,
+        &[
+            mouse::Event::ButtonPressed(mouse::Button::Left),
+            mouse::Event::ButtonReleased(mouse::Button::Left),
+        ],
+    );
+}
+
+fn label(prefix: &str, i: usize) -> &'static str {
+    Box::leak(format!("{prefix} {i}").into_boxed_str())
+}
+
+#[test]
+fn a_tap_in_a_scrolled_list_opens_the_menu_of_the_row_tapped() {
+    let rows = (0..20).map(|i| {
+        shadcn_iced::dropdown_menu::dropdown_menu(
+            button(label("Row", i)).variant(Variant::Outline),
+            menu().item(item(label("Edit", i)).on_select(Message::Picked(label("Edit", i)))),
+        )
+        .into()
+    });
+    let mut ui =
+        simulator(scrollable(iced::widget::Column::with_children(rows).spacing(4)).height(300));
+
+    // Scrolled by 300px.
+    mouse(
+        &mut ui,
+        Point::new(100.0, 100.0),
+        &[mouse::Event::WheelScrolled {
+            delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -300.0 },
+        }],
+    );
+
+    tap(&mut ui, "Row 10");
+
+    assert!(is_shown(&mut ui, "Edit 10"), "the menu of the row tapped");
+    assert!(!is_shown(&mut ui, "Edit 7"));
+}
+
+#[test]
+fn a_long_press_in_a_scrolled_list_opens_a_context_menu_at_the_finger() {
+    let rows = (0..20).map(|i| {
+        shadcn_iced::context_menu::context_menu(
+            container(text(label("Row", i))).padding(8),
+            menu().item(item(label("Copy", i)).on_select(Message::Picked(label("Copy", i)))),
+        )
+        .into()
+    });
+    let mut ui = simulator(scrollable(iced::widget::Column::with_children(rows)).height(300));
+
+    mouse(
+        &mut ui,
+        Point::new(100.0, 100.0),
+        &[mouse::Event::WheelScrolled {
+            delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -300.0 },
+        }],
+    );
+
+    let position = long_press(&mut ui, "Row 10");
+    assert!(is_shown(&mut ui, "Copy 10"), "the menu of the row pressed");
+
+    let copy = center(&mut ui, "Copy 10");
+    assert!(
+        (copy.y - position.y) > 0.0 && (copy.y - position.y) < 40.0,
+        "just below the finger: {copy:?} for {position:?}"
+    );
+}
+
+#[test]
+fn enter_on_a_submenu_trigger_opens_it_and_the_menu_stays() {
+    let mut ui = simulator(submenu());
+
+    key(&mut ui, Named::Tab);
+    key(&mut ui, Named::Enter);
+    wait(&mut ui, Duration::ZERO);
+    // Drawn, the highlighted trigger knows it is.
+    let _ = ui.snapshot(&Theme::Light).expect("a snapshot");
+
+    key(&mut ui, Named::Enter);
+    assert!(is_shown(&mut ui, "Email"), "the submenu opens");
+    wait(&mut ui, Duration::ZERO);
+    assert!(is_shown(&mut ui, "Profile"), "the menu stays");
+    assert!(ui.into_messages().next().is_none());
+}
+
+#[test]
+fn space_selects_in_a_menu_and_closes_it() {
+    let mut ui = simulator(dropdown());
+
+    key(&mut ui, Named::Tab);
+    key(&mut ui, Named::Enter);
+    wait(&mut ui, Duration::ZERO);
+    key(&mut ui, Named::Space);
+    wait(&mut ui, Duration::ZERO);
+
+    assert!(!is_shown(&mut ui, "Profile"), "closed on select");
+    assert_eq!(
+        ui.into_messages().collect::<Vec<_>>(),
+        [Message::Picked("Profile")]
+    );
+}
+
+#[test]
+fn space_selects_in_a_select_and_closes_it() {
+    let mut ui = simulator(
+        shadcn_iced::select::select(None::<&'static str>, Message::Picked)
+            .placeholder("Pick a fruit")
+            .option("Apple", "Apple")
+            .option("Banana", "Banana"),
+    );
+
+    key(&mut ui, Named::Tab);
+    key(&mut ui, Named::Enter);
+    wait(&mut ui, Duration::ZERO);
+    assert!(is_shown(&mut ui, "Banana"), "opened");
+
+    key(&mut ui, Named::ArrowDown);
+    key(&mut ui, Named::Space);
+    wait(&mut ui, Duration::ZERO);
+
+    assert!(!is_shown(&mut ui, "Banana"), "closed on select");
+    assert_eq!(ui.into_messages().count(), 1);
+}
+
+#[test]
+fn a_key_after_a_click_does_not_show_a_tooltip() {
+    let mut ui = simulator(tooltip());
+    let save = center(&mut ui, "Save");
+
+    click(&mut ui, save);
+    mouse(&mut ui, Point::new(500.0, 450.0), &[]);
+    wait(&mut ui, Duration::from_secs(1));
+
+    let _ = ui.simulate([Event::Keyboard(keyboard::Event::KeyPressed {
+        key: Key::Character("s".into()),
+        modified_key: Key::Character("s".into()),
+        physical_key: keyboard::key::Physical::Unidentified(
+            keyboard::key::NativeCode::Unidentified,
+        ),
+        location: keyboard::Location::Standard,
+        modifiers: keyboard::Modifiers::CTRL,
+        text: None,
+        repeat: false,
+    })]);
+    wait(&mut ui, Duration::from_secs(2));
+
+    assert!(!is_shown(&mut ui, "Saves the file"));
+}
+
+#[test]
+fn pressing_a_tooltip_trigger_closes_the_tooltip() {
+    let mut ui = simulator(tooltip());
+    let save = center(&mut ui, "Save");
+
+    mouse(&mut ui, save, &[]);
+    wait(&mut ui, Duration::from_secs(1));
+    assert!(is_shown(&mut ui, "Saves the file"), "shown on hover");
+
+    mouse(
+        &mut ui,
+        save,
+        &[mouse::Event::ButtonPressed(mouse::Button::Left)],
+    );
+    wait(&mut ui, Duration::from_secs(1));
+    assert!(!is_shown(&mut ui, "Saves the file"), "hidden on press");
+}
+
+#[test]
+fn enter_on_a_trigger_button_that_presses_does_not_open_it() {
+    let mut ui = simulator(shadcn_iced::dropdown_menu::dropdown_menu(
+        button("Open").on_press(Message::Pressed),
+        menu().item(item("Profile").on_select(Message::Picked("Profile"))),
+    ));
+
+    key(&mut ui, Named::Tab);
+    key(&mut ui, Named::Enter);
+
+    assert!(!is_shown(&mut ui, "Profile"));
+    assert_eq!(ui.into_messages().collect::<Vec<_>>(), [Message::Pressed]);
+}
+
+fn text_popover() -> Element<'static, Message> {
+    column![
+        shadcn_iced::popover::popover(
+            button("Open").variant(Variant::Outline),
+            text("Nothing to focus"),
+        ),
+        button("Behind").on_press(Message::Picked("Behind")),
+    ]
+    .spacing(200)
+    .into()
+}
+
+#[test]
+fn tab_closes_a_popover_with_nothing_to_focus() {
+    let mut ui = simulator(text_popover());
+
+    key(&mut ui, Named::Tab);
+    key(&mut ui, Named::Enter);
+    wait(&mut ui, Duration::ZERO);
+    assert!(is_shown(&mut ui, "Nothing to focus"));
+
+    // Closed, and on to the next control.
+    key(&mut ui, Named::Tab);
+    assert!(!is_shown(&mut ui, "Nothing to focus"));
+    key(&mut ui, Named::Enter);
+
+    assert_eq!(
+        ui.into_messages().collect::<Vec<_>>(),
+        [Message::Picked("Behind")]
+    );
+}
+
+#[test]
+fn the_arrows_do_not_open_a_popover() {
+    let mut ui = simulator(text_popover());
+
+    key(&mut ui, Named::Tab);
+    key(&mut ui, Named::ArrowDown);
+    key(&mut ui, Named::ArrowUp);
+
+    assert!(!is_shown(&mut ui, "Nothing to focus"));
 }

@@ -426,6 +426,7 @@ impl<Message: Clone, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
         if let Some(message) = active.and_then(|index| self.children[index].on_select.clone()) {
             shell.publish(message);
             shell.capture_event();
+            super::anchored::report_selected();
         }
     }
 }
@@ -740,6 +741,7 @@ where
                 {
                     shell.publish(message.clone());
                     shell.capture_event();
+                    super::anchored::report_selected();
                 }
             }
             // A finger highlights the item it presses (like `:active`), but
@@ -784,6 +786,7 @@ where
                             {
                                 shell.publish(message.clone());
                                 shell.capture_event();
+                                super::anchored::report_selected();
                             }
                         }
                         Some(Gesture::Released) => {

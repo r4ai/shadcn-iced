@@ -399,6 +399,9 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
             // `ring-1` around the list.
             .outset(1.0)
             .close_on_select(true)
+            // `Enter`, `Space` and the arrows open the list from the focused
+            // trigger, and `Tab` closes it.
+            .menu_keys(true)
             .modal(true)
             // `focus-visible:border-ring focus-visible:ring-3`, once
             // dismissed with the keyboard.
