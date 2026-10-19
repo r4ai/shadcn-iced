@@ -17,7 +17,8 @@
 //! - [`LongPress`] opens what a right click or a hover opens with a mouse.
 use iced::{Event, Point, mouse, touch};
 use std::cell::Cell;
-use std::time::{Duration, Instant};
+// `web-time` on the web, where `std::time::Instant::now` panics.
+use iced::time::{Duration, Instant};
 
 /// How far a finger can move before a press stops being a tap (like the
 /// slop of mobile browsers).
