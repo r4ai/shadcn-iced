@@ -5,7 +5,7 @@
 //!
 //! - positioning the floating content next to the anchor (on a [`Side`],
 //!   with an [`Align`]ment and an offset), flipping it to the opposite side
-//!   and shifting it so it stays inside the window,
+//!   and shifting it along its alignment so it stays inside the window,
 //! - opening it, either controlled by your application ([`Anchored::open`])
 //!   or self-managed: on click ([`Anchored::new`]'s default), on hover
 //!   ([`Anchored::hover`]), on right click ([`Anchored::context_menu`]) or
@@ -1143,13 +1143,17 @@ pub fn position(
         }
     };
 
-    (
-        Point::new(
-            clamp(point.x, size.width, viewport.width),
-            clamp(point.y, size.height, viewport.height),
-        ),
-        side,
-    )
+    // Like Base UI (`shift()` without `crossAxis`), the content only
+    // shifts along its alignment axis: on its side, it stays next to the
+    // anchor and may overflow the window when neither side has room.
+    let point = match side {
+        Side::Top | Side::Bottom => Point::new(clamp(point.x, size.width, viewport.width), point.y),
+        Side::Left | Side::Right => {
+            Point::new(point.x, clamp(point.y, size.height, viewport.height))
+        }
+    };
+
+    (point, side)
 }
 
 impl<Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
