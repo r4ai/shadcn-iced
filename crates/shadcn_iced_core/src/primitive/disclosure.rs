@@ -362,6 +362,8 @@ where
             );
 
             if let Some(content) = children.next() {
+                let cursor = content_cursor(tree.state.downcast_ref::<State>(), layout, cursor);
+
                 self.content.as_widget_mut().update(
                     &mut tree.children[2],
                     event,
@@ -484,7 +486,7 @@ where
                     theme,
                     style,
                     content,
-                    cursor,
+                    content_cursor(state, layout, cursor),
                     viewport,
                 );
             };
@@ -533,7 +535,7 @@ where
                 self.content.as_widget().mouse_interaction(
                     &tree.children[2],
                     content,
-                    cursor,
+                    content_cursor(tree.state.downcast_ref::<State>(), layout, cursor),
                     viewport,
                     renderer,
                 )
@@ -622,6 +624,17 @@ where
 {
     fn from(widget: Disclosure<'a, Message, Theme, Renderer>) -> Self {
         Element::new(widget)
+    }
+}
+
+/// The cursor of the content, which is laid out at its full height while
+/// it opens or closes: the part below the box is hidden, so the cursor is
+/// not over it there.
+fn content_cursor(state: &State, layout: Layout<'_>, cursor: mouse::Cursor) -> mouse::Cursor {
+    if state.laid_out >= 1.0 || cursor.is_over(layout.bounds()) {
+        cursor
+    } else {
+        cursor.levitate()
     }
 }
 
