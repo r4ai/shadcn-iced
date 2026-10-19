@@ -25,6 +25,9 @@ use shadcn_iced_core::{Element, style, tokens};
 
 /// Creates a dropdown menu opened by clicking `trigger`.
 ///
+/// The menu opens on a click, a tap, or <kbd>Enter</kbd>, <kbd>Space</kbd>,
+/// <kbd>↓</kbd> and <kbd>↑</kbd> while the trigger is focused.
+///
 /// The menu is placed below the trigger, aligned with its start
 /// (`side="bottom" align="start" sideOffset={4}`). The returned
 /// [`Anchored`] can be customized further, e.g. with [`Anchored::side`] or
@@ -45,6 +48,9 @@ pub fn dropdown_menu<'a, Message: Clone + 'a>(
         .outset(1.0)
         .close_on_select(true)
         .modal(true)
+        // `Enter`, `Space` and `ArrowDown` open it with its first item
+        // highlighted, `ArrowUp` with its last one; `Tab` closes it.
+        .menu_keys(true)
         // `focus-visible:border-ring focus-visible:ring-3` of a button.
         .focus_ring(|theme| {
             let t = tokens(theme);

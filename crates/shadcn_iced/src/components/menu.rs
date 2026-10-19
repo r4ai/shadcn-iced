@@ -16,6 +16,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
+use shadcn_iced_core::primitive::anchored::{self, TouchOpen};
 use shadcn_iced_core::primitive::{Align, Anchored, Side, box_shadow, listbox, tracked};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, Tokens, font, style, tokens};
@@ -251,7 +252,9 @@ impl<'a, Message: Clone + 'a> Menu<'a, Message> {
         self
     }
 
-    /// Appends a submenu, opened when its trigger is hovered.
+    /// Appends a submenu, opened when its trigger is hovered or tapped, or
+    /// with <kbd>→</kbd>, <kbd>Enter</kbd> or <kbd>Space</kbd> while its
+    /// trigger is highlighted (<kbd>←</kbd> closes it again).
     pub fn sub(mut self, label: impl Into<String>, menu: Menu<'a, Message>) -> Self {
         self.entries.push(Entry::Sub {
             label: label.into(),
@@ -567,6 +570,13 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
         let kind = menu.kind;
         let min_width = menu.min_width.unwrap_or_else(|| menu.default_min_width());
         let width = menu.width;
+        // TODO(merge with the lists branch): Radix menus select with
+        // `Space` and highlight the item whose label is typed. Once
+        // `Listbox::typeahead` and `Listbox::text_value` exist, build the
+        // list with `.typeahead(true)`, and call `.text_value(label)` right
+        // after each enabled `list.item(..)` / `list.styled_item(..)` below
+        // (Item, Check, Radio and Sub entries, cloning the label before
+        // `label_text` takes it).
         let mut list = listbox::Listbox::new(highlight);
 
         for entry in menu.entries {
@@ -690,10 +700,26 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                         Anchored::new(
                             listbox::row(trigger, Some(lucide::CHEVRON_RIGHT.sized(16).into()))
                                 .spacing(16.0)
-                                .padding(ITEM_PADDING),
+                                .padding(ITEM_PADDING)
+                                // The color the chevron inherits, telling the
+                                // trigger whether it is highlighted: the keys
+                                // that open the submenu are meant for it.
+                                .trailing_color(|theme, highlighted| {
+                                    anchored::report_highlighted(highlighted);
+
+                                    if highlighted {
+                                        highlight(theme).text_color
+                                    } else {
+                                        menu_tokens(theme).palette.popover_foreground
+                                    }
+                                }),
                             menu,
                         )
                         .hover(Duration::ZERO, Duration::from_millis(150))
+                        // Radix opens submenus on click too: a tap, without
+                        // hover.
+                        .touch_open(TouchOpen::Tap)
+                        .menu_keys(true)
                         .side(Side::Right)
                         .align(Align::Start)
                         .offset(offset)

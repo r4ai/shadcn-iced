@@ -1,8 +1,12 @@
 //! Displays rich content in a portal, triggered by a button.
 //!
 //! Port of <https://ui.shadcn.com/docs/components/popover>. Opens on click
-//! and closes on its own (click outside or <kbd>Escape</kbd>); call
-//! [`Anchored::open`] to control it from your application instead.
+//! (a tap on a touch screen, or <kbd>Enter</kbd> / <kbd>Space</kbd> on the
+//! focused trigger, which focuses the first control of the popover) and
+//! closes on its own (click outside or <kbd>Escape</kbd>, which returns the
+//! focus to the trigger); call [`Anchored::open`] to control it from your
+//! application instead. While it is open, <kbd>Tab</kbd> cycles through its
+//! controls.
 //!
 //! ```no_run
 //! # use shadcn_iced::button::{button, Variant};
