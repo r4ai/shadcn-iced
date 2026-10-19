@@ -122,13 +122,12 @@ where
         let content = layout.children().next().unwrap();
 
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(_)) => {
-                tree.state.downcast_mut::<State>().active = cursor.is_over(layout.bounds());
-            }
             // A tap inside makes the region active too (with a hardware
-            // keyboard, on a tablet).
-            Event::Touch(touch::Event::FingerPressed { position, .. }) => {
-                tree.state.downcast_mut::<State>().active = layout.bounds().contains(*position);
+            // keyboard, on a tablet). The cursor is at the finger, translated
+            // like the region when it scrolls (unlike the touch event).
+            Event::Mouse(mouse::Event::ButtonPressed(_))
+            | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                tree.state.downcast_mut::<State>().active = cursor.is_over(layout.bounds());
             }
             Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) => {
                 let active = tree.state.downcast_ref::<State>().active

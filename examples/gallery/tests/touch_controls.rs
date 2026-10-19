@@ -328,3 +328,42 @@ fn tab_leaves_a_textarea() {
     // The Tab moved the focus to the button, which Enter pressed.
     assert_eq!(messages, [Message::Go]);
 }
+
+/// A tap in scrolled content: a scrollable translates the cursor for its
+/// content, but not the positions of touch events.
+#[test]
+fn a_tap_presses_in_scrolled_content() {
+    use iced::widget::{scrollable, space};
+    use iced::{Length, mouse};
+
+    shadcn_iced::animation::set_enabled(false);
+
+    let content = column![
+        space().height(580),
+        Pressable::new(text("Press me").height(20))
+            .on_press(Message::Press)
+            .padding(10),
+        space().height(400),
+    ];
+
+    let mut ui = Simulator::with_size(
+        iced::Settings::default(),
+        (400.0, 300.0),
+        scrollable(content).height(Length::Fill),
+    );
+
+    // Scrolled by 400px: the pressable (580 to 620 in the content) shows
+    // from 180 to 220.
+    ui.point_at(Point::new(50.0, 150.0));
+    let _ = ui.simulate([Event::Mouse(mouse::Event::WheelScrolled {
+        delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -400.0 },
+    })]);
+
+    let at = Point::new(50.0, 200.0);
+    ui.point_at(at);
+    let _ = ui.simulate([pressed(0, at)]);
+    ui.point_at(at);
+    let _ = ui.simulate([lifted(0, at)]);
+
+    assert_eq!(presses(ui), 1);
+}

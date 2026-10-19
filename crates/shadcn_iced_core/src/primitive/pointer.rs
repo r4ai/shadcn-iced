@@ -121,20 +121,29 @@ pub enum Gesture {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Press {
     pub pointer: Pointer,
+    /// Where the press started, in the coordinates of the widget (see
+    /// [`Gesture`]).
     pub origin: Point,
     /// Whether the pointer moved more than [`SLOP`].
     pub moved: bool,
+    /// Where the press started on the screen, for the slop: the content of
+    /// a scrollable moves along with a finger scrolling it.
+    screen: Point,
 }
 
 impl Press {
     /// Starts a press, if `event` presses the left mouse button or a finger
     /// at a position `accept`ed (usually, over the bounds of the widget).
+    ///
+    /// Positions are the ones of `cursor`, in the coordinates of the widget:
+    /// a scrollable (or any widget translating its content) translates the
+    /// cursor for its content, but not the positions of touch events.
     pub fn start(
         event: &Event,
         cursor: mouse::Cursor,
         accept: impl FnOnce(Point) -> bool,
     ) -> Option<Self> {
-        let (pointer, position) = match event {
+        let (pointer, screen) = match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 (Pointer::Mouse, cursor.position()?)
             }
@@ -143,11 +152,13 @@ impl Press {
             }
             _ => return None,
         };
+        let position = cursor.position().unwrap_or(screen);
 
         accept(position).then_some(Self {
             pointer,
             origin: position,
             moved: false,
+            screen,
         })
     }
 
@@ -157,8 +168,8 @@ impl Press {
     pub fn update(&mut self, event: &Event, cursor: mouse::Cursor) -> Option<Gesture> {
         match (self.pointer, event) {
             (Pointer::Mouse, Event::Mouse(mouse::Event::CursorMoved { position })) => {
-                self.moved |= position.distance(self.origin) > SLOP;
-                Some(Gesture::Moved(*position))
+                self.moved |= position.distance(self.screen) > SLOP;
+                Some(Gesture::Moved(cursor.position().unwrap_or(*position)))
             }
             (Pointer::Mouse, Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))) => {
                 // A mouse may move a little between its press and release:
@@ -169,12 +180,12 @@ impl Press {
             (Pointer::Finger(finger), Event::Touch(touch::Event::FingerMoved { id, position }))
                 if *id == finger =>
             {
-                if !self.moved && position.distance(self.origin) > SLOP {
+                if !self.moved && position.distance(self.screen) > SLOP {
                     self.moved = true;
                     return Some(Gesture::Cancelled);
                 }
 
-                Some(Gesture::Moved(*position))
+                Some(Gesture::Moved(cursor.position().unwrap_or(*position)))
             }
             (
                 Pointer::Finger(finger),
@@ -182,7 +193,7 @@ impl Press {
             ) if *id == finger => Some(if self.moved {
                 Gesture::Released
             } else {
-                Gesture::Tapped(*position)
+                Gesture::Tapped(cursor.position().unwrap_or(*position))
             }),
             (Pointer::Finger(finger), Event::Touch(touch::Event::FingerLost { id, .. }))
                 if *id == finger =>
