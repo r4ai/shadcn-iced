@@ -58,6 +58,7 @@ pub struct Tabs<'a, T, Message> {
     variant: Variant,
     orientation: Orientation,
     width: Length,
+    activate_on_focus: bool,
 }
 
 /// Creates [`Tabs`] with the given selected value.
@@ -73,6 +74,7 @@ pub fn tabs<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a>(
         variant: Variant::Default,
         orientation: Orientation::Horizontal,
         width: Length::Shrink,
+        activate_on_focus: false,
     }
 }
 
@@ -111,6 +113,15 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> Tabs<'a, T, Message> {
     /// Sets the orientation.
     pub fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = orientation;
+        self
+    }
+
+    /// Sets whether moving the focus with the arrow keys also selects the
+    /// newly focused tab (automatic activation, `activateOnFocus`). By
+    /// default, like Base UI's tabs, it does not: <kbd>Enter</kbd> or
+    /// <kbd>Space</kbd> selects the focused tab (manual activation).
+    pub fn activate_on_focus(mut self, activate_on_focus: bool) -> Self {
+        self.activate_on_focus = activate_on_focus;
         self
     }
 
@@ -241,7 +252,8 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
         };
 
         // The arrow keys move the focus between triggers; Enter or Space
-        // activates the focused one (`activateOnFocus={false}`).
+        // activates the focused one (`activateOnFocus={false}`), unless the
+        // tabs activate on focus.
         let list: Element<'a, Message> = if vertical {
             container(
                 Column::with_children(triggers)
@@ -272,11 +284,13 @@ impl<'a, T: Copy + PartialEq + 'a, Message: Clone + 'a> From<Tabs<'a, T, Message
             .into()
         };
 
-        let list = Roving::new(list).keys(if vertical {
-            Keys::Vertical
-        } else {
-            Keys::Horizontal
-        });
+        let list = Roving::new(list)
+            .keys(if vertical {
+                Keys::Vertical
+            } else {
+                Keys::Horizontal
+            })
+            .activate_on_focus(tabs.activate_on_focus);
 
         let has_content = tabs.content.is_some();
 

@@ -84,14 +84,24 @@ impl<'a, Message: Clone + 'a> From<Breadcrumb<'a, Message>> for Element<'a, Mess
         for (index, item) in breadcrumb.items.into_iter().enumerate() {
             let element: Element<'a, Message> = match item {
                 // `hover:text-foreground transition-colors`
-                Item::Link(label, on_press) => Pressable::new(
-                    text(label)
-                        .size(style::text::SM)
-                        .line_height(style::text::leading(style::text::SM)),
-                )
-                .on_press_maybe(on_press)
-                .style(link_style)
-                .into(),
+                Item::Link(label, on_press) => {
+                    let interactive = on_press.is_some();
+                    let link = Pressable::new(
+                        text(label)
+                            .size(style::text::SM)
+                            .line_height(style::text::leading(style::text::SM)),
+                    )
+                    .on_press_maybe(on_press)
+                    .style(link_style);
+
+                    // Like an `<a href>`, Tab reaches a link; it shows the
+                    // focus ring of the other controls.
+                    if interactive {
+                        super::button::focus_ring(link, |t| t.radius_sm()).into()
+                    } else {
+                        link.into()
+                    }
+                }
                 // `text-foreground font-normal`
                 Item::Page(label) => text(label)
                     .size(style::text::SM)

@@ -19,13 +19,19 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
+use shadcn_iced_core::primitive::focus::Ring;
 use shadcn_iced_core::primitive::{Pressable, Side, animated_width};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Operation, Tree, Widget};
+use iced::advanced::{Clipboard, Shell, overlay};
+use iced::keyboard;
 use iced::widget::button::{Status, Style};
 use iced::widget::{Column, Row, container, space, text};
-use iced::{Alignment, Background, Length, Theme, border};
+use iced::{Alignment, Background, Length, Theme, border, mouse};
 
 /// The width of an expanded sidebar (`16rem`).
 pub const WIDTH: f32 = 256.0;
@@ -206,6 +212,7 @@ pub struct Sidebar<'a, Message> {
     variant: Variant,
     side: Side,
     width: f32,
+    on_toggle: Option<Box<dyn Fn(bool) -> Message + 'a>>,
 }
 
 /// Creates an empty [`Sidebar`].
@@ -220,6 +227,7 @@ pub fn sidebar<'a, Message: Clone + 'a>() -> Sidebar<'a, Message> {
         variant: Variant::Sidebar,
         side: Side::Left,
         width: WIDTH,
+        on_toggle: None,
     }
 }
 
@@ -281,6 +289,31 @@ impl<'a, Message: Clone + 'a> Sidebar<'a, Message> {
         self.width = width;
         self
     }
+
+    /// Sets the message asking to collapse (`true`) or expand (`false`) the
+    /// sidebar when <kbd>Ctrl</kbd>+<kbd>B</kbd> (or <kbd>⌘</kbd>+<kbd>B</kbd>)
+    /// is pressed anywhere in the [`layout`] around it, like the
+    /// `SIDEBAR_KEYBOARD_SHORTCUT` of shadcn/ui's `SidebarProvider`.
+    pub fn on_toggle(mut self, on_toggle: impl Fn(bool) -> Message + 'a) -> Self {
+        self.on_toggle = Some(Box::new(on_toggle));
+        self
+    }
+}
+
+/// `ring-sidebar-ring outline-hidden focus-visible:ring-2`: a focusable
+/// button of the sidebar, with its own focus ring.
+fn focusable<'a, Message>(pressable: Pressable<'a, Message>) -> Pressable<'a, Message> {
+    pressable.focusable(true).ring(|theme, _status, focused| {
+        focused.then(|| {
+            let t = tokens(theme);
+
+            Ring {
+                color: t.palette.sidebar_ring,
+                width: 2.0,
+                radius: t.radius_md().into(),
+            }
+        })
+    })
 }
 
 /// The style of a menu button.
@@ -330,7 +363,7 @@ fn badge<'a, Message: 'a>(badge: String, highlighted: bool) -> Element<'a, Messa
 /// A small button shown on the right of an [`Item`] (`SidebarMenuAction`,
 /// `w-5 aspect-square rounded-md hover:bg-sidebar-accent`).
 pub fn menu_action<'a, Message: Clone + 'a>(icon: Icon, on_press: Message) -> Element<'a, Message> {
-    Pressable::new(container(icon.sized(16)).center(20))
+    focusable(Pressable::new(container(icon.sized(16)).center(20)))
         .on_press(on_press)
         .style(|theme, status| {
             let t = tokens(theme);
@@ -416,7 +449,15 @@ fn menu_button<'a, Message: Clone + 'a>(
         size.height()
     };
 
-    let button: Element<'a, Message> = Pressable::new(container(content).center_y(Length::Fill))
+    let interactive = item.on_press.is_some();
+    let button = Pressable::new(container(content).center_y(Length::Fill));
+    let button = if interactive {
+        focusable(button)
+    } else {
+        button
+    };
+
+    let button: Element<'a, Message> = button
         .on_press_maybe(item.on_press)
         .width(if collapsed {
             Length::Fixed(32.0)
@@ -592,9 +633,10 @@ impl<'a, Message: Clone + 'a> From<Sidebar<'a, Message>> for Element<'a, Message
 /// Lays out a sidebar next to the main content (`SidebarProvider` +
 /// `SidebarInset`).
 pub fn layout<'a, Message: Clone + 'a>(
-    sidebar: Sidebar<'a, Message>,
+    mut sidebar: Sidebar<'a, Message>,
     content: impl Into<Element<'a, Message>>,
 ) -> Element<'a, Message> {
+    let on_toggle = sidebar.on_toggle.take();
     let variant = sidebar.variant;
     let side = sidebar.side;
     let collapsed = sidebar.collapsed;
@@ -641,13 +683,150 @@ pub fn layout<'a, Message: Clone + 'a>(
         Row::new().push(sidebar).push(main)
     };
 
-    container(row.height(Length::Fill))
-        .style(move |theme: &Theme| container::Style {
-            background: (variant != Variant::Sidebar)
-                .then(|| Background::Color(tokens(theme).palette.sidebar)),
-            ..container::Style::default()
-        })
-        .into()
+    let layout = container(row.height(Length::Fill)).style(move |theme: &Theme| container::Style {
+        background: (variant != Variant::Sidebar)
+            .then(|| Background::Color(tokens(theme).palette.sidebar)),
+        ..container::Style::default()
+    });
+
+    match on_toggle {
+        Some(on_toggle) => Element::new(Shortcut {
+            content: layout.into(),
+            on_toggle: Box::new(move || on_toggle(!collapsed)),
+        }),
+        None => layout.into(),
+    }
+}
+
+/// `SIDEBAR_KEYBOARD_SHORTCUT`: <kbd>Ctrl</kbd>+<kbd>B</kbd> (or
+/// <kbd>⌘</kbd>+<kbd>B</kbd>) toggles the sidebar, wherever the focus is.
+struct Shortcut<'a, Message> {
+    content: Element<'a, Message>,
+    on_toggle: Box<dyn Fn() -> Message + 'a>,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for Shortcut<'_, Message> {
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &iced::Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &iced::Rectangle,
+    ) {
+        if let iced::Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event
+            && modifiers.command()
+            && key.as_ref() == keyboard::Key::Character("b")
+        {
+            shell.publish((self.on_toggle)());
+            shell.capture_event();
+            return;
+        }
+
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &iced::Rectangle,
+        translation: iced::Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
+    }
 }
 
 /// The button that toggles the sidebar (`SidebarTrigger`).
