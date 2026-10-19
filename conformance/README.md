@@ -44,6 +44,14 @@ pnpm iced button && pnpm test -g button && pnpm baseline button/
 
 and commit `baseline.json` with the fix. On CI, a snapshot without a baseline fails.
 
+### Accepted differences
+
+Some differences come from iced itself and cannot be compensated for in `shadcn_iced`; their scores stay in the baseline:
+
+- **Vertical position of text** (#12): with fractional line heights such as `leading-snug` (19.25px), glyphs sit 0.3–0.5px higher or lower than in Chromium. Chromium rounds the ascent and descent of a font to whole pixels before centering the line, while cosmic-text centers it with the exact metrics, then iced rounds the baseline (`line_y`) and truncates the position of the text in physical pixels. Every text widget is drawn by iced's renderer, which applies this placement after layout, and the scale factor is unknown while drawing, so the offset cannot be undone from a widget. The comparison tolerates one physical pixel, so this only shows in a few scores (`switch/default`, `checkbox/default`, the `sm` code block, the calendar dropdown label).
+- **Backdrop blur** of modal overlays (`backdrop-blur-xs`): iced cannot blur what is drawn behind a layer; the backdrop is dimmed and washed out a little instead (`dialog::backdrop`).
+- **Snapping to pixels** of boxes at fractional positions: the `tiny-skia` renderer of the runner ignores `snap`, which the `wgpu` renderer of applications honors.
+
 ## Determinism
 
 Snapshots must not depend on the machine running the suite:
