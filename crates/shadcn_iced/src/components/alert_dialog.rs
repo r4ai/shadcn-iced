@@ -20,6 +20,7 @@
 use super::button::{Variant, button};
 
 use shadcn_iced_core::icon::Icon;
+use shadcn_iced_core::primitive::layer::auto_focus;
 use shadcn_iced_core::primitive::{Breakpoint, Layer};
 use shadcn_iced_core::{Element, tokens};
 
@@ -239,14 +240,17 @@ fn buttons<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     let fill = footer != Footer::Row;
 
-    let cancel = cancel.map(|(label, message)| {
+    // Like Radix, the alert dialog focuses its cancel button when it opens,
+    // so that a key press does not confirm the action by accident.
+    let cancel = cancel.map(|(label, message)| -> Element<'a, Message> {
         let button = button(label).variant(Variant::Outline).on_press(message);
 
-        if fill {
+        auto_focus(if fill {
             button.width(Length::Fill)
         } else {
             button
-        }
+        })
+        .into()
     });
 
     let action = action.map(|(label, message, variant)| {
