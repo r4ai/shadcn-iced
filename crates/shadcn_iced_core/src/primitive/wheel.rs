@@ -203,6 +203,34 @@ impl Scroll {
         self.delta * ((self.progress(b) - self.progress(a)) / (b - a) / self.duration)
     }
 
+    /// Whether the segment is over at `now`.
+    fn is_done(&self, now: Instant) -> bool {
+        self.time(now) >= 1.0
+    }
+
+    /// Takes the distance to scroll in the frame at `now`, if any.
+    ///
+    /// Steps under half a pixel may not move the content, so they are held
+    /// back until they add up to more, and what is left is taken when the
+    /// segment is over, so that the whole `delta` is scrolled.
+    fn step(&mut self, now: Instant) -> Option<Vector> {
+        let target = if self.is_done(now) {
+            self.delta
+        } else {
+            self.target(now)
+        };
+        let step = target - self.scrolled;
+        let size = step.x.abs().max(step.y.abs());
+
+        if size == 0.0 || (size < 0.5 && !self.is_done(now)) {
+            return None;
+        }
+
+        self.scrolled = target;
+
+        Some(step)
+    }
+
     /// Adds `pixels` to the scroll at `now`, keeping its velocity, like
     /// Chrome does for a notch during a smooth scroll.
     fn retarget(&mut self, pixels: Vector, now: Instant) {
@@ -573,21 +601,13 @@ fn frame<Message, Theme, Renderer>(
         return;
     };
 
-    let done = scroll.time(now) >= 1.0;
-    let target = if done {
-        scroll.delta
-    } else {
-        scroll.target(now)
-    };
-    let step = target - scroll.scrolled;
+    let done = scroll.is_done(now);
+    let step = scroll.step(now);
     let position = scroll.position;
 
-    scroll.scrolled = target;
-
-    // A scroll that reaches the end stops (steps under half a pixel may
-    // not move the content).
-    let scrolled = step.x.abs().max(step.y.abs()) < 0.5
-        || self::scroll(
+    // A scroll that reaches the end stops.
+    let scrolled = step.is_none_or(|step| {
+        self::scroll(
             content,
             &mut tree.children[0],
             step,
@@ -597,7 +617,8 @@ fn frame<Message, Theme, Renderer>(
             clipboard,
             shell,
             viewport,
-        );
+        )
+    });
 
     let state = tree.state.downcast_mut::<State>();
 
@@ -690,5 +711,46 @@ where
 {
     fn from(wheel: Wheel<'a, Message, Theme, Renderer>) -> Self {
         Element::new(wheel)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    /// Scrolls a whole segment of `delta` frame by frame, returning the
+    /// distance sent to the content.
+    fn sent(delta: Vector, frame: Duration) -> Vector {
+        let start = Instant::now();
+        let mut scroll = Scroll::new(delta, 0.0, start, Point::ORIGIN);
+        let mut sent = Vector::ZERO;
+        let mut now = start;
+
+        while !scroll.is_done(now) {
+            now += frame;
+
+            if let Some(step) = scroll.step(now) {
+                sent += step;
+            }
+        }
+
+        sent
+    }
+
+    #[test]
+    fn a_scroll_sends_its_whole_distance() {
+        for frame in [1, 4, 16] {
+            let sent = sent(Vector::new(0.0, 100.0), Duration::from_millis(frame));
+
+            assert!((sent.y - 100.0).abs() < 1e-3, "{frame}ms: {sent:?}");
+        }
+    }
+
+    #[test]
+    fn a_short_scroll_sends_its_whole_distance() {
+        let sent = sent(Vector::new(0.0, -3.0), Duration::from_millis(1));
+
+        assert!((sent.y + 3.0).abs() < 1e-3, "{sent:?}");
     }
 }
