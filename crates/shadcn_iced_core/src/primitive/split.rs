@@ -348,7 +348,9 @@ where
                     shell.request_redraw();
                 }
                 Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) if state.focused => {
-                    let current = self.ratio.unwrap_or(state.ratio);
+                    // From where the divider is, not from a ratio out of
+                    // bounds.
+                    let current = ratio;
                     let next = match (key.as_ref(), self.axis) {
                         (keyboard::Key::Named(key::Named::ArrowRight), Axis::Horizontal)
                         | (keyboard::Key::Named(key::Named::ArrowDown), Axis::Vertical) => {
