@@ -2,7 +2,8 @@
 //!
 //! Port of <https://ui.shadcn.com/docs/components/toast> (Base UI toast).
 //! Toasts live in your state; the [`toaster`] stacks them in the bottom
-//! right corner of the window, expands the stack on hover, and asks you to
+//! right corner of the window, expands the stack on hover (or on a tap), lets
+//! <kbd>F8</kbd> move the focus to it, and asks you to
 //! remove each toast once its timeout has elapsed, when it is closed or when
 //! it is swiped away. The behavior and the animations live in
 //! [`shadcn_iced_core::primitive::toaster`], shared with
@@ -22,9 +23,12 @@ use super::button::{Size, Variant, button, icon_button};
 use shadcn_iced_core::animation;
 use shadcn_iced_core::icon::{Icon, lucide};
 use shadcn_iced_core::primitive::Layer;
-use shadcn_iced_core::primitive::toaster::{self as stack, Action, Direction, Motion, Origin};
+use shadcn_iced_core::primitive::toaster::{
+    self as stack, Action, Direction, Hotkey, Motion, Origin,
+};
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::keyboard::{Modifiers, key::Named};
 use iced::time::Duration;
 use iced::widget::{Column, Row, container, text};
 use iced::{Alignment, Background, Length, Theme};
@@ -122,6 +126,7 @@ pub struct Toaster<'a, Message> {
     toasts: Vec<Toast<Message>>,
     on_close: Box<dyn Fn(u64) -> Message + 'a>,
     limit: usize,
+    hotkey: Option<Hotkey>,
 }
 
 /// Displays `toasts` over `base`, which is usually the root of your view.
@@ -136,6 +141,8 @@ pub fn toaster<'a, Message: Clone + 'a>(
         toasts: toasts.to_vec(),
         on_close: Box::new(on_close),
         limit: 3,
+        // The viewport of Radix Toast focuses its toasts on F8.
+        hotkey: Some(Hotkey::new(Named::F8, Modifiers::empty())),
     }
 }
 
@@ -143,6 +150,13 @@ impl<'a, Message: Clone + 'a> Toaster<'a, Message> {
     /// Sets how many toasts are shown at once (`limit`, 3 by default).
     pub fn limit(mut self, limit: usize) -> Self {
         self.limit = limit.max(1);
+        self
+    }
+
+    /// Sets the keyboard shortcut that focuses the toasts (<kbd>F8</kbd> by
+    /// default); `None` disables it.
+    pub fn hotkey(mut self, hotkey: impl Into<Option<Hotkey>>) -> Self {
+        self.hotkey = hotkey.into();
         self
     }
 }
@@ -275,6 +289,7 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
             .visible(toaster.limit)
             .swipe_directions([Direction::Down, Direction::Right])
             .motion(motion())
+            .hotkey(toaster.hotkey)
             .surface(self::style)
             .shadows(style::SHADOW_LG);
 
