@@ -27,6 +27,15 @@
 //! captured, so the scroll still reaches whatever is outside of the
 //! content (e.g. the page around a web preview).
 //!
+//! iced's scrollables follow a finger, but stop dead when it lifts. A
+//! [`Wheel`] also gives touch scrolling momentum, like mobile browsers and
+//! iOS: a flick keeps the content scrolling at the speed the finger had,
+//! slowing down exponentially (a time constant of 325ms, close to the
+//! deceleration of iOS) until it stops, reaches the end, or the content is
+//! touched, clicked or scrolled by a wheel again. There is no momentum while
+//! animations are disabled, and nested wheels give it once (the outermost
+//! one).
+//!
 //! ```no_run
 //! # fn view<'a>(content: iced::Element<'a, ()>, list: iced::Element<'a, ()>) -> iced::Element<'a, ()> {
 //! use shadcn_iced_core::primitive::wheel;
@@ -42,13 +51,16 @@
 //! # }
 //! ```
 use crate::animation;
+use crate::primitive::pointer;
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::widget::{Id, Operation, Tree, Widget, operation, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::time::{Duration, Instant};
-use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, keyboard, mouse, window};
+use iced::{
+    Element, Event, Length, Point, Rectangle, Size, Vector, keyboard, mouse, touch, window,
+};
 
 use std::cell::Cell;
 use std::sync::atomic::{self, AtomicBool};
@@ -67,6 +79,22 @@ const FRAME: Duration = Duration::from_millis(16);
 /// 0.58, 1)`).
 const X1: f32 = 0.42;
 const X2: f32 = 0.58;
+
+/// How far back the velocity of a finger is measured when it lifts.
+const VELOCITY_WINDOW: Duration = Duration::from_millis(100);
+
+/// The time constant of the deceleration of a fling, in seconds: the
+/// velocity falls to about a third every 325ms.
+const DECELERATION: f32 = 0.325;
+
+/// The slowest flick that flings, in pixels per second (0.3px/ms).
+const MIN_FLING: f32 = 300.0;
+
+/// A fling stops under this velocity, in pixels per second (0.02px/ms).
+const STOP_FLING: f32 = 20.0;
+
+/// The fastest fling, in pixels per second.
+const MAX_FLING: f32 = 8000.0;
 
 static SMOOTH: AtomicBool = AtomicBool::new(false);
 
@@ -267,10 +295,127 @@ fn duration(delta: Vector) -> f32 {
     MAX - (MAX - MIN) * ramp
 }
 
+/// A finger followed for the momentum of its scroll.
+#[derive(Debug, Clone)]
+struct Touch {
+    finger: touch::Finger,
+    /// Where the content was touched: the fling scrolls what is there.
+    origin: Point,
+    /// Where the finger was lately, and when (at most
+    /// [`VELOCITY_WINDOW`] back).
+    samples: Vec<(Instant, Point)>,
+    /// The translations of the scrollables when it pressed, to tell whether
+    /// it scrolled any (and was not, say, dragging a slider).
+    translations: Vec<Vector>,
+}
+
+impl Touch {
+    /// Records the finger at `position`, forgetting what is too old to tell
+    /// its velocity.
+    fn record(&mut self, position: Point, now: Instant) {
+        self.forget(now);
+        self.samples.push((now, position));
+    }
+
+    fn forget(&mut self, now: Instant) {
+        self.samples
+            .retain(|(at, _)| now.saturating_duration_since(*at) <= VELOCITY_WINDOW);
+    }
+
+    /// The velocity of the finger over the last [`VELOCITY_WINDOW`] up to
+    /// `now`, in pixels per second. A finger that rested before lifting is
+    /// slow, since the time it rested counts.
+    fn velocity(&mut self, now: Instant) -> Vector {
+        self.forget(now);
+
+        let (Some((start, from)), Some((_, to))) = (self.samples.first(), self.samples.last())
+        else {
+            return Vector::ZERO;
+        };
+
+        // Touch events come a frame apart at least: closer ones are not
+        // faster.
+        let elapsed = now.saturating_duration_since(*start).max(FRAME);
+        let velocity = (*to - *from) * (1.0 / elapsed.as_secs_f32());
+        let speed = velocity.x.hypot(velocity.y);
+
+        if speed > MAX_FLING {
+            velocity * (MAX_FLING / speed)
+        } else {
+            velocity
+        }
+    }
+}
+
+/// The momentum of a touch scroll, after its finger lifted.
+#[derive(Debug, Clone, Copy)]
+struct Fling {
+    /// In pixels per second, in the direction of the wheel (the one the
+    /// finger moved in).
+    velocity: Vector,
+    /// The last frame; none before the first.
+    last: Option<Instant>,
+    position: Point,
+    /// What was too small to scroll yet.
+    pending: Vector,
+}
+
+impl Fling {
+    /// Takes the distance to scroll in the frame at `now`, and slows down.
+    fn step(&mut self, now: Instant) -> Vector {
+        let elapsed = self
+            .last
+            .map_or(FRAME, |last| now.saturating_duration_since(last))
+            .as_secs_f32();
+        let decay = (-elapsed / DECELERATION).exp();
+
+        // The integral of the exponentially decaying velocity.
+        let step = self.velocity * (DECELERATION * (1.0 - decay)) + self.pending;
+
+        self.velocity *= decay;
+        self.last = Some(now);
+        self.pending = Vector::ZERO;
+
+        step
+    }
+
+    fn is_over(&self) -> bool {
+        self.velocity.x.hypot(self.velocity.y) < STOP_FLING
+    }
+}
+
 #[derive(Debug, Default)]
 struct State {
     modifiers: keyboard::Modifiers,
     scroll: Option<Scroll>,
+    touch: Option<Touch>,
+    fling: Option<Fling>,
+}
+
+thread_local! {
+    /// Whether a wheel handling a touch event is dispatching it, so that
+    /// the wheels within it leave the momentum to it.
+    static FOLLOWING: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Reads the translations of every scrollable.
+struct Translations(Vec<Vector>);
+
+impl Operation for Translations {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+
+    fn scrollable(
+        &mut self,
+        _id: Option<&Id>,
+        _bounds: Rectangle,
+        _content_bounds: Rectangle,
+        translation: Vector,
+        _state: &mut dyn operation::Scrollable,
+    ) {
+        self.0.push(translation);
+    }
 }
 
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -336,10 +481,42 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         let state = tree.state.downcast_mut::<State>();
 
         if let Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) = event {
             state.modifiers = *modifiers;
+        }
+
+        // A click or a wheel stops the momentum.
+        if matches!(
+            event,
+            Event::Mouse(mouse::Event::ButtonPressed(_) | mouse::Event::WheelScrolled { .. })
+        ) {
+            state.fling = None;
+        }
+
+        // The outermost wheel follows the fingers.
+        if let Event::Touch(touch) = event
+            && !FOLLOWING.get()
+        {
+            FOLLOWING.set(true);
+            self::touch(
+                &mut self.content,
+                tree,
+                event,
+                *touch,
+                layout,
+                cursor,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
+            FOLLOWING.set(false);
+
+            return;
         }
 
         let Event::Mouse(mouse::Event::WheelScrolled { delta }) = event else {
@@ -356,6 +533,17 @@ where
 
             if let Event::Window(window::Event::RedrawRequested(now)) = event {
                 frame(
+                    &mut self.content,
+                    tree,
+                    *now,
+                    layout,
+                    renderer,
+                    clipboard,
+                    shell,
+                    viewport,
+                );
+
+                fling(
                     &mut self.content,
                     tree,
                     *now,
@@ -624,6 +812,172 @@ fn frame<Message, Theme, Renderer>(
 
     if done || !scrolled {
         state.scroll = None;
+    } else {
+        shell.request_redraw();
+    }
+}
+
+/// Reads the translations of the scrollables of `content`.
+fn translations<Message, Theme, Renderer>(
+    content: &mut Element<'_, Message, Theme, Renderer>,
+    tree: &mut Tree,
+    layout: Layout<'_>,
+    renderer: &Renderer,
+) -> Vec<Vector>
+where
+    Renderer: iced::advanced::Renderer,
+{
+    let mut translations = Translations(Vec::new());
+
+    content
+        .as_widget_mut()
+        .operate(tree, layout, renderer, &mut translations);
+
+    translations.0
+}
+
+/// Dispatches a touch event to the content, following the first finger to
+/// fling the content when it lifts after a flick.
+fn touch<Message, Theme, Renderer>(
+    content: &mut Element<'_, Message, Theme, Renderer>,
+    tree: &mut Tree,
+    event: &Event,
+    touch: touch::Event,
+    layout: Layout<'_>,
+    cursor: mouse::Cursor,
+    renderer: &Renderer,
+    clipboard: &mut dyn Clipboard,
+    shell: &mut Shell<'_, Message>,
+    viewport: &Rectangle,
+) where
+    Renderer: iced::advanced::Renderer,
+{
+    let now = Instant::now();
+    let pressed = matches!(touch, touch::Event::FingerPressed { .. });
+    let before = pressed.then(|| translations(content, &mut tree.children[0], layout, renderer));
+
+    content.as_widget_mut().update(
+        &mut tree.children[0],
+        event,
+        layout,
+        cursor,
+        renderer,
+        clipboard,
+        shell,
+        viewport,
+    );
+
+    let state = tree.state.downcast_mut::<State>();
+
+    match touch {
+        touch::Event::FingerPressed { id, position } => {
+            // A finger on the content stops it.
+            state.fling = None;
+
+            if state.touch.is_none() {
+                state.touch = Some(Touch {
+                    finger: id,
+                    origin: cursor.position().unwrap_or(position),
+                    samples: vec![(now, position)],
+                    translations: before.unwrap_or_default(),
+                });
+            }
+        }
+        touch::Event::FingerMoved { id, position } => {
+            if let Some(touch) = state.touch.as_mut().filter(|touch| touch.finger == id) {
+                touch.record(position, now);
+            }
+        }
+        touch::Event::FingerLost { id, .. } => {
+            if state.touch.as_ref().is_some_and(|touch| touch.finger == id) {
+                state.touch = None;
+            }
+        }
+        touch::Event::FingerLifted { id, .. } => {
+            if !state.touch.as_ref().is_some_and(|touch| touch.finger == id) {
+                return;
+            }
+
+            let Some(mut touch) = state.touch.take() else {
+                return;
+            };
+
+            let velocity = touch.velocity(now);
+            let flick = velocity.x.hypot(velocity.y) >= MIN_FLING;
+
+            // Only a finger that scrolled something flings it.
+            if flick
+                && animation::enabled()
+                && translations(content, &mut tree.children[0], layout, renderer)
+                    != touch.translations
+            {
+                tree.state.downcast_mut::<State>().fling = Some(Fling {
+                    velocity,
+                    last: None,
+                    position: touch.origin,
+                    pending: Vector::ZERO,
+                });
+                shell.request_redraw();
+            }
+        }
+    }
+}
+
+/// Scrolls a frame of the fling in progress, if any.
+fn fling<Message, Theme, Renderer>(
+    content: &mut Element<'_, Message, Theme, Renderer>,
+    tree: &mut Tree,
+    now: Instant,
+    layout: Layout<'_>,
+    renderer: &Renderer,
+    clipboard: &mut dyn Clipboard,
+    shell: &mut Shell<'_, Message>,
+    viewport: &Rectangle,
+) where
+    Renderer: iced::advanced::Renderer,
+{
+    let state = tree.state.downcast_mut::<State>();
+
+    let Some(fling) = &mut state.fling else {
+        return;
+    };
+
+    if !animation::enabled() {
+        state.fling = None;
+        return;
+    }
+
+    let step = fling.step(now);
+    let position = fling.position;
+    let over = fling.is_over();
+
+    // Steps under half a pixel may not move the content: they add up.
+    let small = step.x.abs().max(step.y.abs()) < 0.5;
+    let mut moved = true;
+
+    if small {
+        fling.pending = step;
+    } else {
+        let before = translations(content, &mut tree.children[0], layout, renderer);
+
+        let _ = scroll(
+            content,
+            &mut tree.children[0],
+            step,
+            position,
+            layout,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+
+        // A scroll that reaches the end stops.
+        moved = translations(content, &mut tree.children[0], layout, renderer) != before;
+    }
+
+    if over || !moved {
+        tree.state.downcast_mut::<State>().fling = None;
     } else {
         shell.request_redraw();
     }
