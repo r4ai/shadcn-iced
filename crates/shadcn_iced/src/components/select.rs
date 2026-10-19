@@ -552,50 +552,6 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer>
                 shell.capture_event();
                 return;
             }
-
-            // `Enter`, `Space` and the arrows open the list from the
-            // focused trigger, like a click on it (which is all the anchor
-            // reacts to).
-            let opens = match key.as_ref() {
-                keyboard::Key::Named(
-                    key::Named::Enter | key::Named::ArrowDown | key::Named::ArrowUp,
-                ) => true,
-                keyboard::Key::Named(key::Named::Space) => !typeahead.is_typing(now),
-                _ => false,
-            };
-
-            if opens
-                && focus::is_focus_within(
-                    &mut self.content,
-                    &mut tree.children[0],
-                    layout,
-                    renderer,
-                )
-                && self
-                    .content
-                    .as_widget_mut()
-                    .overlay(
-                        &mut tree.children[0],
-                        layout,
-                        renderer,
-                        viewport,
-                        Vector::ZERO,
-                    )
-                    .is_none()
-            {
-                self.content.as_widget_mut().update(
-                    &mut tree.children[0],
-                    &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
-                    layout,
-                    mouse::Cursor::Available(layout.bounds().center()),
-                    renderer,
-                    clipboard,
-                    shell,
-                    viewport,
-                );
-                shell.capture_event();
-                return;
-            }
         }
 
         self.content.as_widget_mut().update(

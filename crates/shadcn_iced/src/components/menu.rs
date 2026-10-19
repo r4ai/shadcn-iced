@@ -570,16 +570,23 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
         let kind = menu.kind;
         let min_width = menu.min_width.unwrap_or_else(|| menu.default_min_width());
         let width = menu.width;
-        // TODO(merge with the lists branch): Radix menus select with
-        // `Space` and highlight the item whose label is typed. Once
-        // `Listbox::typeahead` and `Listbox::text_value` exist, build the
-        // list with `.typeahead(true)`, and call `.text_value(label)` right
-        // after each enabled `list.item(..)` / `list.styled_item(..)` below
-        // (Item, Check, Radio and Sub entries, cloning the label before
-        // `label_text` takes it).
-        let mut list = listbox::Listbox::new(highlight);
+        // Radix menus select with `Space` and highlight the item whose label
+        // is typed (`typeahead`), skipping the disabled ones.
+        let mut list = listbox::Listbox::new(highlight).typeahead(true);
 
         for entry in menu.entries {
+            let typed = match &entry {
+                Entry::Item(item) => item.on_select.as_ref().map(|_| item.label.clone()),
+                Entry::Check {
+                    label, on_toggle, ..
+                } => on_toggle.as_ref().map(|_| label.clone()),
+                Entry::Radio {
+                    label, on_select, ..
+                } => on_select.as_ref().map(|_| label.clone()),
+                Entry::Sub { label, .. } => Some(label.clone()),
+                Entry::Label(..) | Entry::Separator | Entry::Custom(_) => None,
+            };
+
             list = match entry {
                 Entry::Item(item) => {
                     let disabled = item.on_select.is_none();
@@ -736,6 +743,10 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                 }
                 Entry::Custom(element) => list.push(element),
             };
+
+            if let Some(typed) = typed {
+                list = list.text_value(typed);
+            }
         }
 
         let style = match (menu.sub, kind) {
