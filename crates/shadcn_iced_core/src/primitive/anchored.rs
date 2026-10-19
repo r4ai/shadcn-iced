@@ -111,6 +111,29 @@ pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
     open_highlight: Option<Box<dyn Fn(&Theme) -> (Background, Border) + 'a>>,
     focus_ring: Option<Box<dyn Fn(&Theme) -> focus::Style + 'a>>,
     animate: bool,
+    anchor_tracker: Option<AnchorTracker>,
+}
+
+/// Where the anchor of open floating content is, for the content to point
+/// at it (e.g. the arrow of a tooltip, which follows the trigger when the
+/// content is shifted to stay inside the window).
+///
+/// Share a clone with [`Anchored::track_anchor`]: the bounds of the anchor,
+/// in the coordinates of the content, are set when the content is laid out,
+/// before it is drawn.
+#[derive(Debug, Clone, Default)]
+pub struct AnchorTracker(std::rc::Rc<std::cell::Cell<Option<Rectangle>>>);
+
+impl AnchorTracker {
+    /// Creates a tracker that knows no anchor yet.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The bounds of the anchor of the open content, if any.
+    pub fn anchor(&self) -> Option<Rectangle> {
+        self.0.get()
+    }
 }
 
 impl<'a, Message, Theme, Renderer> Anchored<'a, Message, Theme, Renderer>
@@ -142,7 +165,14 @@ where
             open_highlight: None,
             focus_ring: None,
             animate: true,
+            anchor_tracker: None,
         }
+    }
+
+    /// Tells `tracker` where the anchor is whenever the content is laid out.
+    pub fn track_anchor(mut self, tracker: AnchorTracker) -> Self {
+        self.anchor_tracker = Some(tracker);
+        self
     }
 
     /// Controls whether the content is open from your application.
@@ -925,6 +955,7 @@ where
                 closing: !open,
                 resolved_side: self.side,
                 group: group.filter(|_| open),
+                anchor_tracker: self.anchor_tracker.as_ref(),
             })))
         } else {
             None
@@ -985,6 +1016,7 @@ struct Floating<'a, 'b, Message, Theme, Renderer> {
     closing: bool,
     resolved_side: Side,
     group: Option<GroupLink<'b>>,
+    anchor_tracker: Option<&'b AnchorTracker>,
 }
 
 /// What the open content of a [`Group`] knows about its siblings.
@@ -1157,6 +1189,10 @@ where
             Some(point) => Rectangle::new(point, Size::ZERO),
             None => self.anchor_bounds,
         };
+
+        if let Some(tracker) = self.anchor_tracker {
+            tracker.0.set(Some(anchor));
+        }
 
         let size = node.size();
         let size = Size::new(
