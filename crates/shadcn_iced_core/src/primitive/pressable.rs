@@ -237,9 +237,57 @@ struct State {
     is_pressed: bool,
     is_hovered: bool,
     status: Option<Status>,
-    previous: Option<Status>,
+    /// The style the transition to `status` starts from.
+    origin: Option<Origin>,
     transition: Transition,
     focus: Focus,
+}
+
+/// A style on screen: the style of `from` mixed into the style of `to` by
+/// `t`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Origin {
+    from: Status,
+    to: Status,
+    t: f32,
+}
+
+impl Origin {
+    /// The style of `status` alone.
+    fn settled(status: Status) -> Self {
+        Self {
+            from: status,
+            to: status,
+            t: 0.0,
+        }
+    }
+
+    /// The style on screen when a transition from `self` to the style of
+    /// `target` is at `t`, so that a new transition starts from it, like CSS
+    /// transitions start from the current value.
+    ///
+    /// It is exact when `target` is one of `from` and `to`, which covers
+    /// going back and forth between two statuses; otherwise it is the
+    /// nearest of them.
+    fn at(self, target: Status, t: f32) -> Self {
+        if self.to == target {
+            Self {
+                t: self.t + (1.0 - self.t) * t,
+                ..self
+            }
+        } else if self.from == target {
+            Self {
+                t: self.t * (1.0 - t),
+                ..self
+            }
+        } else {
+            Self {
+                from: if self.t < 0.5 { self.from } else { self.to },
+                to: target,
+                t,
+            }
+        }
+    }
 }
 
 impl<'a, Message, Theme, Renderer> Pressable<'a, Message, Theme, Renderer> {
@@ -417,7 +465,14 @@ where
 
             match state.status {
                 Some(current) if current != status => {
-                    state.previous = Some(current);
+                    // A status changed mid-transition starts from the
+                    // style on screen, not from the previous one.
+                    state.origin = Some(match state.origin {
+                        Some(origin) if state.transition.is_animating(now) => {
+                            origin.at(current, state.transition.value(now))
+                        }
+                        _ => Origin::settled(current),
+                    });
                     state.transition.set(0.0);
                     state
                         .transition
@@ -545,12 +600,19 @@ where
 
         let focused = state.focus.is_visible();
 
-        let style = match (state.previous, state.status) {
-            (Some(previous), Some(current))
+        let style = match (state.origin, state.status) {
+            (Some(origin), Some(current))
                 if current == status && state.transition.is_animating(now) =>
             {
+                let from = (self.style)(theme, origin.from, focused);
+                let from = if origin.t > 0.0 {
+                    mix_styles(&from, &(self.style)(theme, origin.to, focused), origin.t)
+                } else {
+                    from
+                };
+
                 mix_styles(
-                    &(self.style)(theme, previous, focused),
+                    &from,
                     &(self.style)(theme, current, focused),
                     state.transition.value(now),
                 )
@@ -744,4 +806,43 @@ where
     Renderer: iced::advanced::Renderer,
 {
     Pressable::new(content)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn leaving_mid_hover_starts_from_the_style_on_screen() {
+        // Hovered 40% of the way, then left.
+        let origin = Origin::settled(Status::Active).at(Status::Hovered, 0.4);
+
+        assert_eq!(
+            origin,
+            Origin {
+                from: Status::Active,
+                to: Status::Hovered,
+                t: 0.4,
+            }
+        );
+
+        // Hovered again halfway back to `Active`.
+        let origin = origin.at(Status::Active, 0.5);
+
+        assert_eq!(origin.from, Status::Active);
+        assert_eq!(origin.to, Status::Hovered);
+        assert!((origin.t - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn going_on_towards_the_same_status_keeps_the_progress() {
+        let origin = Origin {
+            from: Status::Active,
+            to: Status::Hovered,
+            t: 0.4,
+        }
+        .at(Status::Hovered, 0.5);
+
+        assert!((origin.t - 0.7).abs() < 1e-6);
+    }
 }
