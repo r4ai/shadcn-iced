@@ -24,6 +24,7 @@
 //! These are the motions of sonner, the defaults; a [`Motion`] changes how
 //! the toasts enter and leave and how the collapsed stack is drawn, which is
 //! how the toasts of Base UI are made from the same stack.
+use super::box_shadow;
 use crate::animation::{self, Easing, Fade, Transition};
 
 use iced::advanced::layout::{self, Layout};
@@ -144,8 +145,10 @@ pub struct Motion {
     pub shrink: f32,
     /// The point the toasts behind the front one are scaled around.
     pub origin: Origin,
-    /// How long a dismissed toast stays before `on_dismiss` is published;
-    /// at least as long as `presence` to let it leave.
+    /// How long a dismissed toast stays before `on_dismiss` is published.
+    ///
+    /// Like sonner (`TIME_BEFORE_UNMOUNT`), the default is shorter than
+    /// `presence`, so a toast is unmounted before its exit transition ends.
     pub unmount: Duration,
 }
 
@@ -221,6 +224,7 @@ pub struct Toaster<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> 
     expand: bool,
     motion: Motion,
     surface: Box<dyn Fn(&Theme) -> container::Style + 'a>,
+    shadows: &'a [box_shadow::Layer],
 }
 
 impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
@@ -240,6 +244,7 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
             expand: false,
             motion: Motion::default(),
             surface: Box::new(|_| container::Style::default()),
+            shadows: &[],
         }
     }
 
@@ -283,6 +288,14 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
     /// Sets the background, border, shadow and text color of the toasts.
     pub fn surface(mut self, surface: impl Fn(&Theme) -> container::Style + 'a) -> Self {
         self.surface = Box::new(surface);
+        self
+    }
+
+    /// Draws layered shadows behind the toasts, like
+    /// [`box_shadow`](super::box_shadow), in addition to the shadow of the
+    /// [surface](Self::surface).
+    pub fn shadows(mut self, shadows: &'a [box_shadow::Layer]) -> Self {
+        self.shadows = shadows;
         self
     }
 
@@ -415,6 +428,20 @@ impl State {
             if entry.removed.is_none() {
                 entry.elapsed += delta;
             }
+        }
+    }
+
+    /// Keeps an entry for each of the `ids`, and only for them.
+    ///
+    /// The timers are advanced to `now` first, so that the new toasts start
+    /// their timers at `now` rather than at the last frame, which may be long
+    /// ago when no toast was shown.
+    fn sync(&mut self, ids: &[u64], now: Instant) {
+        self.tick(now);
+        self.entries.retain(|id, _| ids.contains(id));
+
+        for id in ids {
+            self.entries.entry(*id).or_insert_with(Entry::new);
         }
     }
 }
@@ -909,11 +936,7 @@ where
                 })
                 .collect();
 
-            state.entries.retain(|id, _| ids.contains(id));
-
-            for id in &ids {
-                state.entries.entry(*id).or_insert_with(Entry::new);
-            }
+            state.sync(&ids, Instant::now());
 
             // sonner collapses the toasts when at most one is left.
             if ids.len() <= 1 {
@@ -1283,6 +1306,15 @@ where
                     );
                 }
 
+                for quad in box_shadow::quads(
+                    self.shadows,
+                    placement.bounds,
+                    surface.border.radius.top_left,
+                    opacity,
+                ) {
+                    renderer.fill_quad(quad, Color::TRANSPARENT);
+                }
+
                 renderer.fill_quad(
                     renderer::Quad {
                         bounds: placement.bounds,
@@ -1396,5 +1428,40 @@ where
 {
     fn from(toaster: Toaster<'a, Message, Theme, Renderer>) -> Self {
         Element::new(toaster)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_toasts_start_their_timers_when_they_are_pushed() {
+        let start = Instant::now();
+        let mut state = State::default();
+
+        state.sync(&[1], start);
+        state.tick(start + Duration::from_millis(100));
+        state.sync(&[], start + Duration::from_millis(100));
+
+        // No frame reaches the toaster while no toast is shown.
+        let pushed = start + Duration::from_secs(30);
+        state.sync(&[2], pushed);
+        state.tick(pushed + Duration::from_millis(16));
+
+        assert_eq!(state.entries[&2].elapsed, Duration::from_millis(16));
+    }
+
+    #[test]
+    fn existing_toasts_keep_running_when_a_toast_is_pushed() {
+        let start = Instant::now();
+        let mut state = State::default();
+
+        state.sync(&[1], start);
+        state.sync(&[1, 2], start + Duration::from_secs(1));
+        state.tick(start + Duration::from_millis(1100));
+
+        assert_eq!(state.entries[&1].elapsed, Duration::from_millis(1100));
+        assert_eq!(state.entries[&2].elapsed, Duration::from_millis(100));
     }
 }

@@ -181,7 +181,10 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
         let on_select = &combobox.on_select;
         let selected = combobox.selected.clone();
 
-        let mut list = listbox::Listbox::new(menu::highlight).highlight_first(filter.is_some());
+        // The first match is highlighted again whenever the filter changes.
+        let mut list = listbox::Listbox::new(menu::highlight)
+            .highlight_first(filter.is_some())
+            .key(&filter);
         let mut count = 0;
 
         for (value, label) in combobox.options {
@@ -230,11 +233,12 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
             .into()
         } else {
             // `max-h-72 p-1`, no scrollbar.
-            scrollable(list.padding(4).width(Length::Fill))
-                .direction(scrollable::Direction::Vertical(
+            listbox::region(scrollable(list.padding(4).width(Length::Fill)).direction(
+                scrollable::Direction::Vertical(
                     scrollable::Scrollbar::new().width(0).scroller_width(0),
-                ))
-                .into()
+                ),
+            ))
+            .into()
         };
 
         // `min-w-[calc(var(--anchor-width)+--spacing(7))] rounded-lg
@@ -242,11 +246,14 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Combobox<'a, T, Me
         // its border and the addon (`pr-2 mr-[-0.3rem]` and a `size-6`
         // button).
         let anchor_width = combobox.width - 2.0 - (8.0 - 4.8 + 24.0);
-        let popup = container(body)
-            .padding(1)
-            .width(anchor_width + 28.0 + 2.0)
-            .max_height(288)
-            .style(menu::panel);
+        let popup = menu::shadow(
+            container(body)
+                .padding(1)
+                .width(anchor_width + 28.0 + 2.0)
+                .max_height(288)
+                .style(menu::panel),
+            false,
+        );
 
         if disabled {
             return field.into();

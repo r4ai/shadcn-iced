@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the bundled symbol and emoji fonts from google/fonts.
+"""Generate the bundled symbol, emoji and extra Geist fonts from google/fonts.
 
 - `crates/shadcn_iced_core/assets/fonts/ShadcnIcedSymbols-Regular.ttf`
   ("Shadcn Iced Symbols"): the keyboard symbols (⌘ ⌥ ⌃ ⏎ ⌫ ...) and arrows
@@ -10,6 +10,10 @@
   them all.
 - `conformance/fonts/NotoEmoji-Regular.ttf`: monochrome emoji, so that the
   conformance snapshots do not depend on the emoji font of the system.
+- `crates/shadcn_iced_core/assets/fonts/Geist-ExtraBold.ttf` and
+  `GeistMono-SemiBold.ttf`: the weights of Geist and Geist Mono that the
+  release of Vercel does not ship as static fonts (`font-extrabold`, and the
+  `font-semibold` of inline code), instantiated from the variable fonts.
 
 Variable fonts are instantiated at the regular weight: cosmic-text renders
 the default instance of a variable font only.
@@ -91,7 +95,36 @@ def rename(font: TTFont, family: str):
         name.setName(value, id, 3, 1, 0x409)
 
 
+def instance(font: TTFont, family: str, style: str, weight: int) -> TTFont:
+    """Instantiates a variable font at the given weight, as a static font of
+    the given family and style."""
+    font = instancer.instantiateVariableFont(font, {"wght": weight})
+    font["OS/2"].usWeightClass = weight
+    postscript = f"{family.replace(' ', '')}-{style}"
+    names = {
+        1: family,
+        2: style,
+        3: f"{postscript};{font['head'].fontRevision:.3f}",
+        4: f"{family} {style}",
+        6: postscript,
+    }
+    name = font["name"]
+    name.names = [
+        record for record in name.names if record.nameID not in [*names, 16, 17]
+    ]
+    for id, value in names.items():
+        name.setName(value, id, 3, 1, 0x409)
+    return font
+
+
 def main():
+    for path, family, style, weight in [
+        ("geist/Geist%5Bwght%5D.ttf", "Geist", "ExtraBold", 800),
+        ("geistmono/GeistMono%5Bwght%5D.ttf", "Geist Mono", "SemiBold", 600),
+    ]:
+        font = instance(fetch(path), family, style, weight)
+        save(font, CORE / f"{family.replace(' ', '')}-{style}.ttf")
+
     symbols = [c for start, end in SYMBOLS for c in range(start, end + 1)]
 
     symbols_2 = cut(

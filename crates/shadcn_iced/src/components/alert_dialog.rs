@@ -186,7 +186,11 @@ fn header<'a, Message: 'a>(
 
     let text = Column::new()
         .push(title.map(super::dialog::title_text))
-        .push(description.map(|description| super::dialog::description_text(description, centered)))
+        // `text-balance` (`md:text-pretty` on wide screens)
+        .push(
+            description
+                .map(|description| super::dialog::balanced_description(description, centered)),
+        )
         .spacing(6)
         .align_x(if centered {
             Alignment::Center

@@ -240,12 +240,18 @@ impl<'a, Message: Clone + 'a> From<DatePicker<'a, Message>> for Element<'a, Mess
         }
 
         // `PopoverContent className="w-auto p-0"`
-        let content = container(calendar).style(super::popover::style);
+        let content = super::popover::shadow(container(calendar).style(super::popover::style));
 
         let anchored = Anchored::new(trigger, content)
             .side(Side::Bottom)
             .align(Align::Start)
-            .offset(4.0);
+            .offset(4.0)
+            // `focus-visible:border-ring focus-visible:ring-3` of the
+            // trigger, once dismissed with the keyboard.
+            .focus_ring(|theme| {
+                let t = tokens(theme);
+                style::focus_visible(&t, t.radius_lg())
+            });
 
         match picker.open {
             Some((open, on_dismiss)) => anchored.open(open).on_dismiss(on_dismiss).into(),

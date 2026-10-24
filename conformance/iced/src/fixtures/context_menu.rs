@@ -2,6 +2,7 @@ use super::Fixture;
 use crate::store::{Msg, Store};
 
 use shadcn_iced::context_menu::context_menu;
+use shadcn_iced::core::primitive::dashed_border;
 use shadcn_iced::menu::{Menu, item, menu};
 
 use iced::Element;
@@ -30,17 +31,15 @@ fn example(s: &Store) -> Element<'_, Msg> {
     };
 
     // `aspect-video w-full max-w-xs rounded-xl border border-dashed text-sm`
-    let area = container(text("Right click here").size(14))
-        .center_x(320)
-        .center_y(180)
-        .style(|theme: &iced::Theme| {
+    let area = dashed_border(
+        container(text("Right click here").size(14))
+            .center_x(320)
+            .center_y(180),
+        |theme| {
             let t = shadcn_iced::tokens(theme);
-
-            container::Style {
-                border: shadcn_iced::style::border(t.palette.border, t.radius_xl()),
-                ..Default::default()
-            }
-        });
+            (t.palette.border, t.radius_xl())
+        },
+    );
 
     let menu = menu()
         .item(noop("Back").shortcut("⌘["))

@@ -1,6 +1,6 @@
 // Cloudflare Workers static assets: the prerendered pages of `dist/client`,
 // without a Worker script (`dist/server` is the build-time renderer).
-// Deployed by the `Site` workflow (`pnpm run deploy`).
+// Deployed from `main` by the `Deploy site` job of `ci.yml` (`wrangler deploy`).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "shadcn-iced",
@@ -11,6 +11,12 @@
   // deploys only need Editor on the Worker.
   "workers_dev": false,
   "preview_urls": false,
+  // Worker Previews of pull requests (`wrangler preview`, `Preview site` of
+  // `ci.yml`), served on pr-<number>.shadcn-iced.r4ai.dev: the custom domain
+  // is enabled for "Production and Preview" in the dashboard, where it is
+  // managed, and Cloudflare issues the wildcard DNS record and certificate.
+  // Assets-only, the previews override nothing.
+  "previews": {},
   "assets": {
     "directory": "./dist/client",
     "not_found_handling": "404-page",

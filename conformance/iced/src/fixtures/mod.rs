@@ -164,12 +164,3 @@ pub fn get(component: &str, id: &str) -> Option<Fixture> {
         _ => None,
     }
 }
-
-/// The page around every fixture: `<div class="p-4">` on the web.
-pub fn frame(content: Element<'_, Msg>) -> Element<'_, Msg> {
-    iced::widget::container(content)
-        .padding(16)
-        .width(iced::Fill)
-        .height(iced::Fill)
-        .into()
-}

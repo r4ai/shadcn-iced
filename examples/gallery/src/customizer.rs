@@ -115,6 +115,7 @@ pub fn view(gallery: &Gallery) -> Element<'_, Message> {
         field("Menu Accent", menu_accent),
         text("Code").size(style::text::SM).font(font::medium()),
         code_block(code(gallery))
+            .language("rust")
             .copy_button(Message::CopyTheme, gallery.copied)
             .wrap(true),
         button("Reset")

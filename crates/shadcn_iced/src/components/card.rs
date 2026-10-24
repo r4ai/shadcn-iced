@@ -55,6 +55,7 @@ pub struct Card<'a, Message> {
     width: Length,
     size: Size,
     header_border: bool,
+    content_padding: Option<Padding>,
 }
 
 enum Title<'a, Message> {
@@ -74,6 +75,7 @@ pub fn card<'a, Message: 'a>() -> Card<'a, Message> {
         width: Length::Fill,
         size: Size::Default,
         header_border: false,
+        content_padding: None,
     }
 }
 
@@ -141,6 +143,14 @@ impl<'a, Message: 'a> Card<'a, Message> {
     /// (`CardHeader className="border-b"`).
     pub fn header_border(mut self, border: bool) -> Self {
         self.header_border = border;
+        self
+    }
+
+    /// Replaces the padding of the content (`px-4`, `px-3` for
+    /// [`Size::Sm`]), like a `className` with a padding on `CardContent`,
+    /// e.g. `p-6`.
+    pub fn content_padding(mut self, padding: impl Into<Padding>) -> Self {
+        self.content_padding = Some(padding.into());
         self
     }
 
@@ -234,10 +244,14 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
             }
         }
 
+        let content_padding = card
+            .content_padding
+            .unwrap_or(Padding::from([0.0, spacing]));
+
         for content in card.content {
             sections.push(
                 container(content)
-                    .padding([0.0, spacing])
+                    .padding(content_padding)
                     .width(inner)
                     .into(),
             );
@@ -285,7 +299,7 @@ impl<'a, Message: 'a> From<Card<'a, Message>> for Element<'a, Message> {
                 ring: Some(focus::Ring {
                     color: alpha(t.palette.foreground, 0.1),
                     width: 1.0,
-                    radius: t.radius_xl(),
+                    radius: t.radius_xl().into(),
                 }),
                 ..focus::Style::default()
             }

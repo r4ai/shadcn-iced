@@ -21,7 +21,7 @@ use shadcn_iced_core::{Element, font, style};
 
 use iced::widget::button::{Status, Style};
 use iced::widget::{Row, text};
-use iced::{Alignment, Background, Length, Padding, Theme};
+use iced::{Alignment, Background, Color, Length, Padding, Theme};
 
 /// The visual style of a [`Button`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -117,6 +117,16 @@ impl Size {
         }
     }
 
+    /// The line height of the label. The `text-[0.8rem]` of `sm` has no line
+    /// height of its own and inherits the 20px of the page, which places the
+    /// text lower than the default line height of iced would.
+    fn line_height(self) -> text::LineHeight {
+        match self {
+            Size::Sm | Size::IconSm => text::LineHeight::Absolute(iced::Pixels(20.0)),
+            _ => text::LineHeight::default(),
+        }
+    }
+
     /// The size of the icons.
     pub fn icon_size(self) -> f32 {
         match self {
@@ -148,6 +158,9 @@ pub struct Button<'a, Message> {
     content: Content<'a, Message>,
     leading: Option<Icon>,
     trailing: Option<Icon>,
+    inline_start: bool,
+    inline_end: bool,
+    text_color: Option<fn(&Theme) -> Color>,
     on_press: Option<Message>,
     variant: Variant,
     size: Size,
@@ -158,6 +171,7 @@ pub struct Button<'a, Message> {
     position: style::Position,
     vertical: bool,
     rounded: bool,
+    expanded: bool,
 }
 
 /// Creates a [`Button`] with a text label.
@@ -176,6 +190,9 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
             content,
             leading: None,
             trailing: None,
+            inline_start: false,
+            inline_end: false,
+            text_color: None,
             on_press: None,
             variant: Variant::Default,
             size: Size::Default,
@@ -186,6 +203,7 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
             position: style::Position::Alone,
             vertical: false,
             rounded: false,
+            expanded: false,
         }
     }
 
@@ -230,6 +248,32 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
         self
     }
 
+    /// Marks custom content (see [`Button::new`]) as starting with an icon
+    /// (`data-icon="inline-start"`), which narrows the leading padding
+    /// (`has-data-[icon=inline-start]:pl-2`) like [`Button::icon`] does.
+    pub fn inline_start(mut self, inline_start: bool) -> Self {
+        self.inline_start = inline_start;
+        self
+    }
+
+    /// Marks custom content (see [`Button::new`]) as ending with an icon or
+    /// an icon-like element such as a [`kbd`](super::kbd)
+    /// (`data-icon="inline-end"`), which narrows the trailing padding
+    /// (`has-data-[icon=inline-end]:pr-2`) like [`Button::trailing_icon`]
+    /// does.
+    pub fn inline_end(mut self, inline_end: bool) -> Self {
+        self.inline_end = inline_end;
+        self
+    }
+
+    /// Overrides the color of the content while the button is neither
+    /// hovered nor pressed, e.g. `text-muted-foreground` on a ghost button,
+    /// which keeps `hover:text-foreground`.
+    pub fn text_color(mut self, color: fn(&Theme) -> Color) -> Self {
+        self.text_color = Some(color);
+        self
+    }
+
     /// Disables the button.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
@@ -247,6 +291,14 @@ impl<'a, Message: Clone + 'a> Button<'a, Message> {
     /// Makes the button fully rounded (`rounded-full`).
     pub fn rounded(mut self, rounded: bool) -> Self {
         self.rounded = rounded;
+        self
+    }
+
+    /// Marks the button as the trigger of a shown panel or overlay
+    /// (`aria-expanded`), which keeps outline and ghost buttons muted
+    /// (`aria-expanded:bg-muted aria-expanded:text-foreground`).
+    pub fn expanded(mut self, expanded: bool) -> Self {
+        self.expanded = expanded;
         self
     }
 
@@ -279,12 +331,16 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         let text_size = button.text_size.unwrap_or(size.text_size());
         let padding = match button.padding_x {
             Some(padding) => Padding::from([0.0, 1.0 + padding]),
-            None => size.padding(button.leading.is_some(), button.trailing.is_some()),
+            None => size.padding(
+                button.leading.is_some() || button.inline_start,
+                button.trailing.is_some() || button.inline_end,
+            ),
         };
 
         let label = match button.content {
             Content::Label(label) => text(label)
                 .size(text_size)
+                .line_height(size.line_height())
                 .font(font::medium())
                 .wrapping(text::Wrapping::None)
                 .into(),
@@ -350,26 +406,62 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
         let position = button.position;
         let vertical = button.vertical;
         let rounded = button.rounded;
+        let expanded = button.expanded;
+        let text_color = button.text_color;
+        let radius = move |t: &shadcn_iced_core::Tokens| {
+            if rounded {
+                f32::MAX
+            } else if position != style::Position::Alone {
+                // `in-data-[slot=button-group]:rounded-lg`
+                t.radius_lg()
+            } else {
+                size.radius(t)
+            }
+        };
 
+        // Like a `<button>`: Tab focuses it, Space and Enter press it, and a
+        // click focuses it without showing the ring.
         Pressable::new(content)
             .on_press_maybe(button.on_press)
             .disabled(button.disabled)
+            .focusable(true)
             .width(width)
             .height(height)
             .padding(padding)
             .press_offset(1.0)
             // `border border-transparent bg-clip-padding`
             .clip_background(true)
-            .style(move |theme, status| {
+            .focus_style(move |theme, status, focused| {
+                let t = tokens(theme);
                 let mut style = self::style(theme, status, variant);
-                let radius = if rounded {
-                    f32::MAX
-                } else if position != style::Position::Alone {
-                    // `in-data-[slot=button-group]:rounded-lg`
-                    tokens(theme).radius_lg()
-                } else {
-                    size.radius(&tokens(theme))
-                };
+                let radius = radius(&t);
+
+                if let Some(color) = text_color
+                    && !matches!(status, Status::Hovered | Status::Pressed)
+                {
+                    style.text_color = color(theme);
+                }
+
+                // `aria-expanded:bg-muted aria-expanded:text-foreground`
+                if expanded
+                    && status != Status::Disabled
+                    && matches!(variant, Variant::Outline | Variant::Ghost)
+                {
+                    style.background = Some(Background::Color(t.palette.muted));
+                    style.text_color = t.palette.foreground;
+                }
+
+                // `focus-visible:border-ring`, and
+                // `focus-visible:border-destructive/40` for destructive buttons.
+                // `dark:border-input` of outline buttons comes later in the
+                // stylesheet, and wins.
+                if focused && !(variant == Variant::Outline && t.is_dark()) {
+                    style.border.color = if variant == Variant::Destructive {
+                        alpha(t.palette.destructive, 0.4)
+                    } else {
+                        t.palette.ring
+                    };
+                }
 
                 style.border.radius = if vertical {
                     position.vertical_radius(radius)
@@ -378,6 +470,31 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
                 };
 
                 style
+            })
+            // `focus-visible:ring-3 focus-visible:ring-ring/50`, and
+            // `focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40`
+            // for destructive buttons
+            .ring(move |theme, _status, focused| {
+                focused.then(|| {
+                    let t = tokens(theme);
+                    // The ring has a single radius: square around the
+                    // inner buttons of a group.
+                    let mut ring = style::ring(
+                        &t,
+                        if position == style::Position::Middle {
+                            0.0
+                        } else {
+                            radius(&t)
+                        },
+                    );
+
+                    if variant == Variant::Destructive {
+                        ring.color =
+                            alpha(t.palette.destructive, if t.is_dark() { 0.4 } else { 0.2 });
+                    }
+
+                    ring
+                })
             })
             .into()
     }

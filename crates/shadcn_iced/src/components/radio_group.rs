@@ -270,6 +270,7 @@ fn dot<'a, Message: 'a>(selected: bool) -> Element<'a, Message> {
         container(space().width(8).height(8)).style(move |theme: &Theme| container::Style {
             background: Some(Background::Color(tokens(theme).palette.primary_foreground)),
             border: border::rounded(f32::MAX),
+            snap: true,
             ..container::Style::default()
         })
     });
@@ -301,6 +302,8 @@ pub fn control<'a, Message: Clone + 'a>(
             iced::widget::button::Style {
                 background: style.background,
                 border: style.border,
+                // Chromium snaps the box to whole pixels.
+                snap: true,
                 ..iced::widget::button::Style::default()
             }
         })
@@ -324,9 +327,10 @@ pub fn focused_style(
     if focused {
         let t = tokens(theme);
 
-        // `focus-visible:border-ring`, below `data-checked:border-primary`
-        // and `aria-invalid:border-destructive`.
-        if !selected && !invalid {
+        // `focus-visible:border-ring`, above `data-checked:border-primary`
+        // (Tailwind sorts `focus-visible` after `data-*`) and below
+        // `aria-invalid:border-destructive`.
+        if !invalid {
             style.border.color = t.palette.ring;
         }
 

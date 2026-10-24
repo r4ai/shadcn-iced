@@ -60,4 +60,11 @@ export default {
       </Button>
     </div>
   ),
+  keyboard: () => (
+    <div className="flex items-center gap-2">
+      <Button>Button</Button>
+      <Button variant="outline">Outline</Button>
+      <Button variant="destructive">Destructive</Button>
+    </div>
+  ),
 } satisfies Fixtures

@@ -6,7 +6,7 @@ use crate::fixtures::Fixture;
 use crate::store::{Msg, Store};
 
 use iced::keyboard::{self, Key, Modifiers, key::Named};
-use iced::{Event, Point, Size, Theme, mouse, window};
+use iced::{Event, Point, Rectangle, Size, Theme, Vector, mouse, window};
 use iced_test::core::clipboard;
 use iced_test::core::renderer::{Headless, Style};
 use iced_test::core::widget::operation::{self, Operation, Outcome};
@@ -56,7 +56,12 @@ impl Harness {
             clipboard: Clipboard(None),
         };
 
-        harness.redraw();
+        // Like the iced runtime, tell the widgets about the window (e.g. for
+        // `text-base md:text-sm`).
+        harness.dispatch(Event::Window(window::Event::Opened {
+            position: None,
+            size,
+        }));
         harness
     }
 
@@ -69,7 +74,7 @@ impl Harness {
 
         let output = {
             let mut interface = UserInterface::build(
-                crate::fixtures::frame((self.fixture.view)(&self.store)),
+                crate::page::page((self.fixture.view)(&self.store)),
                 self.size,
                 self.cache.take().expect("cache"),
                 &mut self.renderer,
@@ -140,7 +145,7 @@ impl Harness {
 
     /// Returns the visible bounds of every text with the given content, or
     /// containing it when not `exact`.
-    pub fn visible_texts(&mut self, text: &str, exact: bool) -> Vec<iced::Rectangle> {
+    pub fn visible_texts(&mut self, text: &str, exact: bool) -> Vec<Rectangle> {
         let text = text.to_owned();
 
         self.with_interface(|interface, context| {
@@ -164,13 +169,46 @@ impl Harness {
             interface.operate(context.renderer, &mut operation::black_box(&mut operation));
 
             match operation.finish() {
-                Outcome::Some(bounds) => bounds
-                    .into_iter()
-                    .filter(|bounds| bounds.width > 0.0 && bounds.height > 0.0)
-                    .collect(),
+                Outcome::Some(bounds) => bounds,
                 _ => Vec::new(),
             }
         })
+        .into_iter()
+        .filter_map(|bounds| self.clip_to_viewport(bounds))
+        .collect()
+    }
+
+    /// Finds the visible center of the widget with the given id: the
+    /// counterpart of an accessible name (`aria-label`) on the web, for
+    /// controls without text.
+    pub fn locate_id(&mut self, id: &str) -> Option<Point> {
+        let id = iced::widget::Id::from(id.to_owned());
+
+        self.with_interface(|interface, context| {
+            let mut operation = (move |candidate: Candidate<'_>| {
+                (candidate.id() == Some(&id))
+                    .then(|| candidate.visible_bounds())
+                    .flatten()
+            })
+            .find();
+
+            interface.operate(context.renderer, &mut operation::black_box(&mut operation));
+
+            match operation.finish() {
+                Outcome::Some(bounds) => bounds,
+                _ => None,
+            }
+        })
+        .and_then(|bounds| self.clip_to_viewport(bounds))
+        .map(|bounds| bounds.center())
+    }
+
+    /// The part of `bounds` within the viewport, if any: content that
+    /// overflows the page is not visible, like on the web.
+    fn clip_to_viewport(&self, bounds: Rectangle) -> Option<Rectangle> {
+        bounds
+            .intersection(&Rectangle::with_size(self.size))
+            .filter(|bounds| bounds.width > 0.0 && bounds.height > 0.0)
     }
 
     pub fn move_to(&mut self, position: Point) {
@@ -193,6 +231,18 @@ impl Harness {
                 from.y + (position.y - from.y) * t,
             ));
         }
+    }
+
+    /// Scrolls the wheel by `delta` logical pixels at `position`, like
+    /// Playwright's `mouse.wheel(dx, dy)`: a positive `y` scrolls down.
+    pub fn scroll(&mut self, position: Point, delta: Vector) {
+        self.move_to(position);
+        self.dispatch(Event::Mouse(mouse::Event::WheelScrolled {
+            delta: mouse::ScrollDelta::Pixels {
+                x: -delta.x,
+                y: -delta.y,
+            },
+        }));
     }
 
     pub fn press(&mut self) {
@@ -438,4 +488,96 @@ fn parse_key(name: &str) -> Result<(Key, Option<String>), String> {
     };
 
     Ok((Key::Named(named), None))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use iced::widget::{column, container, scrollable, text};
+    use iced::{Element, Pixels};
+
+    fn harness(view: for<'a> fn(&'a Store) -> Element<'a, Msg>, size: Size) -> Harness {
+        static FONTS: std::sync::Once = std::sync::Once::new();
+        FONTS.call_once(crate::fonts::load);
+
+        Harness::new(Fixture::new(view), Theme::Light, size)
+    }
+
+    /// Ten lines of 20px: 200px in all.
+    fn items<'a>() -> iced::widget::Column<'a, Msg> {
+        column((0..10).map(|i| {
+            text(format!("Item {i}"))
+                .size(14)
+                .line_height(Pixels(20.0))
+                .into()
+        }))
+    }
+
+    #[test]
+    fn content_taller_than_the_viewport_overflows() {
+        let mut harness = harness(|_| items().into(), Size::new(200.0, 100.0));
+
+        // Laid out with its own height, not squeezed into the viewport...
+        let item = harness.visible_texts("Item 3", true);
+        assert_eq!(item.len(), 1);
+        assert_eq!(item[0].y, 16.0 + 3.0 * 20.0);
+        assert_eq!(item[0].height, 20.0);
+
+        // ...and cropped by it, like a browser page.
+        assert!(harness.visible_texts("Item 4", true)[0].height < 20.0);
+        assert!(harness.visible_texts("Item 9", true).is_empty());
+    }
+
+    #[test]
+    fn content_filling_the_viewport_keeps_its_height() {
+        let mut harness = harness(
+            |_| {
+                container(text("Bottom"))
+                    .height(iced::Fill)
+                    .align_bottom(iced::Fill)
+                    .into()
+            },
+            Size::new(200.0, 100.0),
+        );
+
+        let bottom = harness.visible_texts("Bottom", true);
+        assert_eq!(bottom.len(), 1);
+        assert_eq!(bottom[0].y + bottom[0].height, 100.0 - 16.0);
+    }
+
+    #[test]
+    fn wheel_scrolls_by_pixels() {
+        let mut harness = harness(
+            |_| scrollable(items()).height(60).into(),
+            Size::new(200.0, 120.0),
+        );
+
+        assert!(!harness.visible_texts("Item 0", true).is_empty());
+        assert!(harness.visible_texts("Item 6", true).is_empty());
+
+        harness.scroll(Point::new(50.0, 40.0), Vector::new(0.0, 100.0));
+
+        assert!(harness.visible_texts("Item 0", true).is_empty());
+        let item = harness.visible_texts("Item 5", true);
+        assert_eq!(item.len(), 1);
+        assert_eq!(item[0].y, 16.0 + 5.0 * 20.0 - 100.0);
+    }
+
+    #[test]
+    fn locates_controls_by_id() {
+        let mut harness = harness(
+            |_| {
+                column![
+                    text("Above").line_height(Pixels(20.0)),
+                    container(text("x")).id("close").width(40).height(20)
+                ]
+                .into()
+            },
+            Size::new(200.0, 100.0),
+        );
+
+        assert_eq!(harness.locate_id("close"), Some(Point::new(36.0, 46.0)));
+        assert_eq!(harness.locate_id("missing"), None);
+    }
 }

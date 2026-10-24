@@ -5,7 +5,7 @@
 //!
 //! - positioning the floating content next to the anchor (on a [`Side`],
 //!   with an [`Align`]ment and an offset), flipping it to the opposite side
-//!   and shifting it so it stays inside the window,
+//!   and shifting it along its alignment so it stays inside the window,
 //! - opening it, either controlled by your application ([`Anchored::open`])
 //!   or self-managed: on click ([`Anchored::new`]'s default), on hover
 //!   ([`Anchored::hover`]), on right click ([`Anchored::context_menu`]) or
@@ -24,8 +24,8 @@ use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
 use iced::time::{Duration, Instant};
 use iced::{
-    Background, Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector, border,
-    mouse, touch, window,
+    Background, Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector, mouse,
+    touch, window,
 };
 
 use std::sync::atomic::{self, AtomicU64};
@@ -111,6 +111,29 @@ pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
     open_highlight: Option<Box<dyn Fn(&Theme) -> (Background, Border) + 'a>>,
     focus_ring: Option<Box<dyn Fn(&Theme) -> focus::Style + 'a>>,
     animate: bool,
+    anchor_tracker: Option<AnchorTracker>,
+}
+
+/// Where the anchor of open floating content is, for the content to point
+/// at it (e.g. the arrow of a tooltip, which follows the trigger when the
+/// content is shifted to stay inside the window).
+///
+/// Share a clone with [`Anchored::track_anchor`]: the bounds of the anchor,
+/// in the coordinates of the content, are set when the content is laid out,
+/// before it is drawn.
+#[derive(Debug, Clone, Default)]
+pub struct AnchorTracker(std::rc::Rc<std::cell::Cell<Option<Rectangle>>>);
+
+impl AnchorTracker {
+    /// Creates a tracker that knows no anchor yet.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The bounds of the anchor of the open content, if any.
+    pub fn anchor(&self) -> Option<Rectangle> {
+        self.0.get()
+    }
 }
 
 impl<'a, Message, Theme, Renderer> Anchored<'a, Message, Theme, Renderer>
@@ -142,7 +165,14 @@ where
             open_highlight: None,
             focus_ring: None,
             animate: true,
+            anchor_tracker: None,
         }
+    }
+
+    /// Tells `tracker` where the anchor is whenever the content is laid out.
+    pub fn track_anchor(mut self, tracker: AnchorTracker) -> Self {
+        self.anchor_tracker = Some(tracker);
+        self
     }
 
     /// Controls whether the content is open from your application.
@@ -773,11 +803,7 @@ where
             renderer.fill_quad(
                 renderer::Quad {
                     bounds: layout.bounds().expand(ring.width),
-                    border: Border {
-                        color: ring.color,
-                        width: ring.width,
-                        radius: border::radius(ring.radius + ring.width),
-                    },
+                    border: ring.border(),
                     ..renderer::Quad::default()
                 },
                 Background::Color(Color::TRANSPARENT),
@@ -895,7 +921,8 @@ where
             } else {
                 Duration::ZERO
             },
-            animation::ease_out,
+            // `animate-in` / `animate-out`: `var(--tw-ease, ease)`
+            animation::ease,
             now,
         );
 
@@ -929,6 +956,7 @@ where
                 closing: !open,
                 resolved_side: self.side,
                 group: group.filter(|_| open),
+                anchor_tracker: self.anchor_tracker.as_ref(),
             })))
         } else {
             None
@@ -989,6 +1017,7 @@ struct Floating<'a, 'b, Message, Theme, Renderer> {
     closing: bool,
     resolved_side: Side,
     group: Option<GroupLink<'b>>,
+    anchor_tracker: Option<&'b AnchorTracker>,
 }
 
 /// What the open content of a [`Group`] knows about its siblings.
@@ -1027,6 +1056,10 @@ where
                 self.state.hover = Hover::Idle;
                 // Until the pointer leaves, or it would reopen right away.
                 self.state.suppressed = true;
+                // The content is gone and stops tracking the pointer: left
+                // hovered, it would keep the anchor suppressed for good
+                // (an item selected in a submenu closing the whole menu).
+                self.state.content_hovered = false;
                 shell.invalidate_layout();
                 shell.request_redraw();
             }
@@ -1110,13 +1143,17 @@ pub fn position(
         }
     };
 
-    (
-        Point::new(
-            clamp(point.x, size.width, viewport.width),
-            clamp(point.y, size.height, viewport.height),
-        ),
-        side,
-    )
+    // Like Base UI (`shift()` without `crossAxis`), the content only
+    // shifts along its alignment axis: on its side, it stays next to the
+    // anchor and may overflow the window when neither side has room.
+    let point = match side {
+        Side::Top | Side::Bottom => Point::new(clamp(point.x, size.width, viewport.width), point.y),
+        Side::Left | Side::Right => {
+            Point::new(point.x, clamp(point.y, size.height, viewport.height))
+        }
+    };
+
+    (point, side)
 }
 
 impl<Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
@@ -1157,6 +1194,10 @@ where
             Some(point) => Rectangle::new(point, Size::ZERO),
             None => self.anchor_bounds,
         };
+
+        if let Some(tracker) = self.anchor_tracker {
+            tracker.0.set(Some(anchor));
+        }
 
         let size = node.size();
         let size = Size::new(

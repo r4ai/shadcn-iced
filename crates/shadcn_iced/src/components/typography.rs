@@ -1,6 +1,7 @@
 //! Styles for headings, paragraphs, lists...
 //!
 //! Port of <https://ui.shadcn.com/docs/components/typography>.
+use shadcn_iced_core::primitive::typeset::{Typeset, typeset};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::advanced::layout::{self, Layout};
@@ -16,23 +17,24 @@ fn muted(theme: &Theme) -> text::Style {
     }
 }
 
+/// A heading of the given size and font, with `tracking-tight`
+/// (`-0.025em`).
+fn heading<'a>(content: impl text::IntoFragment<'a>, size: f32, font: Font) -> Typeset<'a> {
+    typeset(content.into_fragment().into_owned())
+        .size(size)
+        .font(font)
+        .line_height(style::text::leading(size))
+        .letter_spacing(-0.025 * size)
+}
+
 /// `text-4xl font-extrabold tracking-tight`
-///
-/// Drawn bold (the heaviest bundled weight) and without tracking, which iced
-/// does not support.
-pub fn h1<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content)
-        .size(style::text::XL4)
-        .font(font::bold())
-        .line_height(style::text::leading(style::text::XL4))
+pub fn h1<'a>(content: impl text::IntoFragment<'a>) -> Typeset<'a> {
+    heading(content, style::text::XL4, font::extrabold())
 }
 
 /// `text-3xl font-semibold tracking-tight`
-pub fn h2<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content)
-        .size(style::text::XL3)
-        .font(font::semibold())
-        .line_height(style::text::leading(style::text::XL3))
+pub fn h2<'a>(content: impl text::IntoFragment<'a>) -> Typeset<'a> {
+    heading(content, style::text::XL3, font::semibold())
 }
 
 /// A section heading as in the documentation: an [`h2`] above a bottom
@@ -54,19 +56,13 @@ pub fn h2_bordered<'a, Message: 'a>(content: impl text::IntoFragment<'a>) -> Ele
 }
 
 /// `text-2xl font-semibold tracking-tight`
-pub fn h3<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content)
-        .size(style::text::XL2)
-        .font(font::semibold())
-        .line_height(style::text::leading(style::text::XL2))
+pub fn h3<'a>(content: impl text::IntoFragment<'a>) -> Typeset<'a> {
+    heading(content, style::text::XL2, font::semibold())
 }
 
 /// `text-xl font-semibold tracking-tight`
-pub fn h4<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
-    text(content)
-        .size(style::text::XL)
-        .font(font::semibold())
-        .line_height(style::text::leading(style::text::XL))
+pub fn h4<'a>(content: impl text::IntoFragment<'a>) -> Typeset<'a> {
+    heading(content, style::text::XL, font::semibold())
 }
 
 /// `leading-7`
@@ -109,14 +105,12 @@ pub fn muted_text<'a>(content: impl text::IntoFragment<'a>) -> Text<'a> {
 }
 
 /// Inline code: `rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`
-///
-/// Drawn with the medium weight, the heaviest bundled weight of Geist Mono.
 pub fn inline_code<'a, Message: 'a>(content: impl text::IntoFragment<'a>) -> Element<'a, Message> {
     container(
         text(content)
             .size(style::text::SM)
             .line_height(style::text::leading(style::text::SM))
-            .font(font::weight(font::mono(), iced::font::Weight::Medium)),
+            .font(font::weight(font::mono(), iced::font::Weight::Semibold)),
     )
     .padding([3.2, 4.8])
     .style(|theme: &Theme| container::Style {
@@ -129,8 +123,8 @@ pub fn inline_code<'a, Message: 'a>(content: impl text::IntoFragment<'a>) -> Ele
 
 /// `border-l-2 pl-6 italic`, with the line height of the page (24px).
 ///
-/// Geist has no italic face: unless one is loaded, the text stays upright
-/// (iced does not synthesize oblique faces).
+/// Geist has no italic face: unless one is loaded, the text is slanted like
+/// browsers synthesize an oblique face.
 pub fn blockquote<'a, Message: 'a>(content: impl text::IntoFragment<'a>) -> Element<'a, Message> {
     Row::new()
         .push(
@@ -144,13 +138,11 @@ pub fn blockquote<'a, Message: 'a>(content: impl text::IntoFragment<'a>) -> Elem
         )
         .push(
             container(
-                text(content)
+                typeset(content.into_fragment().into_owned())
                     .size(style::text::BASE)
                     .line_height(style::text::leading(style::text::BASE))
-                    .font(Font {
-                        style: iced::font::Style::Italic,
-                        ..font::sans()
-                    }),
+                    .font(font::sans())
+                    .italic(true),
             )
             .padding(iced::Padding::ZERO.left(24)),
         )

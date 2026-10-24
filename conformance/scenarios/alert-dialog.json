@@ -4,7 +4,7 @@
   "scenarios": [
     {
       "id": "default",
-      "description": "Opens with a click, closes with Escape and with the Cancel button.",
+      "description": "Opens with a click and closes with Escape, which rings the trigger.",
       "viewport": [640, 400],
       "steps": [
         { "snapshot": "closed" },
@@ -18,6 +18,14 @@
         { "snapshot": "open" },
         { "press": "Escape" },
         { "expect": { "hidden": ["Are you absolutely sure?"] } },
+        { "snapshot": "closed-after-escape" }
+      ]
+    },
+    {
+      "id": "cancel",
+      "description": "Closes with the Cancel button, without the keyboard: the trigger gets the focus back without a ring. (After an Escape, Chromium rings it or not from run to run.)",
+      "viewport": [640, 400],
+      "steps": [
         { "click": "Show Dialog" },
         { "expect": { "visible": ["Are you absolutely sure?"] } },
         { "click": "Cancel" },

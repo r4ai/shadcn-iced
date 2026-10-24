@@ -15,6 +15,15 @@
       ]
     },
     {
+      "id": "wheel",
+      "viewport": [260, 330],
+      "steps": [
+        { "scroll": { "at": [100, 150], "delta": [0, 200] } },
+        { "expect": { "hidden": ["Tags"] } },
+        { "snapshot": "scrolled" }
+      ]
+    },
+    {
       "id": "horizontal",
       "viewport": [420, 290],
       "steps": [

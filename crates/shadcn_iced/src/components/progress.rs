@@ -1,6 +1,7 @@
 //! Displays an indicator showing the completion progress of a task.
 //!
 //! Port of <https://ui.shadcn.com/docs/components/progress>.
+use shadcn_iced_core::primitive::typeset::{TABULAR_NUMS, typeset};
 use shadcn_iced_core::{Element, font, style, tokens};
 
 use iced::widget::{Column, ProgressBar, Row, progress_bar, space, text};
@@ -37,9 +38,10 @@ pub fn progress_with_label<'a, Message: 'a>(
                 .push(space::horizontal())
                 // `text-muted-foreground ml-auto text-sm tabular-nums`
                 .push(
-                    text(format!("{}%", value.round()))
+                    typeset(format!("{}%", value.round()))
                         .size(style::text::SM)
                         .line_height(style::text::leading(style::text::SM))
+                        .feature(TABULAR_NUMS)
                         .style(|theme: &Theme| text::Style {
                             color: Some(tokens(theme).palette.muted_foreground),
                         }),

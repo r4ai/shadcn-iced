@@ -74,6 +74,20 @@ pub fn get(id: &str) -> Option<Fixture> {
             .align_y(Center)
             .into()
         }),
+        "keyboard" => Fixture::new(|_| {
+            row![
+                button("Button").on_press(Msg::Noop),
+                button("Outline")
+                    .variant(Variant::Outline)
+                    .on_press(Msg::Noop),
+                button("Destructive")
+                    .variant(Variant::Destructive)
+                    .on_press(Msg::Noop),
+            ]
+            .spacing(8)
+            .align_y(Center)
+            .into()
+        }),
         _ => return None,
     })
 }

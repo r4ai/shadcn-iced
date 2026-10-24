@@ -2,8 +2,9 @@
 //!
 //! shadcn/ui's default preset (Nova) uses [Geist](https://vercel.com/font)
 //! and [Geist Mono](https://vercel.com/font) (feature `geist`).
-//! [Inter](https://rsms.me/inter/) (feature `inter`) and the
-//! [Lucide](https://lucide.dev) icon font (feature `lucide`) are bundled too.
+//! The [Lucide](https://lucide.dev) icon font (feature `lucide`) is bundled
+//! too, and [Inter](https://rsms.me/inter/) with the feature `inter` (off by
+//! default).
 //! The keyboard symbols and arrows that Geist lacks (⌘ ⌥ ⌃ ⏎ ⌫ ...), used by
 //! shortcuts, are bundled too (feature `symbols`), so that they do not depend
 //! on the fonts of the system: see [`SYMBOLS`].
@@ -140,6 +141,11 @@ pub fn bold() -> Font {
     weight(sans(), Weight::Bold)
 }
 
+/// `font-extrabold` (800).
+pub fn extrabold() -> Font {
+    weight(sans(), Weight::ExtraBold)
+}
+
 /// The heading font (`cn-font-heading`) with the given weight.
 pub fn heading(weight: Weight) -> Font {
     Font {
@@ -174,8 +180,10 @@ pub fn all() -> Vec<Cow<'static, [u8]>> {
         include_bytes!("../assets/fonts/Geist-Medium.ttf").as_slice(),
         include_bytes!("../assets/fonts/Geist-SemiBold.ttf").as_slice(),
         include_bytes!("../assets/fonts/Geist-Bold.ttf").as_slice(),
+        include_bytes!("../assets/fonts/Geist-ExtraBold.ttf").as_slice(),
         include_bytes!("../assets/fonts/GeistMono-Regular.ttf").as_slice(),
         include_bytes!("../assets/fonts/GeistMono-Medium.ttf").as_slice(),
+        include_bytes!("../assets/fonts/GeistMono-SemiBold.ttf").as_slice(),
     ]);
 
     #[cfg(feature = "symbols")]

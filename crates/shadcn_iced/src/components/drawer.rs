@@ -135,23 +135,23 @@ impl<'a, Message: Clone + 'a> From<Drawer<'a, Message>> for Element<'a, Message>
         let vertical = direction.is_vertical();
 
         // `gap-0.5 p-4 pb-0`, centered on the y axis.
-        let header = (drawer.title.is_some() || drawer.description.is_some()).then(|| {
-            Column::new()
-                .push(drawer.title.map(super::dialog::title_text))
-                .push(
-                    drawer
-                        .description
-                        .map(|description| super::dialog::description_text(description, vertical)),
-                )
-                .spacing(2)
-                .padding(Padding::new(16.0).bottom(0))
-                .align_x(if vertical {
-                    Alignment::Center
-                } else {
-                    Alignment::Start
-                })
-                .width(Length::Fill)
-        });
+        let header =
+            (drawer.title.is_some() || drawer.description.is_some()).then(|| {
+                Column::new()
+                    .push(drawer.title.map(super::dialog::title_text))
+                    // `text-balance`
+                    .push(drawer.description.map(|description| {
+                        super::dialog::balanced_description(description, vertical)
+                    }))
+                    .spacing(2)
+                    .padding(Padding::new(16.0).bottom(0))
+                    .align_x(if vertical {
+                        Alignment::Center
+                    } else {
+                        Alignment::Start
+                    })
+                    .width(Length::Fill)
+            });
 
         let content = (!drawer.content.is_empty()).then(|| {
             container(Column::with_children(drawer.content).spacing(16))

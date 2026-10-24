@@ -26,7 +26,7 @@
 //! hover, self-managed overlays) is captured.
 //!
 //! Snapshots are written to `target/snapshots/`.
-use gallery::{APPS, Gallery, Message, PAGES, Page};
+use gallery::{APPS, CHARTS, Gallery, Message, PAGES, Page};
 use shadcn_iced::Mode;
 
 use iced::keyboard::{Key, key::Named};
@@ -44,10 +44,28 @@ enum Action {
     Wait(u64),
 }
 
-/// The gallery on its page, or an example app on its own.
-fn view<'a>(gallery: &'a Gallery, app: Option<&Page>) -> iced::Element<'a, Message> {
-    match app {
-        Some(page) => gallery::view_example(gallery, page, 0),
+/// What a page id renders on its own instead of the gallery.
+#[derive(Clone, Copy)]
+enum Alone {
+    /// An example app, as on the website.
+    App(&'static Page),
+    /// Every chart of a chart page, one after the other.
+    Charts(&'static Page),
+}
+
+/// The gallery on its page, or a page rendered on its own.
+fn view<'a>(gallery: &'a Gallery, alone: Option<Alone>) -> iced::Element<'a, Message> {
+    match alone {
+        Some(Alone::App(page)) => gallery::view_example(gallery, page, 0),
+        Some(Alone::Charts(page)) => iced::widget::container((page.view)(gallery))
+            .padding(16)
+            .style(|theme: &iced::Theme| iced::widget::container::Style {
+                background: Some(shadcn_iced::tokens(theme).palette.background.into()),
+                ..Default::default()
+            })
+            .width(iced::Fill)
+            .height(iced::Fill)
+            .into(),
         None => gallery.view(),
     }
 }
@@ -260,8 +278,12 @@ fn main() {
         };
 
         // An example app (`dashboard`, `settings`) renders on its own, as
-        // on the website.
-        let app = APPS.iter().find(|page| page.id == id);
+        // on the website, and so do the charts of a chart page.
+        let app = APPS
+            .iter()
+            .find(|page| page.id == id)
+            .map(Alone::App)
+            .or_else(|| CHARTS.iter().find(|page| page.id == id).map(Alone::Charts));
 
         let Some(index) = Gallery::page_by_id(&id).or(app.map(|_| 0)) else {
             eprintln!("unknown page: {id}");

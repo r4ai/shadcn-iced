@@ -44,6 +44,14 @@ pnpm iced button && pnpm test -g button && pnpm baseline button/
 
 and commit `baseline.json` with the fix. On CI, a snapshot without a baseline fails.
 
+### Accepted differences
+
+Some differences come from iced itself and cannot be compensated for in `shadcn_iced`; their scores stay in the baseline:
+
+- **Vertical position of text** (#12): with fractional line heights such as `leading-snug` (19.25px), glyphs sit 0.3–0.5px higher or lower than in Chromium. Chromium rounds the ascent and descent of a font to whole pixels before centering the line, while cosmic-text centers it with the exact metrics, then iced rounds the baseline (`line_y`) and truncates the position of the text in physical pixels. Every text widget is drawn by iced's renderer, which applies this placement after layout, and the scale factor is unknown while drawing, so the offset cannot be undone from a widget. The comparison tolerates one physical pixel, so this only shows in a few scores (`switch/default`, `checkbox/default`, the `sm` code block, the calendar dropdown label).
+- **Backdrop blur** of modal overlays (`backdrop-blur-xs`): iced cannot blur what is drawn behind a layer; the backdrop is dimmed and washed out a little instead (`dialog::backdrop`).
+- **Snapping to pixels** of boxes at fractional positions: the `tiny-skia` renderer of the runner ignores `snap`, which the `wgpu` renderer of applications honors.
+
 ## Determinism
 
 Snapshots must not depend on the machine running the suite:
@@ -83,10 +91,11 @@ A scenario file covers a component:
 }
 ```
 
-- `viewport` is the logical size of the page (default `[320, 120]`); fixtures are placed at the top-left corner with a padding of 16.
+- `viewport` is the logical size of the page (default `[320, 120]`); fixtures are placed at the top-left corner with a padding of 16. Like a browser page, content taller than the viewport overflows it and the snapshot shows its top part: the iced runner lays fixtures out with an unbounded height (`iced/src/page.rs`), unless they fill the page (`Length::Fill`).
 - `themes` defaults to `["light", "dark"]`.
-- Steps: `snapshot`, `hover` (with `"steps": n` to move the pointer in n moves instead of jumping), `click`, `rightClick`, `drag` (`{ "from": ..., "to": ... }`), `press` (Playwright key names: `Enter`, `Escape`, `Tab`, `Shift+Tab`, `ArrowDown`, `Space`, `a`, ...), `type`, `wait` (milliseconds) and `expect` (`visible` and `hidden` texts, matched exactly). Without steps, a scenario takes a single snapshot named `default`.
-- Pointer locators are the content of a visible text (`"Open"`, `{ "text": "Open", "nth": 1 }` for the second one, or `{ "text": "Profile", "exact": false }` for a text containing it, e.g. a menu item with a shortcut) or a position (`{ "at": [100, 40] }`). Prefer texts: they do not depend on the layout. On the web, texts are matched against the whole text of an element: CSS transforms (`capitalize`) are not applied, and input values or placeholders are not texts (show a readout like "You typed: ..." instead).
+- Steps: `snapshot`, `hover` (with `"steps": n` to move the pointer in n moves instead of jumping), `click`, `rightClick`, `drag` (`{ "from": ..., "to": ... }`), `scroll` (`{ "at": [x, y], "delta": [dx, dy] }` scrolls the wheel by `delta` logical pixels, a positive `dy` scrolling down; `at` can be any object locator, e.g. `{ "text": "...", "delta": ... }`), `press` (Playwright key names: `Enter`, `Escape`, `Tab`, `Shift+Tab`, `ArrowDown`, `Space`, `a`, ...), `type`, `wait` (milliseconds) and `expect` (`visible` and `hidden` texts, matched exactly). Without steps, a scenario takes a single snapshot named `default`.
+- Pointer locators are the content of a visible text (`"Open"`, `{ "text": "Open", "nth": 1 }` for the second one, or `{ "text": "Profile", "exact": false }` for a text containing it, e.g. a menu item with a shortcut), the accessible name of a control without text (`{ "label": "Close" }`: its `aria-label` on the web, and in iced the widget id of the control or of a container around it, `container(..).id("Close")`), or a position (`{ "at": [100, 40] }`). Prefer texts and labels: they do not depend on the layout.
+- A text is visible when some of it is within the viewport and within every ancestor that clips its overflow (scroll areas, `overflow-hidden`), on both sides: text scrolled out of a scroll area is hidden. Locators point at the center of the visible part. On the web, texts are matched against the whole text of an element: CSS transforms (`capitalize`) are not applied, and input values or placeholders are not texts (show a readout like "You typed: ..." instead).
 - iced has no built-in focus traversal: like iced applications do, the runner moves the focus with `focus_next`/`focus_previous` when no widget captures Tab.
 
 [`scenarios/schema.json`](scenarios/schema.json) describes the format; [`tests/spec.ts`](tests/spec.ts) and [`iced/src/spec.rs`](iced/src/spec.rs) implement it.
@@ -103,3 +112,4 @@ Fixtures must be equivalent: same texts, icons, sizes and layout (`flex gap-2` i
 - Animations are disabled on both sides (`?static` disables CSS transitions and animations; the iced runner calls `shadcn_iced::animation::set_enabled(false)`). Delays (tooltips, hover cards) still apply: use `wait`.
 - The pointer stays where the last `hover` or `click` left it, which keeps hover styles in later snapshots on both sides.
 - `expect` waits up to 2 seconds on the shadcn/ui side and checks immediately on the iced side.
+- Text drawn on a `canvas` (charts, for instance) is not a widget text in iced: `expect` and text locators cannot find it. Assert such content with snapshots, and locate it with `at`.

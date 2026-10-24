@@ -38,7 +38,7 @@ bash scripts/check-copy.sh
 
 ## Running the Desktop Gallery
 
-The `gallery` package (`examples/gallery`) showcases all **65** component pages. The **4** chart pages (`charts-area`, `charts-bar`, `charts-line`, `charts-pie`) are only shown on the website, through `gallery-web`.
+The `gallery` package (`examples/gallery`) showcases all **65** component pages. The **7** chart pages (`charts-area`, `charts-bar`, `charts-line`, `charts-pie`, `charts-radar`, `charts-radial`, `charts-tooltip`) are only shown on the website, through `gallery-web`, and can be rendered on their own by `snapshot` (e.g. `charts-radar:dark --size 440x4600`).
 
 ```sh
 # The minimal app of the README quick start
@@ -265,10 +265,13 @@ The Python dependencies are locked in `scripts/uv.lock` (`scripts/pyproject.toml
 | Workflow | Jobs | Runs when |
 | :--- | :--- | :--- |
 | `rust.yml` (**Rust**) | Format, Clippy, Test, Snapshots,<br/>Copy components, Package | Rust code, `Cargo.*` or `scripts/` change |
-| `site.yml` (**Site**) | Lint, Data, Live previews, Build (+ e2e),<br/>Deploy (`main` only, `production` environment) | `site/`, `crates/` or `examples/` change |
+| `site.yml` (**Site**) | Lint, Data, Live previews, Build (+ e2e) | `site/`, `crates/` or `examples/` change |
 | `conformance.yml` (**Conformance**) | Type check, Compare | `crates/` or `conformance/` change;<br/>weekly with the latest shadcn/ui |
 | `lint.yml` (**Lint**) | Workflows (actionlint, zizmor, pinact),<br/>Python (`uv.lock`, compile) | `.github/` or `scripts/` change |
+| `preview.yml` (**Preview**) | Delete site preview | A pull request closes |
 | `release.yml` (**Release**) | Release PR, Check, Publish, Binaries | Every push to `main` (see [Releasing](#releasing)) |
+
+`ci.yml` itself deploys the site built by **Site**, since a called workflow does not get the secrets of an environment: **Deploy site** publishes it from `main` (`production` environment), and **Preview site** publishes the site of a pull request as a [Worker Preview](https://developers.cloudflare.com/workers/previews/) on `pr-<number>.shadcn-iced.r4ai.dev` (`preview` environment), linked from the pull request as a deployment. `preview.yml` (**Preview**) deletes the preview when the pull request closes. Both environments need the `CLOUDFLARE_API_TOKEN` (Edit Cloudflare Workers) and `CLOUDFLARE_ACCOUNT_ID` secrets, and the custom domain `shadcn-iced.r4ai.dev` is enabled for "Production and Preview" in the dashboard. Pull requests from forks get no secrets, and have no preview.
 
 ### Supply-chain policies
 
