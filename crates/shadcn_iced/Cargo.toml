@@ -1,6 +1,11 @@
 [package]
 name = "shadcn-iced"
 description = "shadcn/ui components for iced"
+readme = "README.md"
+keywords = ["shadcn", "iced", "gui", "ui", "components"]
+categories = ["gui"]
+homepage = "https://shadcn-iced.r4ai.dev"
+documentation = "https://docs.rs/shadcn-iced"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
