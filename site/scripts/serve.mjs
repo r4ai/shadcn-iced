@@ -2,13 +2,18 @@
 // assets do with `wrangler.jsonc`: `auto-trailing-slash` for the pages, and
 // `404.html` for unknown paths. For the end-to-end tests and local checks:
 //
-//   node scripts/serve.mjs [port]
+//   node scripts/serve.mjs [port] [dist]
+//
+// `dist` is another build to serve than `dist/` (e.g. the one of `main`, for
+// `scripts/lighthouse.mjs`).
 import { createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = fileURLToPath(new URL("../dist/client", import.meta.url));
+const root = process.argv[3]
+  ? resolve(process.argv[3], "client")
+  : fileURLToPath(new URL("../dist/client", import.meta.url));
 const port = Number(process.argv[2] ?? process.env.PORT ?? 4322);
 
 const TYPES = {
