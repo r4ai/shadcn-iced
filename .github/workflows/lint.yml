@@ -23,10 +23,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         with:
-          version: 2026.10.7
-          sha256: 6eb1b890e90818417ca34c90dbbd47881917d5cd199f31b63b062ea9c6b18d85
+          version: 2026.10.12
+          sha256: 72404716768b5b044cbd5170136d3d795cbd592658b6e932b66f0f8d67a54875
           install_args: actionlint aqua:zizmorcore/zizmor aqua:suzuki-shunsuke/pinact
       - name: actionlint
         run: actionlint
@@ -50,10 +50,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         with:
-          version: 2026.10.7
-          sha256: 6eb1b890e90818417ca34c90dbbd47881917d5cd199f31b63b062ea9c6b18d85
+          version: 2026.10.12
+          sha256: 72404716768b5b044cbd5170136d3d795cbd592658b6e932b66f0f8d67a54875
           install_args: uv
       # `uv.lock` is up to date with `pyproject.toml`, and every script
       # compiles with its locked dependencies.
