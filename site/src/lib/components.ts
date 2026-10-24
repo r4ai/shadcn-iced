@@ -100,10 +100,11 @@ export function minHeight(id: string) {
     popover: 400,
     sonner: 400,
     toast: 400,
-    // The example apps: the dashboard fills its frame and scrolls inside
-    // it, the settings grow to their natural height.
+    // The example apps fill their frame and scroll inside it, like their
+    // window: the settings would change the height of the page with each
+    // section otherwise.
     dashboard: 860,
-    settings: 720,
+    settings: 860,
   };
 
   return tall[id] ?? 320;

@@ -565,7 +565,13 @@ where
         let bounds = cell.bounds + Vector::new(layout.bounds().x, layout.bounds().y);
         let outer = bounds.expand(ring.width);
 
-        renderer.with_layer(outer, |renderer| {
+        // A layer does not clip to the one it is in: clipped to the viewport
+        // too, the ring stays inside a scroll area.
+        let Some(clip) = outer.intersection(viewport) else {
+            return;
+        };
+
+        renderer.with_layer(clip, |renderer| {
             renderer.fill_quad(
                 renderer::Quad {
                     bounds: outer,
