@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-shadcn-iced"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "cc"
@@ -3518,7 +3518,7 @@ dependencies = [
 
 [[package]]
 name = "shadcn-iced"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "iced",
  "shadcn_iced_core",
@@ -3526,7 +3526,7 @@ dependencies = [
 
 [[package]]
 name = "shadcn_iced_core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "iced",
 ]
