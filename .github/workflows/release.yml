@@ -114,17 +114,32 @@ jobs:
       - uses: ./.github/actions/setup-rust
       - run: ./scripts/prepare-publish.sh
       - id: release
+        continue-on-error: true
+        uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5.142
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      # crates.io sometimes refuses the trusted publishing token (403): retry
+      # once a minute later. release-plz skips the crates already published.
+      - if: steps.release.outcome == 'failure'
+        run: sleep 60
+      - id: release-retry
+        if: steps.release.outcome == 'failure'
         uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5.142
         with:
           command: release
         env:
           GITHUB_TOKEN: ${{ github.token }}
       # The version of `cargo-shadcn-iced` if it was released, and the tag of
-      # the GitHub release (that of `shadcn-iced`, the same version).
+      # the GitHub release (that of `shadcn-iced`, the same version), from
+      # both attempts.
       - id: cli
         env:
-          RELEASES: ${{ steps.release.outputs.releases }}
+          FIRST: ${{ steps.release.outputs.releases }}
+          RETRY: ${{ steps.release-retry.outputs.releases }}
         run: |
+          RELEASES="$(jq -n --argjson a "${FIRST:-[]}" --argjson b "${RETRY:-[]}" '$a + $b')"
           echo "$RELEASES" | jq .
           {
             echo "version=$(jq -r '.[] | select(.package_name == "cargo-shadcn-iced") | .version' <<< "$RELEASES")"
