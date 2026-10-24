@@ -515,7 +515,13 @@ where
             (&self.first, &tree.children[0], first),
             (&self.second, &tree.children[1], second),
         ] {
-            renderer.with_layer(layout.bounds(), |renderer| {
+            // A layer does not clip to the one it is in: clipped to the
+            // viewport too, the pane stays inside a scroll area.
+            let Some(clip) = layout.bounds().intersection(viewport) else {
+                continue;
+            };
+
+            renderer.with_layer(clip, |renderer| {
                 element
                     .as_widget()
                     .draw(tree, renderer, theme, style, layout, cursor, viewport);

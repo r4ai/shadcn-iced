@@ -550,7 +550,11 @@ where
                     ..bounds
                 };
 
-                renderer.with_layer(clip, draw);
+                // A layer does not clip to the one it is in: clipped to the
+                // viewport too, it stays inside a scroll area.
+                if let Some(clip) = clip.intersection(viewport) {
+                    renderer.with_layer(clip, draw);
+                }
             } else {
                 draw(renderer);
             }
