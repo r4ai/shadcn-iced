@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/r4ai/shadcn-iced/compare/v0.2.0...v0.3.0) - 2026-10-24
+
+### Added
+
+- [**breaking**] make every component work with touch and the keyboard ([#70](https://github.com/r4ai/shadcn-iced/pull/70))
+- [**breaking**] close remaining shadcn/ui differences and fix animation and behavior bugs ([#68](https://github.com/r4ai/shadcn-iced/pull/68))
+
+### Fixed
+
+- keep charts and other clipped layers under headers, and stop the settings preview from shifting the page ([#74](https://github.com/r4ai/shadcn-iced/pull/74))
+
+### Other
+
+- add a README to each published crate ([#72](https://github.com/r4ai/shadcn-iced/pull/72))
+
 ## [0.2.0](https://github.com/r4ai/shadcn-iced/compare/v0.1.0...v0.2.0) - 2026-10-18
 
 ### Added
