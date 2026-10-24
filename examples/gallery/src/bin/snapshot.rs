@@ -8,6 +8,7 @@
 //! - `--click "Label"`: clicks the text widget with that content,
 //! - `--at X,Y`: clicks at a logical position,
 //! - `--hover X,Y`: moves the cursor to a logical position,
+//! - `--scroll DY`: scrolls down by `DY` pixels under the cursor,
 //! - `--type "text"`: types some text,
 //! - `--key escape|enter|tab|down|up`: taps a key,
 //! - `--wait MS`: lets time pass (for hover delays and timers).
@@ -39,6 +40,7 @@ enum Action {
     Click(String),
     At(Point),
     Hover(Point),
+    Scroll(f32),
     Type(String),
     Key(Key),
     Wait(u64),
@@ -104,6 +106,11 @@ fn perform(ui: &mut Simulator<'_, Message>, action: &Action) {
                 position: *position,
             })]);
         }
+        Action::Scroll(y) => {
+            let _ = ui.simulate([iced::Event::Mouse(mouse::Event::WheelScrolled {
+                delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -*y },
+            })]);
+        }
         Action::Type(text) => {
             let _ = ui.typewrite(text);
         }
@@ -142,6 +149,9 @@ fn main() {
             "--click" => Some(Action::Click(args.next().expect("label"))),
             "--at" => Some(Action::At(point(&args.next().expect("X,Y")))),
             "--hover" => Some(Action::Hover(point(&args.next().expect("X,Y")))),
+            "--scroll" => Some(Action::Scroll(
+                args.next().expect("DY").parse().expect("DY"),
+            )),
             "--type" => Some(Action::Type(args.next().expect("text"))),
             "--key" => Some(Action::Key(key(&args.next().expect("key")))),
             "--wait" => Some(Action::Wait(args.next().expect("ms").parse().expect("ms"))),

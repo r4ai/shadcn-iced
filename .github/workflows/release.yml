@@ -40,7 +40,7 @@ jobs:
       # `RELEASE_APP_PRIVATE_KEY` secret when there is one.
       - id: app
         if: vars.RELEASE_APP_ID != ''
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -52,7 +52,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
       - run: ./scripts/prepare-publish.sh
-      - uses: release-plz/action@f393a7b38aca9d9b4c58447b291dbac963901df6 # v0.5.141
+      - uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5.142
         with:
           command: release-pr
         env:
@@ -114,7 +114,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
       - run: ./scripts/prepare-publish.sh
       - id: release
-        uses: release-plz/action@f393a7b38aca9d9b4c58447b291dbac963901df6 # v0.5.141
+        uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5.142
         with:
           command: release
         env:

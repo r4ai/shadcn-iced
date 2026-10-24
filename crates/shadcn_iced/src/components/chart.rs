@@ -43,6 +43,7 @@ pub use shadcn_iced_core::primitive::plot::Curve;
 
 use iced::advanced::graphics::geometry::Renderer as _;
 use iced::advanced::layout::{self, Layout};
+use iced::advanced::overlay;
 use iced::advanced::renderer::{self, Renderer as _};
 use iced::advanced::widget::operation::Focusable;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
@@ -2948,15 +2949,19 @@ impl<'a, Message: 'a> Widget<Message, Theme, iced::Renderer> for ChartWidget<'a,
         let t = tokens(theme);
         let active = self.active_category(state).filter(|_| self.chart.tooltip);
 
-        // Clipped to the bounds, like the `<svg>` of Recharts.
-        renderer.with_layer(bounds, |renderer| {
-            renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
-                let mut frame = Frame::new(renderer, bounds.size());
-                self.chart
-                    .draw_plot(&mut frame, &t, bounds.size(), state.legend, active);
-                renderer.draw_geometry(frame.into_geometry());
+        // Clipped to the bounds, like the `<svg>` of Recharts, and to the
+        // viewport: a layer does not clip to the one it is in, and the plot
+        // would cover what is outside of a scroll area (a header).
+        if let Some(clip) = bounds.intersection(viewport) {
+            renderer.with_layer(clip, |renderer| {
+                renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
+                    let mut frame = Frame::new(renderer, bounds.size());
+                    self.chart
+                        .draw_plot(&mut frame, &t, bounds.size(), state.legend, active);
+                    renderer.draw_geometry(frame.into_geometry());
+                });
             });
-        });
+        }
 
         let children: Vec<Layout<'_>> = layout.children().collect();
 
@@ -2971,51 +2976,100 @@ impl<'a, Message: 'a> Widget<Message, Theme, iced::Renderer> for ChartWidget<'a,
                 viewport,
             );
         }
+    }
 
-        if let (Some(target), Some(tooltip)) = (self.shown_target(state), self.shown_tooltip(state))
-        {
-            let index = self.tooltip_child();
-            let laid = children[index].bounds();
+    /// The tooltip, drawn as an overlay so that the widgets drawn after the
+    /// chart do not cover it (like the absolutely positioned tooltip of
+    /// Recharts).
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        _renderer: &iced::Renderer,
+        _viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        let state = tree.state.downcast_ref::<State>();
+        let target = self.shown_target(state)?;
+        self.shown_tooltip(state)?;
 
-            // The tooltip was laid out for the pointer of the last layout:
-            // follow the pointer since.
-            let category = if self.chart.kind == Kind::Pie {
-                target
-            } else {
-                target % self.chart.count().max(1)
-            };
-            let position = self.chart.tooltip_position(
-                self.chart.plot(bounds.size(), state.legend),
-                category,
-                state.cursor,
-                laid.size(),
+        let bounds = layout.bounds();
+        let index = self.tooltip_child();
+        let laid = layout.children().nth(index)?.bounds();
+
+        // The tooltip was laid out for the pointer of the last layout:
+        // follow the pointer since.
+        let category = if self.chart.kind == Kind::Pie {
+            target
+        } else {
+            target % self.chart.count().max(1)
+        };
+        let position = self.chart.tooltip_position(
+            self.chart.plot(bounds.size(), state.legend),
+            category,
+            state.cursor,
+            laid.size(),
+        );
+        let position = Point::new(
+            bounds.x + position.x + translation.x,
+            bounds.y + position.y + translation.y,
+        );
+
+        let (_, tooltip) = self.tooltip.as_mut()?;
+
+        Some(overlay::Element::new(Box::new(TooltipOverlay {
+            tooltip,
+            tree: &mut tree.children[index],
+            position,
+        })))
+    }
+}
+
+/// The tooltip of a chart, drawn above the rest of the interface.
+struct TooltipOverlay<'a, 'b, Message> {
+    tooltip: &'b mut Element<'a, Message>,
+    tree: &'b mut Tree,
+    /// Where the tooltip is shown, in window coordinates.
+    position: Point,
+}
+
+impl<Message> overlay::Overlay<Message, Theme, iced::Renderer> for TooltipOverlay<'_, '_, Message> {
+    fn layout(&mut self, renderer: &iced::Renderer, _bounds: Size) -> layout::Node {
+        self.tooltip
+            .as_widget_mut()
+            .layout(
+                self.tree,
+                renderer,
+                &layout::Limits::new(Size::ZERO, Size::INFINITE),
+            )
+            .move_to(self.position)
+    }
+
+    fn draw(
+        &self,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+    ) {
+        let bounds = layout.bounds();
+
+        // The layout of an overlay is only redone with the layout of the
+        // interface: the pointer may have moved the tooltip since.
+        let offset = self.position - bounds.position();
+
+        renderer.with_translation(offset, |renderer| {
+            self.tooltip.as_widget().draw(
+                self.tree,
+                renderer,
+                theme,
+                style,
+                layout,
+                cursor,
+                &Rectangle::INFINITE,
             );
-            let offset = Vector::new(
-                bounds.x + position.x - laid.x,
-                bounds.y + position.y - laid.y,
-            );
-
-            let layer = Rectangle {
-                x: bounds.x - 32.0,
-                y: bounds.y - 32.0,
-                width: bounds.width + 64.0,
-                height: bounds.height + 64.0,
-            };
-
-            renderer.with_layer(layer, |renderer| {
-                renderer.with_translation(offset, |renderer| {
-                    tooltip.as_widget().draw(
-                        &tree.children[index],
-                        renderer,
-                        theme,
-                        style,
-                        children[index],
-                        cursor,
-                        viewport,
-                    );
-                });
-            });
-        }
+        });
     }
 }
 
