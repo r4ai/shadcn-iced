@@ -538,6 +538,8 @@ pub const SIDEBAR: Page = Page {
                     .on_press(Message::Noop),
             )
             .collapsed(collapsed)
+            // `Ctrl`/`Cmd`+`B`
+            .on_toggle(|collapsed| demo(DemoMessage::SidebarCollapsed(collapsed)))
             .variant(shadcn_iced::sidebar::Variant::Inset);
 
         // `h-16 shrink-0 items-center gap-2 px-4`, then `gap-4 p-4 pt-0`

@@ -459,13 +459,32 @@ pub fn choice_card<'a, Message: Clone + 'a>(
     checked: bool,
     on_press: Option<Message>,
 ) -> Element<'a, Message> {
+    let interactive = on_press.is_some();
+
     // `border` + `*:data-[slot=field]:p-2.5`
-    Pressable::new(container(content).width(Length::Fill))
+    let card = Pressable::new(container(content).width(Length::Fill))
         .on_press_maybe(on_press)
         .width(Length::Fill)
         .padding(11)
-        .style(move |theme, status| choice_card_style(theme, status, checked))
-        .into()
+        .focus_style(move |theme, status, focused| {
+            let mut style = choice_card_style(theme, status, checked);
+
+            // `focus-visible:border-ring`, like the controls.
+            if focused {
+                style.border.color = tokens(theme).palette.ring;
+            }
+
+            style
+        });
+
+    // In shadcn/ui, the control inside of the card takes the focus: so does
+    // a checkbox or a switch here. A card around a mere indicator takes it
+    // instead, with the ring of the controls (`focus-visible:ring-3`).
+    if interactive {
+        super::button::focus_ring(card.yield_focus(true), |t| t.radius_lg()).into()
+    } else {
+        card.into()
+    }
 }
 
 /// The style of a [`choice_card`]: `rounded-lg border`,

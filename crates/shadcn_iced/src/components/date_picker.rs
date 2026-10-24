@@ -15,11 +15,16 @@ use super::button::{Button, Variant};
 use super::calendar::{Date, Month, calendar};
 
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::{Align, Anchored, Side};
+use shadcn_iced_core::primitive::{Align, Anchored, Side, focus_grid, tab};
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::{Clipboard, Shell, overlay};
+use iced::keyboard::{self, key::Named};
 use iced::widget::{container, text};
-use iced::{Length, Theme};
+use iced::{Event, Length, Rectangle, Size, Theme, Vector, mouse, touch};
 
 enum Selection {
     Single(Option<Date>),
@@ -228,7 +233,8 @@ impl<'a, Message: Clone + 'a> From<DatePicker<'a, Message>> for Element<'a, Mess
             .months(picker.months)
             // The popover is `text-sm`.
             .leading(20.0 / 14.0)
-            .transparent(true);
+            .transparent(true)
+            .focus_on_show(true);
 
         calendar = match picker.selection {
             Selection::Single(date) => calendar.selected(date),
@@ -253,10 +259,148 @@ impl<'a, Message: Clone + 'a> From<DatePicker<'a, Message>> for Element<'a, Mess
                 style::focus_visible(&t, t.radius_lg())
             });
 
-        match picker.open {
+        let anchored: Element<'a, Message> = match picker.open {
             Some((open, on_dismiss)) => anchored.open(open).on_dismiss(on_dismiss).into(),
             None => anchored.into(),
+        };
+
+        Element::new(FocusOnOpen { content: anchored })
+    }
+}
+
+/// Moves the focus to the days of the calendar when a key opens it from the
+/// focused trigger, like a date picker with an `autoFocus` calendar: the
+/// arrow keys then move between the days right away. Opened with the
+/// pointer, the calendar leaves the focus where it is.
+struct FocusOnOpen<'a, Message> {
+    content: Element<'a, Message>,
+}
+
+impl<Message> Widget<Message, Theme, iced::Renderer> for FocusOnOpen<'_, Message> {
+    fn tag(&self) -> tree::Tag {
+        self.content.as_widget().tag()
+    }
+
+    fn state(&self) -> tree::State {
+        self.content.as_widget().state()
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        self.content.as_widget().children()
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        self.content.as_widget().diff(tree);
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn size_hint(&self) -> Size<Length> {
+        self.content.as_widget().size_hint()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content.as_widget_mut().layout(tree, renderer, limits)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(tree, layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(_))
+            | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                focus_grid::cancel_focus_when_shown();
+            }
+            // The keys opening a popover from its trigger. Only the trigger
+            // is operated: the calendar is in the popover.
+            Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
+                if matches!(
+                    key,
+                    keyboard::Key::Named(Named::Enter | Named::Space | Named::ArrowDown)
+                ) && !modifiers.control()
+                    && !modifiers.alt()
+                    && !modifiers.logo() =>
+            {
+                let content = self.content.as_widget_mut();
+
+                if tab::has_focus(|operation| content.operate(tree, layout, renderer, operation)) {
+                    focus_grid::focus_when_shown();
+                }
+            }
+            _ => {}
         }
+
+        self.content.as_widget_mut().update(
+            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content
+            .as_widget()
+            .draw(tree, renderer, theme, style, layout, cursor, viewport);
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        self.content
+            .as_widget()
+            .mouse_interaction(tree, layout, cursor, viewport, renderer)
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        self.content
+            .as_widget_mut()
+            .overlay(tree, layout, renderer, viewport, translation)
     }
 }
 

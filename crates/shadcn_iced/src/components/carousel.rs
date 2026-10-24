@@ -3,7 +3,8 @@
 //! Port of <https://ui.shadcn.com/docs/components/carousel>. The current
 //! index lives in your state. Once the carousel was clicked (like the focus
 //! within its region on the web), <kbd>ArrowLeft</kbd> and
-//! <kbd>ArrowRight</kbd> go to the previous and next items.
+//! <kbd>ArrowRight</kbd> (<kbd>ArrowUp</kbd> and <kbd>ArrowDown</kbd> when
+//! vertical) go to the previous and next items.
 //!
 //! ```no_run
 //! # use shadcn_iced::carousel::carousel;
@@ -192,10 +193,13 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
         };
 
         // `onKeyDownCapture` on the carousel region: ArrowLeft and
-        // ArrowRight go to the previous and next items.
+        // ArrowRight (ArrowUp and ArrowDown when vertical) go to the
+        // previous and next items.
         keys(content, move |key, _| match key {
-            keyboard::Key::Named(key::Named::ArrowLeft) => previous_message.clone(),
-            keyboard::Key::Named(key::Named::ArrowRight) => next_message.clone(),
+            keyboard::Key::Named(key::Named::ArrowLeft) if horizontal => previous_message.clone(),
+            keyboard::Key::Named(key::Named::ArrowRight) if horizontal => next_message.clone(),
+            keyboard::Key::Named(key::Named::ArrowUp) if !horizontal => previous_message.clone(),
+            keyboard::Key::Named(key::Named::ArrowDown) if !horizontal => next_message.clone(),
             _ => None,
         })
         .into()

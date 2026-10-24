@@ -16,6 +16,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
+use shadcn_iced_core::primitive::anchored::{self, TouchOpen};
 use shadcn_iced_core::primitive::{Align, Anchored, Side, box_shadow, listbox, tracked};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, Tokens, font, style, tokens};
@@ -251,7 +252,9 @@ impl<'a, Message: Clone + 'a> Menu<'a, Message> {
         self
     }
 
-    /// Appends a submenu, opened when its trigger is hovered.
+    /// Appends a submenu, opened when its trigger is hovered or tapped, or
+    /// with <kbd>→</kbd>, <kbd>Enter</kbd> or <kbd>Space</kbd> while its
+    /// trigger is highlighted (<kbd>←</kbd> closes it again).
     pub fn sub(mut self, label: impl Into<String>, menu: Menu<'a, Message>) -> Self {
         self.entries.push(Entry::Sub {
             label: label.into(),
@@ -567,9 +570,23 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
         let kind = menu.kind;
         let min_width = menu.min_width.unwrap_or_else(|| menu.default_min_width());
         let width = menu.width;
-        let mut list = listbox::Listbox::new(highlight);
+        // Radix menus select with `Space` and highlight the item whose label
+        // is typed (`typeahead`), skipping the disabled ones.
+        let mut list = listbox::Listbox::new(highlight).typeahead(true);
 
         for entry in menu.entries {
+            let typed = match &entry {
+                Entry::Item(item) => item.on_select.as_ref().map(|_| item.label.clone()),
+                Entry::Check {
+                    label, on_toggle, ..
+                } => on_toggle.as_ref().map(|_| label.clone()),
+                Entry::Radio {
+                    label, on_select, ..
+                } => on_select.as_ref().map(|_| label.clone()),
+                Entry::Sub { label, .. } => Some(label.clone()),
+                Entry::Label(..) | Entry::Separator | Entry::Custom(_) => None,
+            };
+
             list = match entry {
                 Entry::Item(item) => {
                     let disabled = item.on_select.is_none();
@@ -690,10 +707,26 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                         Anchored::new(
                             listbox::row(trigger, Some(lucide::CHEVRON_RIGHT.sized(16).into()))
                                 .spacing(16.0)
-                                .padding(ITEM_PADDING),
+                                .padding(ITEM_PADDING)
+                                // The color the chevron inherits, telling the
+                                // trigger whether it is highlighted: the keys
+                                // that open the submenu are meant for it.
+                                .trailing_color(|theme, highlighted| {
+                                    anchored::report_highlighted(highlighted);
+
+                                    if highlighted {
+                                        highlight(theme).text_color
+                                    } else {
+                                        menu_tokens(theme).palette.popover_foreground
+                                    }
+                                }),
                             menu,
                         )
                         .hover(Duration::ZERO, Duration::from_millis(150))
+                        // Radix opens submenus on click too: a tap, without
+                        // hover.
+                        .touch_open(TouchOpen::Tap)
+                        .menu_keys(true)
                         .side(Side::Right)
                         .align(Align::Start)
                         .offset(offset)
@@ -710,6 +743,10 @@ impl<'a, Message: Clone + 'a> From<Menu<'a, Message>> for Element<'a, Message> {
                 }
                 Entry::Custom(element) => list.push(element),
             };
+
+            if let Some(typed) = typed {
+                list = list.text_value(typed);
+            }
         }
 
         let style = match (menu.sub, kind) {

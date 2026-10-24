@@ -5,7 +5,8 @@
 //! asks you to remove each one once it has been dismissed: when its duration
 //! has elapsed, when its action or close button is pressed, or when it is
 //! swiped away. Like sonner, the toasts stack behind the newest one and
-//! expand into a list on hover; the behavior and the animations live in
+//! expand into a list on hover (or on a tap), and <kbd>Alt</kbd>+<kbd>T</kbd>
+//! moves the focus to them; the behavior and the animations live in
 //! [`shadcn_iced_core::primitive::toaster`].
 //!
 //! ```no_run
@@ -19,9 +20,10 @@ use super::button::{Size, Variant, button};
 
 use shadcn_iced_core::icon::{Icon, lucide};
 use shadcn_iced_core::primitive::Layer;
-use shadcn_iced_core::primitive::toaster::{self as stack, Action, Direction, Edge};
+use shadcn_iced_core::primitive::toaster::{self as stack, Action, Direction, Edge, Hotkey};
 use shadcn_iced_core::{Element, font, style, tokens};
 
+use iced::keyboard::{Key, Modifiers};
 use iced::time::Duration;
 use iced::widget::{Column, Row, container, text};
 use iced::{Alignment, Background, Length, Padding, Theme};
@@ -151,6 +153,7 @@ pub struct Toaster<'a, Message> {
     close_button: bool,
     expand: bool,
     visible_toasts: usize,
+    hotkey: Option<Hotkey>,
 }
 
 /// Displays `toasts` over `base`, which is usually the root of your view.
@@ -167,6 +170,8 @@ pub fn toaster<'a, Message: Clone + 'a>(
         close_button: false,
         expand: false,
         visible_toasts: stack::VISIBLE,
+        // sonner's `hotkey = ['altKey', 'KeyT']`
+        hotkey: Some(Hotkey::new(Key::Character("t".into()), Modifiers::ALT)),
     }
 }
 
@@ -193,6 +198,13 @@ impl<'a, Message: Clone + 'a> Toaster<'a, Message> {
     /// default).
     pub fn visible_toasts(mut self, count: usize) -> Self {
         self.visible_toasts = count;
+        self
+    }
+
+    /// Sets the keyboard shortcut that focuses the toasts (`hotkey`,
+    /// <kbd>Alt</kbd>+<kbd>T</kbd> by default); `None` disables it.
+    pub fn hotkey(mut self, hotkey: impl Into<Option<Hotkey>>) -> Self {
+        self.hotkey = hotkey.into();
         self
     }
 }
@@ -319,6 +331,7 @@ impl<'a, Message: Clone + 'a> From<Toaster<'a, Message>> for Element<'a, Message
             .gap(GAP)
             .visible(toaster.visible_toasts)
             .expand(toaster.expand)
+            .hotkey(toaster.hotkey)
             .surface(toast_style);
 
         Layer::new(toaster.base, stack, open)

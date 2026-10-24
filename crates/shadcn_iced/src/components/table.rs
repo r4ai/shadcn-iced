@@ -12,6 +12,7 @@
 //!     .into()
 //! # }
 //! ```
+use shadcn_iced_core::primitive::pointer;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -436,6 +437,8 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Grid<'_, Message> {
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         for ((cell, tree), layout) in self
             .cells
             .iter_mut()
@@ -449,12 +452,16 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Grid<'_, Message> {
 
         let bounds = layout.bounds();
         let state = tree.state.downcast_mut::<State>();
-        let hovered = cursor.position_over(bounds).and_then(|position| {
-            state.rows.iter().position(|(y, height)| {
-                let top = bounds.y + y;
-                position.y >= top && position.y < top + height
-            })
-        });
+        // A tapped row is not hovered once the finger lifted, like
+        // `hover:bg-muted/50` on touch screens.
+        let hovered = pointer::hover(cursor)
+            .position_over(bounds)
+            .and_then(|position| {
+                state.rows.iter().position(|(y, height)| {
+                    let top = bounds.y + y;
+                    position.y >= top && position.y < top + height
+                })
+            });
 
         if state.hovered != hovered {
             state.hovered = hovered;

@@ -8,7 +8,9 @@
 //! the free length of the track. [`Scrollbars`] does the same: hide the
 //! scrollbars of the scrollable ([`Scrollbar::hidden`]) and wrap it, and
 //! [`Scrollbars`] draws the thumbs, drags them, and jumps to where the track
-//! is pressed.
+//! is pressed. A finger drags the thumbs too, like the pointer events of
+//! Base UI: the drag follows the finger that pressed, and the other fingers
+//! do nothing until it lifts.
 //!
 //! ```no_run
 //! # use shadcn_iced_core::primitive::scrollbars;
@@ -27,12 +29,16 @@
 //!
 //! [`Scrollable`]: iced::widget::Scrollable
 //! [`Scrollbar::hidden`]: iced::widget::scrollable::Scrollbar::hidden
+use super::pointer::{self, Pointer};
+
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Id, Operation, Tree, Widget, operation, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::widget::scrollable::AbsoluteOffset;
-use iced::{Background, Element, Event, Length, Point, Rectangle, Size, Vector, border, mouse};
+use iced::{
+    Background, Element, Event, Length, Point, Rectangle, Size, Vector, border, mouse, touch,
+};
 
 /// The smallest length of a thumb (`MIN_THUMB_SIZE` of Base UI).
 pub const MIN_THUMB: f32 = 16.0;
@@ -144,6 +150,8 @@ struct Metrics {
 /// A drag of a thumb.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Drag {
+    /// The pointer that pressed the scrollbar.
+    pointer: Pointer,
     axis: Axis,
     start: f32,
     scroll: f32,
@@ -426,70 +434,116 @@ where
             .unwrap_or_default();
         let bar = |axis: Axis| bars.into_iter().flatten().find(|bar| bar.axis == axis);
 
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                let pressed = cursor.position().and_then(|position| {
-                    bars.into_iter()
-                        .flatten()
-                        .find(|bar| bar.track.contains(position))
-                        .map(|bar| (bar, position))
-                });
+        pointer::observe(event);
 
-                if let Some((bar, position)) = pressed {
-                    let axis = bar.axis;
-                    let at = axis.of(position);
-
-                    // A press on the track (not on the thumb) first moves
-                    // the center of the thumb under the pointer.
-                    let scroll = if bar.thumb.contains(position) {
-                        bar.scroll
-                    } else {
-                        let (start, length) = match axis {
-                            Axis::Vertical => (bar.track.y, bar.thumb.height),
-                            Axis::Horizontal => (bar.track.x, bar.thumb.width),
-                        };
-                        let click = at - start - length / 2.0 - self.padding * 2.0;
-                        let scroll = bar.scroll(0.0, click);
-
-                        self.scroll_to(tree, content, renderer, axis.offset(scroll));
-
-                        scroll
-                    };
-
-                    tree.state.downcast_mut::<State>().drag = Some(Drag {
-                        axis,
-                        start: at,
-                        scroll,
-                    });
-
-                    shell.capture_event();
-                    shell.request_redraw();
-
-                    return;
-                }
+        // The pointer of the drag, and where it moved to, on an event about
+        // it. The cursor follows the fingers, and is translated by the
+        // scrollables around, unlike the positions of touch events.
+        let moved = state.drag.and_then(|drag| match (drag.pointer, event) {
+            (Pointer::Mouse, Event::Mouse(mouse::Event::CursorMoved { position })) => {
+                Some((drag, *position))
             }
-            Event::Mouse(mouse::Event::CursorMoved { position }) => {
-                if let Some(drag) = state.drag {
-                    if let Some(bar) = bar(drag.axis) {
-                        let scroll = bar.scroll(drag.scroll, drag.axis.of(*position) - drag.start);
-
-                        if scroll != bar.scroll {
-                            self.scroll_to(tree, content, renderer, drag.axis.offset(scroll));
-                            shell.request_redraw();
-                        }
-                    }
-
-                    shell.capture_event();
-
-                    return;
-                }
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-                if state.drag.is_some() =>
+            (Pointer::Finger(finger), Event::Touch(touch::Event::FingerMoved { id, .. }))
+                if *id == finger =>
             {
-                tree.state.downcast_mut::<State>().drag = None;
+                Some((drag, cursor.position()?))
             }
-            _ => {}
+            _ => None,
+        });
+
+        let released = state.drag.is_some_and(|drag| match (drag.pointer, event) {
+            (Pointer::Mouse, Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))) => {
+                true
+            }
+            (
+                Pointer::Finger(finger),
+                Event::Touch(
+                    touch::Event::FingerLifted { id, .. } | touch::Event::FingerLost { id, .. },
+                ),
+            ) => *id == finger,
+            _ => false,
+        });
+
+        let pressed_by = match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => Some(Pointer::Mouse),
+            Event::Touch(touch::Event::FingerPressed { id, .. }) if state.drag.is_none() => {
+                Some(Pointer::Finger(*id))
+            }
+            _ => None,
+        };
+
+        if let Some((drag, position)) = moved {
+            if let Some(bar) = bar(drag.axis) {
+                let scroll = bar.scroll(drag.scroll, drag.axis.of(position) - drag.start);
+
+                if scroll != bar.scroll {
+                    self.scroll_to(tree, content, renderer, drag.axis.offset(scroll));
+                    shell.request_redraw();
+                }
+            }
+
+            shell.capture_event();
+
+            return;
+        }
+
+        if released {
+            tree.state.downcast_mut::<State>().drag = None;
+        } else if matches!(
+            state.drag,
+            Some(Drag {
+                pointer: Pointer::Finger(_),
+                ..
+            })
+        ) && matches!(event, Event::Touch(_))
+        {
+            // The other fingers do not scroll while a thumb is dragged.
+            shell.capture_event();
+
+            return;
+        }
+
+        let pressed = pressed_by
+            .zip(cursor.position())
+            .and_then(|(pointer, position)| {
+                bars.into_iter()
+                    .flatten()
+                    .find(|bar| bar.track.contains(position))
+                    .map(|bar| (pointer, bar, position))
+            });
+
+        if let Some((pointer, bar, position)) = pressed {
+            let axis = bar.axis;
+            let at = axis.of(position);
+
+            // A press on the track (not on the thumb) first moves the center
+            // of the thumb under the pointer.
+            let scroll = if bar.thumb.contains(position) {
+                bar.scroll
+            } else {
+                let (start, length) = match axis {
+                    Axis::Vertical => (bar.track.y, bar.thumb.height),
+                    Axis::Horizontal => (bar.track.x, bar.thumb.width),
+                };
+                let click = at - start - length / 2.0 - self.padding * 2.0;
+                let scroll = bar.scroll(0.0, click);
+
+                self.scroll_to(tree, content, renderer, axis.offset(scroll));
+
+                scroll
+            };
+
+            tree.state.downcast_mut::<State>().drag = Some(Drag {
+                pointer,
+                axis,
+                start: at,
+                scroll,
+            });
+
+            shell.capture_event();
+            shell.request_redraw();
+
+            return;
         }
 
         self.content.as_widget_mut().update(

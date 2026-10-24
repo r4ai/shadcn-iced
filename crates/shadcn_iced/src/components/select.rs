@@ -3,6 +3,12 @@
 //!
 //! Port of <https://ui.shadcn.com/docs/components/select>.
 //!
+//! Like a Radix select, the trigger takes the keyboard focus, and typing
+//! while it is focused selects the option starting with what was typed.
+//! In the open list, <kbd>Enter</kbd> and <kbd>Space</kbd> select the
+//! highlighted option and typing highlights the matching one; a finger
+//! selects an option with a tap, and scrolls the list with a drag.
+//!
 //! ```no_run
 //! # use shadcn_iced::select::select;
 //! # #[derive(Clone)] enum Message { Fruit(&'static str) }
@@ -18,13 +24,20 @@
 use super::menu::{self, menu_tokens};
 
 use shadcn_iced_core::icon::lucide;
-use shadcn_iced_core::primitive::{Align, Anchored, Pressable, Side, listbox};
+use shadcn_iced_core::primitive::{Align, Anchored, Pressable, Side, focus, listbox};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, style, tokens};
 
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::widget::{Operation, Tree, tree};
+use iced::advanced::{Clipboard, Shell, Widget, overlay, renderer};
+use iced::keyboard::{self, key};
+use iced::time::Instant;
 use iced::widget::button::{Status, Style};
 use iced::widget::{Row, container, scrollable, text};
-use iced::{Alignment, Background, Border, Color, Length, Theme, border};
+use iced::{
+    Alignment, Background, Border, Color, Event, Length, Rectangle, Theme, Vector, border, mouse,
+};
 
 enum Entry<T> {
     Option(T, String, bool),
@@ -61,6 +74,14 @@ impl Size {
         match self {
             Size::Sm => 28.0,
             Size::Default => 32.0,
+        }
+    }
+
+    /// `rounded-lg`, or `rounded-[min(var(--radius-md),10px)]`.
+    fn radius(self, tokens: &shadcn_iced_core::Tokens) -> f32 {
+        match self {
+            Size::Default => tokens.radius_lg(),
+            Size::Sm => tokens.radius_md().min(10.0),
         }
     }
 }
@@ -232,7 +253,33 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
             left: 11.0,
         })
         .disabled(select.disabled)
-        .style(move |theme, status| trigger_style(theme, status, invalid, size));
+        // Like the `<button>` of a Radix select: Tab focuses it, and a click
+        // focuses it without showing the ring.
+        .focusable(true)
+        // `focus-visible:border-ring`, unless `aria-invalid:border-destructive`.
+        .focus_style(move |theme, status, focused| {
+            let mut style = trigger_style(theme, status, invalid, size);
+
+            if focused && !invalid {
+                style.border.color = tokens(theme).palette.ring;
+            }
+
+            style
+        })
+        // `focus-visible:ring-3 focus-visible:ring-ring/50`, or
+        // `aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40`.
+        .ring(move |theme, _status, focused| {
+            focused.then(|| {
+                let t = tokens(theme);
+                let radius = size.radius(&t);
+
+                if invalid {
+                    style::invalid_outset_ring(&t, radius)
+                } else {
+                    style::ring(&t, radius)
+                }
+            })
+        });
 
         // Where the selected (or first) option sits in the list, to open
         // the list with it on top of the trigger.
@@ -260,13 +307,30 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
             matches!(entry, Entry::Option(value, ..) if select.selected.as_ref() == Some(value))
         });
 
-        let mut list = listbox::Listbox::new(menu::highlight).highlighted(selected_index);
+        // Like the content of a Radix select, the list owns the keyboard:
+        // `Space` selects, and typing highlights the matching option.
+        let mut list = listbox::Listbox::new(menu::highlight)
+            .highlighted(selected_index)
+            .typeahead(true);
+
+        // The enabled options, for typing ahead on the closed trigger.
+        let mut options = Vec::new();
+        let mut current = None;
 
         for entry in select.entries {
             list = match entry {
                 Entry::Option(value, label, disabled) => {
                     let is_selected = select.selected.as_ref() == Some(&value);
 
+                    if !disabled {
+                        if is_selected {
+                            current = Some(options.len());
+                        }
+
+                        options.push((label.clone(), (select.on_select)(value.clone())));
+                    }
+
+                    let text_value = label.clone();
                     let label = text(label)
                         .size(style::text::SM)
                         .line_height(iced::Pixels(20.0))
@@ -292,6 +356,7 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                             .padding(menu::ITEM_PADDING.right(8)),
                         (!disabled).then(|| (select.on_select)(value)),
                     )
+                    .text_value(text_value)
                 }
                 Entry::Label(label) => list.push(
                     // `px-1.5 py-1 text-xs text-muted-foreground`
@@ -333,6 +398,9 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
             // `ring-1` around the list.
             .outset(1.0)
             .close_on_select(true)
+            // `Enter`, `Space` and the arrows open the list from the focused
+            // trigger, and `Tab` closes it.
+            .menu_keys(true)
             .modal(true)
             // `focus-visible:border-ring focus-visible:ring-3`, once
             // dismissed with the keyboard.
@@ -347,7 +415,7 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                 )
             });
 
-        if select.align_item_with_trigger {
+        let anchored = if select.align_item_with_trigger {
             // The item centered on the trigger, its text aligned with the
             // value, or below the trigger when there is no room for it.
             anchored
@@ -355,10 +423,204 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
                 .offset(-(size.height() + 28.0) / 2.0 - aligned_top)
                 .fallback_offset(4.0)
                 .animate(false)
-                .into()
         } else {
-            anchored.side(Side::Bottom).offset(4.0).into()
+            anchored.side(Side::Bottom).offset(4.0)
+        };
+
+        Element::new(TypeaheadTrigger {
+            content: anchored.into(),
+            options,
+            current,
+        })
+    }
+}
+
+/// The trigger of a select, picking the option whose label starts with the
+/// characters typed while it is focused and closed, like a native
+/// `<select>` (and the trigger of a Radix select).
+struct TypeaheadTrigger<'a, Message> {
+    content: Element<'a, Message>,
+    /// The label of the enabled options, and the message selecting them.
+    options: Vec<(String, Message)>,
+    /// The selected option, in `options`.
+    current: Option<usize>,
+}
+
+impl<'a, Message: Clone + 'a> Widget<Message, Theme, iced::Renderer>
+    for TypeaheadTrigger<'a, Message>
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<listbox::Typeahead>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(listbox::Typeahead::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn size_hint(&self) -> iced::Size<Length> {
+        self.content.as_widget().size_hint()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        // The open list handles (and captures) the keys typed into it.
+        if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event
+            && !shell.is_event_captured()
+            && !modifiers.control()
+            && !modifiers.alt()
+            && !modifiers.logo()
+        {
+            let now = Instant::now();
+            let typeahead = tree.state.downcast_ref::<listbox::Typeahead>();
+
+            let typed = match key.as_ref() {
+                keyboard::Key::Character(c) => Some(c),
+                // While typing ahead, `Space` is part of the search rather
+                // than opening the list.
+                keyboard::Key::Named(key::Named::Space) if typeahead.is_typing(now) => Some(" "),
+                _ => None,
+            };
+
+            if let Some(typed) = typed
+                && focus::is_focus_within(
+                    &mut self.content,
+                    &mut tree.children[0],
+                    layout,
+                    renderer,
+                )
+            {
+                let search = tree
+                    .state
+                    .downcast_mut::<listbox::Typeahead>()
+                    .push(typed, now);
+
+                if let Some(index) = listbox::next_match(
+                    search,
+                    self.options
+                        .iter()
+                        .enumerate()
+                        .map(|(index, (label, _))| (index, label.as_str())),
+                    self.current,
+                ) {
+                    shell.publish(self.options[index].1.clone());
+                    // Until the selection comes back in the next view.
+                    self.current = Some(index);
+                }
+
+                shell.capture_event();
+                return;
+            }
         }
+
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
     }
 }
 

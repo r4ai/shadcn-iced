@@ -14,7 +14,8 @@
 //! }
 //!
 //! fn view(_: &()) -> iced::Element<'_, Message> {
-//!     button("Save").on_press(Message::Save).into()
+//!     // `tab_order` moves the focus on Tab (iced leaves it to applications).
+//!     tab_order(button("Save").on_press(Message::Save)).into()
 //! }
 //!
 //! fn main() -> iced::Result {
@@ -37,5 +38,6 @@ pub use shadcn_iced_core::{
 pub mod prelude {
     pub use crate::components::prelude::*;
     pub use shadcn_iced_core::icon::{Icon, icon, lucide};
+    pub use shadcn_iced_core::primitive::tab_order;
     pub use shadcn_iced_core::{ApplicationExt, Mode};
 }

@@ -500,6 +500,30 @@ impl<'a, Message: Clone + 'a> From<Button<'a, Message>> for Element<'a, Message>
     }
 }
 
+/// Makes an interactive element that is not a [`Button`] (a link, a
+/// clickable card...) focusable like one: <kbd>Tab</kbd> reaches it,
+/// <kbd>Enter</kbd> and <kbd>Space</kbd> press it, and it shows the focus
+/// ring of buttons while the keyboard focus is visible
+/// (`focus-visible:ring-3 focus-visible:ring-ring/50`), around the corner
+/// `radius` it has in the theme.
+///
+/// Elements with a border also turn it to `border-ring` in their style,
+/// since the style is theirs.
+pub(crate) fn focus_ring<'a, Message>(
+    pressable: Pressable<'a, Message>,
+    radius: impl Fn(&shadcn_iced_core::Tokens) -> f32 + 'a,
+) -> Pressable<'a, Message> {
+    pressable
+        .focusable(true)
+        .ring(move |theme, _status, focused| {
+            focused.then(|| {
+                let t = tokens(theme);
+
+                style::ring(&t, radius(&t))
+            })
+        })
+}
+
 /// The style of a [`Button`] of the given variant.
 ///
 /// Usable with plain iced buttons too:

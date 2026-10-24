@@ -4,7 +4,7 @@
 //! [`Scrollable`] with thin, rounded scrollbars drawn by
 //! [`Scrollbars`](shadcn_iced_core::primitive::Scrollbars), inset in their
 //! track like Base UI's.
-use shadcn_iced_core::primitive::scrollbars;
+use shadcn_iced_core::primitive::{scroll_keys, scrollbars};
 use shadcn_iced_core::{Element, tokens};
 
 use iced::widget::Scrollable;
@@ -89,10 +89,16 @@ impl<'a, Message: 'a> From<ScrollArea<'a, Message>> for Element<'a, Message> {
     fn from(area: ScrollArea<'a, Message>) -> Self {
         // `bg-border rounded-full` thumbs in `p-px` tracks of `w-2.5` (or
         // `h-2.5`) with a transparent `border-l` (or `border-t`).
-        scrollbars(area.scrollable)
+        let scrollbars = scrollbars(area.scrollable)
             .vertical(area.vertical)
             .horizontal(area.horizontal)
-            .thumb(|theme: &Theme| Background::Color(tokens(theme).palette.border))
+            .thumb(|theme: &Theme| Background::Color(tokens(theme).palette.border));
+
+        // A click or a tap makes it the target of the scrolling keys, like
+        // a focusable scrollable `div`.
+        scroll_keys(scrollbars)
+            .vertical(area.vertical)
+            .horizontal(area.horizontal)
             .into()
     }
 }

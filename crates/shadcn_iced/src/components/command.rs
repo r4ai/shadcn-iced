@@ -1,8 +1,12 @@
 //! Fast, composable command menu.
 //!
 //! Port of <https://ui.shadcn.com/docs/components/command>. The query lives
-//! in your state; the command filters its items and supports keyboard
-//! navigation (<kbd>↑</kbd>, <kbd>↓</kbd>, <kbd>Enter</kbd>).
+//! in your state; the command filters its items and supports the keyboard
+//! navigation of cmdk while its search field is focused: <kbd>↑</kbd> and
+//! <kbd>↓</kbd> (or <kbd>Ctrl</kbd>+<kbd>N</kbd> / <kbd>Ctrl</kbd>+<kbd>J</kbd>
+//! and <kbd>Ctrl</kbd>+<kbd>P</kbd> / <kbd>Ctrl</kbd>+<kbd>K</kbd>),
+//! <kbd>PageUp</kbd>, <kbd>PageDown</kbd> and <kbd>Enter</kbd>. A finger
+//! selects an item with a tap, and scrolls the list with a drag.
 //!
 //! ```no_run
 //! # use shadcn_iced::command::{command, item};
@@ -231,6 +235,7 @@ impl<'a, Message: Clone + 'a> From<Command<'a, Message>> for Element<'a, Message
             .width(Length::Fill)
             .highlight_first(true)
             .clear_on_leave(false)
+            .vim_bindings(true)
             .key(&query);
 
         let mut visible_groups = 0;

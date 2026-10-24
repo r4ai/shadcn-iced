@@ -11,7 +11,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::{Icon, lucide};
-use shadcn_iced_core::primitive::{Pressable, dashed};
+use shadcn_iced_core::primitive::{Pressable, dashed, focus};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -23,7 +23,7 @@ use iced::widget::button::Status;
 use iced::widget::{Column, Row, Stack, container, image, text};
 use iced::{
     Alignment, Background, Border, Color, Event, Length, Padding, Rectangle, Size as Bounds, Theme,
-    Vector, border, mouse,
+    Vector, border, mouse, touch,
 };
 
 /// The state of an [`Attachment`].
@@ -335,8 +335,11 @@ impl<'a, Message: Clone + 'a> From<Attachment<'a, Message>> for Element<'a, Mess
         let pressable = attachment.on_press.is_some();
 
         let card: Element<'a, Message> = match attachment.on_press {
+            // The trigger is a `<button>`: Tab reaches it, Enter and Space
+            // press it.
             Some(message) => Pressable::new(body)
                 .on_press(message)
+                .focusable(true)
                 .style(move |theme, status| {
                     let style = self::style(theme, state, size, status);
                     iced::widget::button::Style {
@@ -454,18 +457,6 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Outline<'_, Message> {
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        if self.focusable
-            && let Event::Mouse(mouse::Event::ButtonPressed(_)) = event
-        {
-            let focus = tree.state.downcast_mut::<Focus>();
-            let focused = cursor.is_over(layout.bounds());
-
-            if focus.0 != focused {
-                focus.0 = focused;
-                shell.request_redraw();
-            }
-        }
-
         self.content.as_widget_mut().update(
             &mut tree.children[0],
             event,
@@ -476,6 +467,34 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Outline<'_, Message> {
             shell,
             viewport,
         );
+
+        // `focus-within`: the trigger or an action holds the focus, gained
+        // with a click, a tap or the keyboard. Moving the pointer never
+        // moves the focus.
+        if self.focusable
+            && !matches!(
+                event,
+                Event::Mouse(
+                    mouse::Event::CursorMoved { .. }
+                        | mouse::Event::CursorEntered
+                        | mouse::Event::CursorLeft
+                        | mouse::Event::WheelScrolled { .. }
+                ) | Event::Touch(touch::Event::FingerMoved { .. })
+            )
+        {
+            let focused = focus::is_focus_within(
+                &mut self.content,
+                &mut tree.children[0],
+                layout.children().next().unwrap(),
+                renderer,
+            );
+            let state = tree.state.downcast_mut::<Focus>();
+
+            if state.0 != focused {
+                state.0 = focused;
+                shell.request_redraw();
+            }
+        }
     }
 
     fn draw(

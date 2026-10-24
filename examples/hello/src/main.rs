@@ -7,13 +7,14 @@ enum Message {
 }
 
 fn view(_state: &()) -> iced::Element<'_, Message> {
-    iced::widget::center(
+    // `tab_order` moves the focus with Tab, like in a browser.
+    tab_order(iced::widget::center(
         card()
             .title("Create project")
             .description("Deploy your new project in one-click.")
             .footer(button("Deploy").on_press(Message::Save))
             .width(350),
-    )
+    ))
     .into()
 }
 

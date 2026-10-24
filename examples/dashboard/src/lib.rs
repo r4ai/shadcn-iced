@@ -431,7 +431,9 @@ impl Dashboard {
         let sidebar = sidebar::sidebar()
             .variant(sidebar::Variant::Inset)
             .width(288.0)
-            .collapsed(self.collapsed);
+            .collapsed(self.collapsed)
+            // `Ctrl`/`Cmd`+`B`
+            .on_toggle(|_| Message::ToggleSidebar);
 
         if self.collapsed {
             // Icons only: the secondary links join the groups.
