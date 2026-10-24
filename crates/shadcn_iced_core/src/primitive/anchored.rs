@@ -469,6 +469,10 @@ struct State {
     /// Whether the content was opened with the keyboard and focuses its
     /// first control once shown.
     focus_content: bool,
+    /// Whether the open content was opened with the keyboard, directly or
+    /// with the arrows from another menu of its group opened so: only then
+    /// do the arrows open the next menu with its first item highlighted.
+    keyboard: bool,
     /// Whether the anchor is the highlighted item of a list, as reported
     /// while it was last drawn (see [`report_highlighted`]).
     highlighted: Cell<bool>,
@@ -725,6 +729,7 @@ fn open_click<Message>(
     on_open_change: Option<&dyn Fn(bool) -> Message>,
 ) {
     state.open = true;
+    state.keyboard = false;
     state.epoch = select_epoch();
     shell.invalidate_layout();
     shell.request_redraw();
@@ -744,6 +749,7 @@ fn open_at<Message>(
     let was_open = state.open;
 
     state.open = true;
+    state.keyboard = false;
     state.epoch = select_epoch();
     state.point = Some(position);
     shell.invalidate_layout();
@@ -758,6 +764,8 @@ fn open_at<Message>(
 /// (its last one for <kbd>↑</kbd>), other content focuses its first control,
 /// once shown.
 fn opened_with_keyboard(state: &mut State, menu: bool, key: key::Named) {
+    state.keyboard = true;
+
     if menu {
         // `Home` and `End` rather than the arrows: a menu opened before may
         // still have an item highlighted.
@@ -2010,7 +2018,7 @@ where
                 (group.index + count - 1) % count
             };
 
-            *group.request = Some((other, true));
+            *group.request = Some((other, self.state.keyboard));
             self.dismiss(shell);
             shell.capture_event();
             return;
@@ -2406,6 +2414,7 @@ where
             let state = tree.state.downcast_mut::<State>();
             state.open = true;
             state.epoch = select_epoch();
+            state.keyboard = keyboard;
 
             // Like Radix, a menu reached with the keyboard highlights its
             // first item, and its trigger takes the focus (to return it on

@@ -170,11 +170,12 @@ fn space_selects_the_highlighted_option_of_a_select() {
     let mut ui = simulator(select_view());
 
     let _ = ui.click("Pick").expect("the trigger");
-    // The first option is highlighted when nothing is selected.
+    // Like shadcn/ui, nothing is highlighted when nothing is selected, and
+    // `ArrowDown` highlights the first option.
     ui.tap_key(Named::ArrowDown);
     ui.tap_key(Named::Space);
 
-    assert_eq!(picked(ui), [Message::Picked(2)]);
+    assert_eq!(picked(ui), [Message::Picked(1)]);
 }
 
 #[test]

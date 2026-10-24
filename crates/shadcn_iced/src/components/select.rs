@@ -311,7 +311,6 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
         // `Space` selects, and typing highlights the matching option.
         let mut list = listbox::Listbox::new(menu::highlight)
             .highlighted(selected_index)
-            .highlight_first(true)
             .typeahead(true);
 
         // The enabled options, for typing ahead on the closed trigger.
