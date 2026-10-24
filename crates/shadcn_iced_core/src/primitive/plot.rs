@@ -420,7 +420,7 @@ impl Bars {
     /// Fits `groups` bars side by side in a band, like Recharts with a
     /// `barCategoryGap` of `category_gap` (a fraction of the band) and a
     /// `barGap` of `gap`, which goes away when the bars do not fit. Bars
-    /// wider than a pixel get whole widths.
+    /// wider than a pixel get rounded widths (Recharts 3.10).
     pub fn new(band: f32, groups: usize, category_gap: f32, gap: f32) -> Self {
         let groups = groups.max(1) as f32;
         let offset = band * category_gap;
@@ -432,7 +432,7 @@ impl Bars {
 
         let mut width = (band - 2.0 * offset - (groups - 1.0) * gap) / groups;
         if width > 1.0 {
-            width = width.floor();
+            width = width.round();
         }
 
         Self { offset, width, gap }
