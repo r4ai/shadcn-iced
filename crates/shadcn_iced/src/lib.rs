@@ -25,6 +25,12 @@
 //!         .run()
 //! }
 //! ```
+
+// Compiles the examples of the README (`cargo test --doc`).
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 pub mod components;
 
 pub use components::*;

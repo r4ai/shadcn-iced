@@ -23,29 +23,35 @@ Use **65+ components**—from forms, overlays, and data tables to charts and AI 
 
 ## Installation
 
+The project is split into three crates:
+
+| Crate | What it is |
+| --- | --- |
+| [`shadcn-iced`](crates/shadcn_iced) | The components, ready to use as a library. |
+| [`shadcn_iced_core`](crates/shadcn_iced_core) | Theme tokens, bundled fonts and icons, and headless primitives the components are built on. |
+| [`cargo-shadcn-iced`](crates/cargo-shadcn-iced) | A cargo subcommand that copies component source files into your project. |
+
+All of them require Rust 1.88 or later.
+
 ### Option 1: Use as a Library
 
-Add `shadcn_iced` to your `Cargo.toml`:
-
-```toml
-[dependencies]
-iced = "0.14"
-shadcn-iced = { git = "https://github.com/r4ai/shadcn-iced.git" }
+```sh
+cargo add iced
+cargo add shadcn-iced
 ```
+
+The fonts bundled by default (Lucide, Geist and keyboard symbols) can be turned off with feature flags: see [the crate's README](crates/shadcn_iced/README.md#feature-flags).
 
 ### Option 2: Copy and Own (CLI)
 
 Depend on `shadcn_iced_core` and use `cargo-shadcn-iced` to copy only the components you need into your repository:
 
-```toml
-[dependencies]
-iced = { version = "0.14", features = ["advanced", "canvas", "image", "svg"] }
-shadcn_iced_core = { git = "https://github.com/r4ai/shadcn-iced.git" }
-```
-
 ```sh
-# Install the CLI
-cargo install --git https://github.com/r4ai/shadcn-iced.git cargo-shadcn-iced
+cargo add iced --features advanced,canvas,image,svg
+cargo add shadcn_iced_core
+
+# Install the CLI (or `cargo binstall cargo-shadcn-iced` for a prebuilt binary)
+cargo install cargo-shadcn-iced
 
 # Copy components (and their transitive sibling dependencies) into src/ui/
 cargo shadcn-iced add button card dialog dropdown-menu
@@ -54,6 +60,8 @@ cargo shadcn-iced add button card dialog dropdown-menu
 cargo shadcn-iced list
 cargo shadcn-iced diff
 ```
+
+To follow the unreleased `main` branch instead, depend on the crates with `git = "https://github.com/r4ai/shadcn-iced.git"`.
 
 ---
 
@@ -127,6 +135,8 @@ let theme: iced::Theme = theme::zinc(Mode::Dark)
   - Workspace structure, token pipeline, and headless primitives
 - **[Development Guide (`docs/development.md`)](docs/development.md)**
   - Desktop gallery, headless snapshots, CLI usage, and CI checks
+- **API documentation on docs.rs**
+  - [`shadcn-iced`](https://docs.rs/shadcn-iced) and [`shadcn_iced_core`](https://docs.rs/shadcn_iced_core)
 - **[Conformance Suite (`conformance/README.md`)](conformance/README.md)**
   - Automated pixel-diff testing against official React `shadcn/ui`
 

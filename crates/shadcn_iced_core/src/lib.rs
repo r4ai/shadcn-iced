@@ -4,6 +4,12 @@
 //!
 //! Components built on top of this crate only depend on `iced` and
 //! `shadcn_iced_core`, which is what makes them copy-pasteable.
+
+// Compiles the examples of the README (`cargo test --doc`).
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 pub mod animation;
 pub mod font;
 pub mod highlight;
