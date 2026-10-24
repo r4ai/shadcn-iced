@@ -1,6 +1,11 @@
 [package]
 name = "shadcn-iced"
 description = "shadcn/ui components for iced"
+readme = "README.md"
+keywords = ["shadcn", "iced", "gui", "ui", "components"]
+categories = ["gui"]
+homepage = "https://shadcn-iced.r4ai.dev"
+documentation = "https://docs.rs/shadcn-iced"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -17,7 +22,7 @@ symbols = ["shadcn_iced_core/symbols"]
 
 [dependencies]
 iced.workspace = true
-shadcn_iced_core = { path = "../shadcn_iced_core", version = "0.2.0", default-features = false }
+shadcn_iced_core = { path = "../shadcn_iced_core", version = "0.3.0", default-features = false }
 
 [lints]
 workspace = true

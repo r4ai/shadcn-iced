@@ -7,7 +7,12 @@
 //! with the pointer: the track follows the pointer and, once released,
 //! asks to go to the item it was dragged to ([`Track::on_change`]).
 //!
+//! A finger swiping across the track (more up and down than along a
+//! horizontal track) scrolls the page instead, like the `touch-action` Embla
+//! sets; once the track follows a finger, the page around stops scrolling.
+//!
 //! The index lives in your state, like the value of any other control.
+use super::pointer::{self, Pointer};
 use crate::animation::{self, Transition};
 
 use iced::advanced::layout::{self, Layout};
@@ -90,6 +95,39 @@ impl<'a, Message, Theme, Renderer> Track<'a, Message, Theme, Renderer> {
     fn last(&self) -> usize {
         self.items.len().saturating_sub(self.per_view)
     }
+
+    /// Passes `event` to the items, with the cursor slid along with them.
+    #[allow(clippy::too_many_arguments)]
+    fn update_items(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        translation: Vector,
+    ) where
+        Renderer: iced::advanced::Renderer,
+    {
+        let bounds = layout.bounds();
+        let cursor = match cursor.position_over(bounds) {
+            Some(position) => mouse::Cursor::Available(position + translation),
+            None => cursor.levitate() + translation,
+        };
+
+        for ((item, tree), layout) in self
+            .items
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+        {
+            item.as_widget_mut().update(
+                tree, event, layout, cursor, renderer, clipboard, shell, &bounds,
+            );
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -105,6 +143,8 @@ struct State {
 
 #[derive(Debug, Clone, Copy)]
 struct Drag {
+    /// The pointer that pressed: other fingers are ignored.
+    pointer: Pointer,
     origin: Point,
     offset: f32,
     dragging: bool,
@@ -237,6 +277,8 @@ where
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         let bounds = layout.bounds();
         let last = self.last();
         let index = self.index.min(last);
@@ -289,11 +331,36 @@ where
             let state = tree.state.downcast_mut::<State>();
             let max = state.max(last);
 
+            // The pointer of the drag, on an event about it; the others are
+            // ignored, so a second finger neither restarts nor ends it.
+            let ours = state.drag.is_some_and(|drag| match (drag.pointer, event) {
+                (Pointer::Mouse, Event::Mouse(_)) => true,
+                (
+                    Pointer::Finger(finger),
+                    Event::Touch(
+                        touch::Event::FingerMoved { id, .. }
+                        | touch::Event::FingerLifted { id, .. }
+                        | touch::Event::FingerLost { id, .. },
+                    ),
+                ) => *id == finger,
+                _ => false,
+            });
+
             match event {
                 Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-                | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                | Event::Touch(touch::Event::FingerPressed { .. })
+                    if state.drag.is_none() =>
+                {
+                    let pointer = match event {
+                        Event::Touch(touch::Event::FingerPressed { id, .. }) => {
+                            Pointer::Finger(*id)
+                        }
+                        _ => Pointer::Mouse,
+                    };
+
                     if let Some(position) = cursor.position_over(bounds) {
                         state.drag = Some(Drag {
+                            pointer,
                             origin: position,
                             offset,
                             dragging: false,
@@ -301,17 +368,67 @@ where
                     }
                 }
                 Event::Mouse(mouse::Event::CursorMoved { .. })
-                | Event::Touch(touch::Event::FingerMoved { .. }) => {
+                | Event::Touch(touch::Event::FingerMoved { .. })
+                    if ours =>
+                {
                     if let Some(drag) = &mut state.drag
                         && let Some(position) = cursor.position()
                     {
-                        let moved = along(position - drag.origin);
+                        let delta = position - drag.origin;
+                        let moved = along(delta);
+                        let across = if vertical { delta.x } else { delta.y };
+
+                        // A finger moving across the track first scrolls the
+                        // page instead, like the `touch-action: pan-y` of
+                        // Embla: the drag gives up.
+                        if !drag.dragging
+                            && matches!(drag.pointer, Pointer::Finger(_))
+                            && across.abs() >= DRAG_THRESHOLD
+                            && across.abs() > moved.abs()
+                        {
+                            state.drag = None;
+                            return self.update_items(
+                                tree,
+                                event,
+                                layout,
+                                cursor,
+                                renderer,
+                                clipboard,
+                                shell,
+                                translation,
+                            );
+                        }
 
                         if !drag.dragging && moved.abs() >= DRAG_THRESHOLD {
                             drag.dragging = true;
+
+                            // Like the `pointercancel` of browsers once a
+                            // touch pans: whatever the press started in the
+                            // items (a pressed button) is cancelled.
+                            let cancel = match drag.pointer {
+                                Pointer::Finger(id) => {
+                                    Event::Touch(touch::Event::FingerLost { id, position })
+                                }
+                                Pointer::Mouse => Event::Mouse(mouse::Event::CursorLeft),
+                            };
+
+                            self.update_items(
+                                tree,
+                                &cancel,
+                                layout,
+                                mouse::Cursor::Unavailable,
+                                renderer,
+                                clipboard,
+                                shell,
+                                translation,
+                            );
                         }
 
-                        if drag.dragging {
+                        let state = tree.state.downcast_mut::<State>();
+
+                        if let Some(drag) = state.drag
+                            && drag.dragging
+                        {
                             let wanted = drag.offset - moved;
 
                             // Rubber band past both ends.
@@ -333,7 +450,7 @@ where
                 Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
                 | Event::Touch(
                     touch::Event::FingerLifted { .. } | touch::Event::FingerLost { .. },
-                ) => {
+                ) if ours => {
                     if let Some(drag) = state.drag.take()
                         && drag.dragging
                     {
@@ -374,21 +491,16 @@ where
             }
         }
 
-        let cursor = match cursor.position_over(bounds) {
-            Some(position) => mouse::Cursor::Available(position + translation),
-            None => cursor.levitate() + translation,
-        };
-
-        for ((item, tree), layout) in self
-            .items
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-        {
-            item.as_widget_mut().update(
-                tree, event, layout, cursor, renderer, clipboard, shell, &bounds,
-            );
-        }
+        self.update_items(
+            tree,
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            translation,
+        );
     }
 
     fn draw(

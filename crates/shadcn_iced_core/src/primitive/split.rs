@@ -8,6 +8,13 @@
 //! splitter: once focused (with <kbd>Tab</kbd> or a click), the arrow keys
 //! of its axis move it by 5% and <kbd>Home</kbd>/<kbd>End</kbd> move it to
 //! its limits.
+//!
+//! A finger drags the divider too, and grabs it from a little farther than
+//! the mouse ([`pointer::TOUCH_SLOP`]), since the 1px line is hard to hit:
+//! like the `touch-action: none` of the handles of react-resizable-panels,
+//! the drag follows the finger that started it and ignores the others.
+use super::pointer::{self, Pointer};
+
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, operation, tree};
@@ -142,7 +149,8 @@ where
 #[derive(Debug)]
 struct State {
     ratio: f32,
-    dragging: bool,
+    /// The pointer dragging the divider, if any.
+    dragging: Option<Pointer>,
     /// The distance from the center of the divider to the pointer when the
     /// drag started, kept while dragging.
     grab: f32,
@@ -206,7 +214,7 @@ where
     fn state(&self) -> tree::State {
         tree::State::new(State {
             ratio: self.default_ratio,
-            dragging: false,
+            dragging: None,
             grab: 0.0,
             focused: false,
             focus_visible: false,
@@ -316,29 +324,103 @@ where
         let ratio = self.current(tree.state.downcast_ref::<State>());
         let divider = self.divider(bounds, ratio);
 
+        pointer::observe(event);
+
+        // Where the pointer that drags the divider is, on an event about it.
+        // The cursor follows the fingers, and is translated by the
+        // scrollables around, unlike the positions of touch events.
+        let dragged = |dragging: Option<Pointer>| match (dragging?, event) {
+            (Pointer::Mouse, Event::Mouse(mouse::Event::CursorMoved { .. })) => cursor.position(),
+            (Pointer::Finger(finger), Event::Touch(touch::Event::FingerMoved { id, .. }))
+                if *id == finger =>
+            {
+                cursor.position()
+            }
+            _ => None,
+        };
+
+        // Whether the pointer that drags the divider was released.
+        let released = |dragging: Option<Pointer>| match (dragging, event) {
+            (
+                Some(Pointer::Mouse),
+                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+            ) => true,
+            (
+                Some(Pointer::Finger(finger)),
+                Event::Touch(
+                    touch::Event::FingerLifted { id, .. } | touch::Event::FingerLost { id, .. },
+                ),
+            ) => *id == finger,
+            _ => false,
+        };
+
+        // A press that grabs the divider: a finger from a little farther.
+        let grabbed = match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => cursor
+                .position_over(divider)
+                .map(|position| (Pointer::Mouse, position)),
+            Event::Touch(touch::Event::FingerPressed { id, .. }) => cursor
+                .position_over(divider.expand(pointer::TOUCH_SLOP))
+                .map(|position| (Pointer::Finger(*id), position)),
+            _ => None,
+        };
+
         {
             let state = tree.state.downcast_mut::<State>();
 
-            match event {
-                Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-                | Event::Touch(touch::Event::FingerPressed { .. })
-                    if cursor.is_over(divider) =>
-                {
-                    state.dragging = true;
-                    state.grab = cursor.position().map_or(0.0, |position| {
-                        let center = divider.center();
+            if state.dragging.is_none()
+                && let Some((by, position)) = grabbed
+            {
+                let center = divider.center();
 
-                        match self.axis {
-                            Axis::Horizontal => position.x - center.x,
-                            Axis::Vertical => position.y - center.y,
-                        }
-                    });
-                    state.focused = true;
-                    state.focus_visible = false;
-                    shell.capture_event();
-                    shell.request_redraw();
-                    return;
+                state.dragging = Some(by);
+                state.grab = match self.axis {
+                    Axis::Horizontal => position.x - center.x,
+                    Axis::Vertical => position.y - center.y,
+                };
+                state.focused = true;
+                state.focus_visible = false;
+                shell.capture_event();
+                shell.request_redraw();
+                return;
+            }
+
+            // The drag ends with its own pointer, also when the system takes
+            // the finger (a `pointercancel`).
+            if released(state.dragging) {
+                state.dragging = None;
+                shell.capture_event();
+                shell.request_redraw();
+                return;
+            }
+
+            // Other fingers neither move nor end the drag.
+            if let Some(position) = dragged(state.dragging) {
+                let next = match self.axis {
+                    Axis::Horizontal => {
+                        (position.x - state.grab - bounds.x - 0.5) / (bounds.width - 1.0)
+                    }
+                    Axis::Vertical => {
+                        (position.y - state.grab - bounds.y - 0.5) / (bounds.height - 1.0)
+                    }
                 }
+                .clamp(self.min_ratio, self.max_ratio);
+
+                if self.ratio.is_none() {
+                    state.ratio = next;
+                    shell.invalidate_layout();
+                }
+
+                if let Some(on_resize) = &self.on_resize {
+                    shell.publish(on_resize(next));
+                }
+
+                shell.request_redraw();
+                shell.capture_event();
+                return;
+            }
+
+            match event {
                 Event::Mouse(mouse::Event::ButtonPressed(_))
                 | Event::Touch(touch::Event::FingerPressed { .. })
                     if state.focused =>
@@ -381,44 +463,6 @@ where
                         shell.capture_event();
                         return;
                     }
-                }
-                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-                | Event::Touch(touch::Event::FingerLifted { .. })
-                    if state.dragging =>
-                {
-                    state.dragging = false;
-                    shell.capture_event();
-                    return;
-                }
-                Event::Mouse(mouse::Event::CursorMoved { .. })
-                | Event::Touch(touch::Event::FingerMoved { .. })
-                    if state.dragging =>
-                {
-                    if let Some(position) = cursor.position() {
-                        let next = match self.axis {
-                            Axis::Horizontal => {
-                                (position.x - state.grab - bounds.x - 0.5) / (bounds.width - 1.0)
-                            }
-                            Axis::Vertical => {
-                                (position.y - state.grab - bounds.y - 0.5) / (bounds.height - 1.0)
-                            }
-                        }
-                        .clamp(self.min_ratio, self.max_ratio);
-
-                        if self.ratio.is_none() {
-                            state.ratio = next;
-                            shell.invalidate_layout();
-                        }
-
-                        if let Some(on_resize) = &self.on_resize {
-                            shell.publish(on_resize(next));
-                        }
-
-                        shell.request_redraw();
-                    }
-
-                    shell.capture_event();
-                    return;
                 }
                 _ => {}
             }
@@ -471,7 +515,13 @@ where
             (&self.first, &tree.children[0], first),
             (&self.second, &tree.children[1], second),
         ] {
-            renderer.with_layer(layout.bounds(), |renderer| {
+            // A layer does not clip to the one it is in: clipped to the
+            // viewport too, the pane stays inside a scroll area.
+            let Some(clip) = layout.bounds().intersection(viewport) else {
+                continue;
+            };
+
+            renderer.with_layer(clip, |renderer| {
                 element
                     .as_widget()
                     .draw(tree, renderer, theme, style, layout, cursor, viewport);
@@ -479,7 +529,8 @@ where
         }
 
         let appearance = (self.style)(theme);
-        let active = state.dragging || cursor.is_over(self.divider(bounds, ratio));
+        let active =
+            state.dragging.is_some() || pointer::is_hovered(cursor, self.divider(bounds, ratio));
 
         let line = match self.axis {
             Axis::Horizontal => Rectangle {
@@ -583,7 +634,9 @@ where
         let state = tree.state.downcast_ref::<State>();
         let bounds = layout.bounds();
 
-        if state.dragging || cursor.is_over(self.divider(bounds, self.current(state))) {
+        if state.dragging.is_some()
+            || pointer::is_hovered(cursor, self.divider(bounds, self.current(state)))
+        {
             return match self.axis {
                 Axis::Horizontal => mouse::Interaction::ResizingHorizontally,
                 Axis::Vertical => mouse::Interaction::ResizingVertically,

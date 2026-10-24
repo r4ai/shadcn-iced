@@ -15,27 +15,38 @@
 //!   their content and peek out by the gap, 5% smaller for each toast in
 //!   front of them, and only the first three are visible;
 //! - hovering the stack expands it into a list (and pauses the timers);
+//!   on touch screens, a tap expands it (without pausing the timers once
+//!   the finger lifted) and a tap elsewhere collapses it;
 //! - a dismissed toast slides back towards the edge and fades out, and is
 //!   unmounted (reported with `on_dismiss`) 200ms later.
 //!
 //! The content of a toast produces [`Action`]s, so that its buttons can
 //! dismiss it with the exit animation.
 //!
+//! With a [`Hotkey`], the keyboard reaches the toasts from anywhere (sonner's
+//! <kbd>Alt</kbd>+<kbd>T</kbd>, the <kbd>F8</kbd> of Radix Toast's viewport): it
+//! expands the stack and focuses the first control of the newest toast.
+//! <kbd>Tab</kbd> then moves through the toasts, and <kbd>Escape</kbd>
+//! dismisses the focused one. The timers pause while the focus is within.
+//!
 //! These are the motions of sonner, the defaults; a [`Motion`] changes how
 //! the toasts enter and leave and how the collapsed stack is drawn, which is
 //! how the toasts of Base UI are made from the same stack.
 use super::box_shadow;
+use super::pointer::{self, Pointer};
+use super::tab;
 use crate::animation::{self, Easing, Fade, Transition};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
+use iced::advanced::widget::operation::{Focusable, focusable};
+use iced::advanced::widget::{Id, Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell};
 use iced::time::{Duration, Instant};
 use iced::widget::container;
 use iced::{
     Background, Color, Element, Event, Length, Point, Rectangle, Size, Transformation, Vector,
-    mouse, touch, window,
+    keyboard, mouse, touch, window,
 };
 
 use std::collections::HashMap;
@@ -106,6 +117,49 @@ pub enum Origin {
     Top,
     /// The middle of its bottom edge (`transform-origin: bottom`).
     Bottom,
+}
+
+/// A keyboard shortcut that moves the focus to the toasts of a [`Toaster`]
+/// from anywhere in the window (sonner's `hotkey`).
+///
+/// ```
+/// use iced::keyboard::{Key, Modifiers, key::Named};
+/// use shadcn_iced_core::primitive::toaster::Hotkey;
+///
+/// // sonner's default, `['altKey', 'KeyT']`.
+/// let sonner = Hotkey::new(Key::Character("t".into()), Modifiers::ALT);
+/// // The viewport of Base UI's toasts.
+/// let radix = Hotkey::new(Named::F8, Modifiers::empty());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hotkey {
+    key: keyboard::Key,
+    modifiers: keyboard::Modifiers,
+}
+
+impl Hotkey {
+    /// Creates a hotkey: `key` pressed with exactly `modifiers`.
+    ///
+    /// The key is compared without the modifiers applied (like the `code`
+    /// sonner compares), so <kbd>Alt</kbd>+<kbd>T</kbd> works where
+    /// <kbd>Alt</kbd> changes the character, and letters ignore their case.
+    pub fn new(key: impl Into<keyboard::Key>, modifiers: keyboard::Modifiers) -> Self {
+        Self {
+            key: key.into(),
+            modifiers,
+        }
+    }
+
+    fn matches(&self, key: &keyboard::Key, modifiers: keyboard::Modifiers) -> bool {
+        let same = match (&self.key, key) {
+            (keyboard::Key::Character(expected), keyboard::Key::Character(key)) => {
+                expected.eq_ignore_ascii_case(key)
+            }
+            (expected, key) => expected == key,
+        };
+
+        same && modifiers == self.modifiers
+    }
 }
 
 /// How the toasts of a [`Toaster`] move. The default is sonner's.
@@ -223,6 +277,7 @@ pub struct Toaster<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> 
     visible: usize,
     expand: bool,
     motion: Motion,
+    hotkey: Option<Hotkey>,
     surface: Box<dyn Fn(&Theme) -> container::Style + 'a>,
     shadows: &'a [box_shadow::Layer],
 }
@@ -243,6 +298,7 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
             visible: VISIBLE,
             expand: false,
             motion: Motion::default(),
+            hotkey: None,
             surface: Box::new(|_| container::Style::default()),
             shadows: &[],
         }
@@ -282,6 +338,13 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
     /// Sets how the toasts move.
     pub fn motion(mut self, motion: Motion) -> Self {
         self.motion = motion;
+        self
+    }
+
+    /// Sets the keyboard shortcut that focuses the toasts (`hotkey`); none
+    /// by default.
+    pub fn hotkey(mut self, hotkey: impl Into<Option<Hotkey>>) -> Self {
+        self.hotkey = hotkey.into();
         self
     }
 
@@ -396,10 +459,17 @@ struct Drag {
 struct State {
     ids: Vec<u64>,
     entries: HashMap<u64, Entry>,
-    /// Whether the cursor is over the toasts (`expanded`).
+    /// Whether the toasts are expanded (`expanded`): the cursor is over
+    /// them, a finger tapped them, or the focus is within.
     expanded: bool,
-    /// Whether a pointer is pressed on the toasts (`interacting`).
-    interacting: bool,
+    /// Whether a finger expanded the toasts. A finger cannot leave them like
+    /// a mouse does, so its tap does not pause the timers.
+    touched: bool,
+    /// The pointer pressed on the toasts (`interacting`); other fingers
+    /// are ignored.
+    press: Option<Pointer>,
+    /// Whether the focus is within a toast.
+    focused: bool,
     drag: Option<Drag>,
     /// The last time the timers were advanced.
     last: Option<Instant>,
@@ -407,8 +477,11 @@ struct State {
 }
 
 impl State {
+    /// Whether the timers are paused: while the cursor is over the toasts
+    /// (`expanded`), a pointer presses them (`interacting`), or the focus is
+    /// within them (like the `onFocus` of Radix's toasts).
     fn paused(&self) -> bool {
-        self.expanded || self.interacting
+        (self.expanded && !self.touched) || self.press.is_some() || self.focused
     }
 
     /// Advances the timers of the toasts to `now`.
@@ -728,17 +801,27 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
         now: Instant,
         shell: &mut Shell<'_, Message>,
     ) {
-        let expanded = if self.is_hovered(state, layout, cursor, now) {
-            true
+        let hovered = self.is_hovered(state, layout, cursor, now);
+        let expanded = hovered
+            // Swiping a toast out of the stack, or moving the focus through
+            // it, keeps it expanded.
+            || (state.expanded
+                && (state.press.is_some() || state.drag.is_some() || state.focused));
+        let touched = if hovered {
+            pointer::is_touch()
         } else {
-            // Swiping a toast out of the stack keeps it expanded.
-            state.expanded && (state.interacting || state.drag.is_some())
+            state.touched
         };
 
-        if state.expanded != expanded {
+        if state.expanded != expanded || state.touched != touched {
             state.tick(now);
-            state.expanded = expanded;
-            self.refresh(state, now);
+            state.touched = touched;
+
+            if state.expanded != expanded {
+                state.expanded = expanded;
+                self.refresh(state, now);
+            }
+
             shell.request_redraw();
         }
     }
@@ -858,33 +941,278 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
             }
         }
     }
+
+    /// The toasts that can be interacted with, newest first.
+    fn interactive(&self, state: &State) -> Vec<u64> {
+        self.live(state)
+            .into_iter()
+            .enumerate()
+            .filter(|(index, id)| {
+                state
+                    .entries
+                    .get(id)
+                    .is_some_and(|entry| self.is_interactive(state, entry, *index))
+            })
+            .map(|(_, id)| id)
+            .collect()
+    }
+
+    /// Runs `operation` over the content of the toasts `ids`, newest first.
+    fn operate_on(
+        &mut self,
+        children: &mut [Tree],
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        ids: &[u64],
+        operation: &mut dyn Operation,
+    ) where
+        Renderer: iced::advanced::Renderer,
+    {
+        for ((toast, tree), layout) in self
+            .toasts
+            .iter_mut()
+            .zip(children)
+            .zip(layout.children())
+            .rev()
+        {
+            if ids.contains(&toast.id) {
+                toast
+                    .content
+                    .as_widget_mut()
+                    .operate(tree, layout, renderer, operation);
+            }
+        }
+    }
+
+    /// The toast among `ids` the focus is within.
+    fn focused(
+        &mut self,
+        children: &mut [Tree],
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        ids: &[u64],
+    ) -> Option<u64>
+    where
+        Renderer: iced::advanced::Renderer,
+    {
+        ids.iter().copied().find(|id| {
+            tab::has_focus(|operation| {
+                self.operate_on(children, layout, renderer, &[*id], operation);
+            })
+        })
+    }
+
+    /// Handles the [hotkey](Self::hotkey), and <kbd>Tab</kbd> and
+    /// <kbd>Escape</kbd> while the focus is within the toasts.
+    #[allow(clippy::too_many_arguments)]
+    fn keyboard(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        now: Instant,
+        shell: &mut Shell<'_, Message>,
+    ) where
+        Renderer: iced::advanced::Renderer,
+    {
+        let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event else {
+            return;
+        };
+
+        let state = tree.state.downcast_mut::<State>();
+        let children = &mut tree.children;
+
+        // sonner's hotkey: `setExpanded(true)`, then the focus moves to the
+        // toasts, here to the first control of the newest one.
+        if self
+            .hotkey
+            .as_ref()
+            .is_some_and(|hotkey| hotkey.matches(key, *modifiers))
+        {
+            let any = state
+                .entries
+                .values()
+                .any(|entry| entry.mounted && entry.removed.is_none() && !entry.unmounted);
+
+            if !any {
+                return;
+            }
+
+            state.tick(now);
+            state.expanded = true;
+            state.touched = false;
+            self.refresh(state, now);
+
+            let ids = self.interactive(state);
+            state.focused = tab::focus_first(|operation| {
+                self.operate_on(children, layout, renderer, &ids, operation);
+            });
+
+            shell.capture_event();
+            shell.request_redraw();
+            return;
+        }
+
+        if !state.focused {
+            return;
+        }
+
+        let ids = self.interactive(state);
+
+        match key {
+            // Radix and Base UI close the focused toast on Escape; the focus
+            // leaves the toasts.
+            keyboard::Key::Named(keyboard::key::Named::Escape) => {
+                let Some(id) = self.focused(children, layout, renderer, &ids) else {
+                    return;
+                };
+
+                self.operate_on(
+                    children,
+                    layout,
+                    renderer,
+                    &ids,
+                    &mut focusable::unfocus::<()>(),
+                );
+
+                state.tick(now);
+                state.focused = false;
+                self.remove(state, id, false, now, shell);
+                self.hover(state, layout, pointer::hover(cursor), now, shell);
+                shell.capture_event();
+            }
+            // Tab moves through the toasts, newest first; past the last
+            // (or before the first) one, the focus leaves them for the
+            // window, which moves it on.
+            _ => {
+                let Some(backwards) = tab::tab_pressed(event) else {
+                    return;
+                };
+
+                let mut count = Count::default();
+                self.operate_on(children, layout, renderer, &ids, &mut count);
+
+                let Some(focused) = count.focused else {
+                    return;
+                };
+
+                let target = if backwards {
+                    focused.checked_sub(1)
+                } else {
+                    Some(focused + 1).filter(|next| *next < count.total)
+                };
+
+                match target {
+                    Some(target) => {
+                        self.operate_on(
+                            children,
+                            layout,
+                            renderer,
+                            &ids,
+                            &mut FocusAt { target, current: 0 },
+                        );
+                        shell.capture_event();
+                    }
+                    None => {
+                        self.operate_on(
+                            children,
+                            layout,
+                            renderer,
+                            &ids,
+                            &mut focusable::unfocus::<()>(),
+                        );
+
+                        state.tick(now);
+                        state.focused = false;
+                        self.hover(state, layout, pointer::hover(cursor), now, shell);
+                    }
+                }
+
+                shell.request_redraw();
+            }
+        }
+    }
 }
 
-/// The position of a pointer event, and whether it presses or releases.
-enum Pointer {
-    Pressed(Option<Point>),
-    Moved(Point),
-    Released,
+/// A pointer event: which pointer, its position, and whether it presses or
+/// releases.
+enum Input {
+    Pressed(Pointer, Option<Point>),
+    Moved(Pointer, Point),
+    Released(Pointer),
     Left,
 }
 
-fn pointer(event: &Event, cursor: mouse::Cursor) -> Option<Pointer> {
+fn input(event: &Event, cursor: mouse::Cursor) -> Option<Input> {
     Some(match event {
         Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-            Pointer::Pressed(cursor.land().position())
+            Input::Pressed(Pointer::Mouse, cursor.land().position())
         }
-        Event::Mouse(mouse::Event::CursorMoved { position }) => Pointer::Moved(*position),
-        Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => Pointer::Released,
-        Event::Mouse(mouse::Event::CursorLeft) => Pointer::Left,
-        Event::Touch(touch::Event::FingerPressed { position, .. }) => {
-            Pointer::Pressed(Some(*position))
+        Event::Mouse(mouse::Event::CursorMoved { position }) => {
+            Input::Moved(Pointer::Mouse, *position)
         }
-        Event::Touch(touch::Event::FingerMoved { position, .. }) => Pointer::Moved(*position),
-        Event::Touch(touch::Event::FingerLifted { .. } | touch::Event::FingerLost { .. }) => {
-            Pointer::Released
+        Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+            Input::Released(Pointer::Mouse)
         }
+        Event::Mouse(mouse::Event::CursorLeft) => Input::Left,
+        Event::Touch(touch::Event::FingerPressed { id, position }) => {
+            Input::Pressed(Pointer::Finger(*id), Some(*position))
+        }
+        Event::Touch(touch::Event::FingerMoved { id, position }) => {
+            Input::Moved(Pointer::Finger(*id), *position)
+        }
+        Event::Touch(
+            touch::Event::FingerLifted { id, .. } | touch::Event::FingerLost { id, .. },
+        ) => Input::Released(Pointer::Finger(*id)),
         _ => return None,
     })
+}
+
+/// Counts the focusable widgets an operation visits, and finds the focused
+/// one.
+#[derive(Default)]
+struct Count {
+    focused: Option<usize>,
+    total: usize,
+}
+
+impl Operation for Count {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+
+    fn focusable(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn Focusable) {
+        if state.is_focused() {
+            self.focused = Some(self.total);
+        }
+
+        self.total += 1;
+    }
+}
+
+/// Focuses the `target`-th focusable widget an operation visits, and
+/// unfocuses the others.
+struct FocusAt {
+    target: usize,
+    current: usize,
+}
+
+impl Operation for FocusAt {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+
+    fn focusable(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn Focusable) {
+        if self.current == self.target {
+            state.focus();
+        } else if state.is_focused() {
+            state.unfocus();
+        }
+
+        self.current += 1;
+    }
 }
 
 impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -1022,11 +1350,13 @@ where
         renderer: &Renderer,
         operation: &mut dyn Operation,
     ) {
+        // Newest first, the order of sonner's list and of the focus.
         for ((toast, tree), layout) in self
             .toasts
             .iter_mut()
             .zip(&mut tree.children)
             .zip(layout.children())
+            .rev()
         {
             toast
                 .content
@@ -1046,6 +1376,8 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         let now = match event {
             Event::Window(window::Event::RedrawRequested(now)) => *now,
             _ => Instant::now(),
@@ -1131,22 +1463,56 @@ where
             }
         }
 
-        match pointer(event, cursor) {
-            Some(Pointer::Moved(position)) => {
-                if state.drag.is_some() {
+        // The focus moves on its own (with Tab, or a press elsewhere): the
+        // timers resume once it left, and the stack collapses unless hovered.
+        if !matches!(
+            event,
+            Event::Mouse(mouse::Event::CursorMoved { .. })
+                | Event::Touch(touch::Event::FingerMoved { .. })
+        ) {
+            let ids = self.interactive(state);
+            let focused = self
+                .focused(&mut tree.children, layout, renderer, &ids)
+                .is_some();
+
+            if focused != state.focused {
+                state.tick(now);
+                state.focused = focused;
+
+                if !focused {
+                    self.hover(state, layout, pointer::hover(cursor), now, shell);
+                }
+
+                shell.request_redraw();
+            }
+        }
+
+        if !captured {
+            self.keyboard(tree, event, layout, cursor, renderer, now, shell);
+        }
+
+        let state = tree.state.downcast_mut::<State>();
+
+        match input(event, cursor) {
+            Some(Input::Moved(moved, position)) => {
+                if state.drag.is_some() && state.press == Some(moved) {
                     self.swipe(state, position);
                     shell.request_redraw();
                 }
 
-                self.hover(state, layout, cursor, now, shell);
+                // A finger moving over the toasts swipes them, or scrolls:
+                // like touch events on the web, it does not hover them.
+                if moved == Pointer::Mouse {
+                    self.hover(state, layout, cursor, now, shell);
+                }
             }
-            Some(Pointer::Left) => {
-                self.hover(state, layout, mouse::Cursor::Unavailable, now, shell)
-            }
-            Some(Pointer::Pressed(position)) => {
-                if self.is_hovered(state, layout, cursor, now) {
+            Some(Input::Left) => self.hover(state, layout, mouse::Cursor::Unavailable, now, shell),
+            Some(Input::Pressed(pressed, position)) => {
+                if state.press.is_some() {
+                    // Another finger, while the first one swipes.
+                } else if self.is_hovered(state, layout, cursor, now) {
                     state.tick(now);
-                    state.interacting = true;
+                    state.press = Some(pressed);
 
                     if !captured && let Some(position) = position {
                         // The newest toast under the pointer.
@@ -1181,12 +1547,20 @@ where
                     }
 
                     shell.capture_event();
+                } else if pressed != Pointer::Mouse {
+                    // A tap elsewhere is how a finger leaves the toasts
+                    // (the `mouseleave` mobile browsers emulate).
+                    self.hover(state, layout, mouse::Cursor::Unavailable, now, shell);
                 }
             }
-            Some(Pointer::Released) if state.interacting || state.drag.is_some() => {
+            Some(Input::Released(released)) if state.press == Some(released) => {
                 state.tick(now);
-                state.interacting = false;
+                state.press = None;
                 self.release(state, now, shell);
+
+                // A finger lifted over the toasts tapped them: they expand,
+                // as a tap emulates `mouseenter` on mobile browsers; lifted
+                // elsewhere, after a swipe, it left them.
                 self.hover(state, layout, cursor, now, shell);
             }
             _ => {}

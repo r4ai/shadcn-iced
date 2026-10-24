@@ -178,20 +178,28 @@ fn surface<'a, Message: Clone + 'a>(
     on_press: Option<Message>,
     interactive: bool,
 ) -> Element<'a, Message> {
-    Pressable::new(content)
-        .on_press_maybe(on_press)
-        .style(move |theme, button_status| {
-            let hovered = interactive
-                && matches!(button_status, ButtonStatus::Hovered | ButtonStatus::Pressed);
+    let pressable =
+        Pressable::new(content)
+            .on_press_maybe(on_press)
+            .style(move |theme, button_status| {
+                let hovered = interactive
+                    && matches!(button_status, ButtonStatus::Hovered | ButtonStatus::Pressed);
 
-            Style {
-                background: None,
-                text_color: color(theme, status, hovered),
-                border: iced::border::rounded(tokens(theme).radius_md()),
-                ..Style::default()
-            }
-        })
-        .into()
+                Style {
+                    background: None,
+                    text_color: color(theme, status, hovered),
+                    border: iced::border::rounded(tokens(theme).radius_md()),
+                    ..Style::default()
+                }
+            });
+
+    // A pressable line (or the trigger of a collapsible one) is a
+    // `<button>`: `rounded-md focus-visible:ring-3 focus-visible:ring-ring/50`.
+    if interactive {
+        super::button::focus_ring(pressable, |t| t.radius_md()).into()
+    } else {
+        pressable.into()
+    }
 }
 
 impl<'a, Message: Clone + 'a> From<TraceLine<Message>> for Element<'a, Message> {

@@ -12,6 +12,7 @@
 //!
 //! Several thumbs select a range ([`range_slider`]).
 use shadcn_iced_core::primitive::Focus;
+use shadcn_iced_core::primitive::pointer::{self, Pointer};
 use shadcn_iced_core::theme::{alpha, mix};
 use shadcn_iced_core::{Element, style, tokens};
 
@@ -32,6 +33,9 @@ const THUMB: f32 = 12.0;
 const TRACK: f32 = 4.0;
 /// `after:-inset-2`: the thumb reacts to the cursor around it.
 const HIT_SLOP: f32 = 8.0;
+/// A finger grabs the slider from farther: the 4px track and the 12px
+/// thumbs are much smaller than a fingertip.
+const TOUCH_HIT_SLOP: f32 = HIT_SLOP + pointer::TOUCH_SLOP;
 
 /// The direction of a [`Slider`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -258,13 +262,14 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
     }
 
     fn hovered_thumb(&self, bounds: Rectangle, cursor: mouse::Cursor) -> Option<usize> {
-        let position = cursor.position()?;
+        self.thumb_at(bounds, cursor.position()?, HIT_SLOP)
+    }
 
-        (0..self.values.len()).rev().find(|&index| {
-            self.thumb(bounds, index)
-                .expand(HIT_SLOP)
-                .contains(position)
-        })
+    /// The thumb within `slop` of `position`, the last one on top.
+    fn thumb_at(&self, bounds: Rectangle, position: iced::Point, slop: f32) -> Option<usize> {
+        (0..self.values.len())
+            .rev()
+            .find(|&index| self.thumb(bounds, index).expand(slop).contains(position))
     }
 }
 
@@ -279,6 +284,9 @@ fn decimals(value: f32) -> i32 {
 #[derive(Debug, Default)]
 struct State {
     dragging: Option<usize>,
+    /// The pointer dragging a thumb: other fingers are ignored, like the
+    /// pointer capture of Radix.
+    pointer: Option<Pointer>,
     /// The thumb under the cursor, which shows a ring.
     hovered: Option<usize>,
     /// The keyboard focus of each thumb.
@@ -367,6 +375,8 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         if self.disabled || self.values.is_empty() {
             return;
         }
@@ -453,67 +463,107 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
             }
         }
 
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerPressed { .. }) => {
-                let Some(position) = cursor.position() else {
-                    return;
-                };
-
-                if !bounds.expand(HIT_SLOP).contains(position) {
-                    return;
-                }
-
-                // The hovered thumb, or the closest one.
-                let index = self.hovered_thumb(bounds, cursor).unwrap_or_else(|| {
-                    let value = self.value_at(bounds, position);
-
-                    (0..self.values.len())
-                        .min_by(|&a, &b| {
-                            (self.values[a] - value)
-                                .abs()
-                                .total_cmp(&(self.values[b] - value).abs())
-                        })
-                        .unwrap_or(0)
-                });
-
-                state.focus(count)[index].focus_with_pointer();
-                state.dragging = Some(change(index, position, shell));
-                shell.capture_event();
-                shell.request_redraw();
+        // Where the pointer dragging a thumb moved to, on an event about it.
+        let dragged = match (state.pointer, event) {
+            (Some(Pointer::Mouse), Event::Mouse(mouse::Event::CursorMoved { .. })) => {
+                cursor.position()
             }
-            Event::Mouse(mouse::Event::CursorMoved { .. })
-            | Event::Touch(touch::Event::FingerMoved { .. }) => {
-                if let (Some(index), Some(position)) = (state.dragging, cursor.position()) {
-                    state.dragging = Some(change(index, position, shell));
-                    shell.capture_event();
-                    shell.request_redraw();
-                }
-
-                // Only the ring of the hovered thumb follows the cursor.
-                let hovered = (!self.disabled)
-                    .then(|| self.hovered_thumb(bounds, cursor))
-                    .flatten();
-
-                if hovered != state.hovered {
-                    state.hovered = hovered;
-                    shell.request_redraw();
-                }
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerLifted { .. } | touch::Event::FingerLost { .. })
-                if state.dragging.is_some() =>
+            (Some(Pointer::Finger(finger)), Event::Touch(touch::Event::FingerMoved { id, .. }))
+                if *id == finger =>
             {
-                state.dragging = None;
+                cursor.position()
+            }
+            _ => None,
+        };
 
-                if let Some(message) = &self.on_release {
-                    shell.publish(message.clone());
-                }
+        // Whether the pointer dragging a thumb was released, or taken by the
+        // system.
+        let released = match (state.pointer, event) {
+            (
+                Some(Pointer::Mouse),
+                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+            ) => true,
+            (
+                Some(Pointer::Finger(finger)),
+                Event::Touch(
+                    touch::Event::FingerLifted { id, .. } | touch::Event::FingerLost { id, .. },
+                ),
+            ) => *id == finger,
+            _ => false,
+        };
 
-                shell.capture_event();
+        let pressed = match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => cursor
+                .position()
+                .map(|position| (Pointer::Mouse, position, HIT_SLOP)),
+            // The cursor follows the fingers, and is translated by the
+            // scrollables around, unlike the positions of touch events.
+            Event::Touch(touch::Event::FingerPressed { id, .. }) => cursor
+                .position()
+                .map(|position| (Pointer::Finger(*id), position, TOUCH_HIT_SLOP)),
+            _ => None,
+        };
+
+        if let Some((by, position, slop)) = pressed {
+            // A second finger does not take the thumb from the first one.
+            if state.pointer.is_some() || !bounds.expand(slop).contains(position) {
+                return;
+            }
+
+            // The hovered thumb, or the closest one.
+            let index = self.thumb_at(bounds, position, slop).unwrap_or_else(|| {
+                let value = self.value_at(bounds, position);
+
+                (0..self.values.len())
+                    .min_by(|&a, &b| {
+                        (self.values[a] - value)
+                            .abs()
+                            .total_cmp(&(self.values[b] - value).abs())
+                    })
+                    .unwrap_or(0)
+            });
+
+            state.focus(count)[index].focus_with_pointer();
+            state.dragging = Some(change(index, position, shell));
+            state.pointer = Some(by);
+            shell.capture_event();
+            shell.request_redraw();
+            return;
+        }
+
+        if let (Some(index), Some(position)) = (state.dragging, dragged) {
+            state.dragging = Some(change(index, position, shell));
+            shell.capture_event();
+            shell.request_redraw();
+        }
+
+        if released {
+            state.dragging = None;
+            state.pointer = None;
+
+            if let Some(message) = &self.on_release {
+                shell.publish(message.clone());
+            }
+
+            shell.capture_event();
+            shell.request_redraw();
+        }
+
+        // Only the ring of the hovered thumb follows the cursor; a finger
+        // leaves no ring behind once it lifted (`hover:` is for mice).
+        if let Event::Mouse(mouse::Event::CursorMoved { .. })
+        | Event::Touch(
+            touch::Event::FingerMoved { .. }
+            | touch::Event::FingerLifted { .. }
+            | touch::Event::FingerLost { .. },
+        ) = event
+        {
+            let hovered = self.hovered_thumb(bounds, pointer::hover(cursor));
+
+            if hovered != state.hovered {
+                state.hovered = hovered;
                 shell.request_redraw();
             }
-            _ => {}
         }
     }
 
@@ -602,7 +652,7 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
         }
 
         let hovered = (!self.disabled)
-            .then(|| self.hovered_thumb(bounds, cursor))
+            .then(|| self.hovered_thumb(bounds, pointer::hover(cursor)))
             .flatten();
 
         for index in 0..self.values.len() {

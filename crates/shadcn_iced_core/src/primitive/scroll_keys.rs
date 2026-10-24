@@ -5,8 +5,10 @@
 //! the end, <kbd>PageUp</kbd>, <kbd>PageDown</kbd> and <kbd>Space</kbd>
 //! (with <kbd>Shift</kbd> upwards) scroll by a page, <kbd>↑</kbd> and
 //! <kbd>↓</kbd> by a line. [`ScrollKeys`] does the same for the vertical
-//! scrollables of its content, and shows the focus once a key scrolled
-//! them (`:focus-visible`) through [`ScrollKeys::outline`].
+//! scrollables of its content (the horizontal ones with
+//! [`ScrollKeys::horizontal`]), and shows the focus once a key scrolled
+//! them (`:focus-visible`) through [`ScrollKeys::outline`]. A tap focuses
+//! it like a click does.
 //!
 //! ```no_run
 //! # use shadcn_iced_core::primitive::scroll_keys;
@@ -27,7 +29,7 @@ use iced::advanced::widget::{Id, Operation, Tree, Widget, operation, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
 use iced::widget::scrollable::{AbsoluteOffset, RelativeOffset};
-use iced::{Border, Color, Element, Event, Length, Rectangle, Size, Vector, mouse};
+use iced::{Border, Color, Element, Event, Length, Rectangle, Size, Vector, mouse, touch};
 
 /// How far an arrow key scrolls, like browsers do.
 pub const LINE: f32 = 40.0;
@@ -47,6 +49,8 @@ pub struct Status {
 pub struct ScrollKeys<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
     anchor_end: bool,
+    vertical: bool,
+    horizontal: bool,
     outline: Option<Box<dyn Fn(&Theme, Status) -> Border + 'a>>,
 }
 
@@ -57,6 +61,8 @@ pub fn scroll_keys<'a, Message, Theme, Renderer>(
     ScrollKeys {
         content: content.into(),
         anchor_end: false,
+        vertical: true,
+        horizontal: false,
         outline: None,
     }
 }
@@ -71,6 +77,20 @@ impl<'a, Message, Theme, Renderer> ScrollKeys<'a, Message, Theme, Renderer> {
         self
     }
 
+    /// Sets whether the scrollables scroll vertically (the default): the
+    /// page and boundary keys then move along the vertical axis, else along
+    /// the horizontal one.
+    pub fn vertical(mut self, vertical: bool) -> Self {
+        self.vertical = vertical;
+        self
+    }
+
+    /// Sets whether <kbd>←</kbd> and <kbd>→</kbd> scroll horizontally.
+    pub fn horizontal(mut self, horizontal: bool) -> Self {
+        self.horizontal = horizontal;
+        self
+    }
+
     /// Draws a border over the bounds, depending on the [`Status`].
     pub fn outline(mut self, outline: impl Fn(&Theme, Status) -> Border + 'a) -> Self {
         self.outline = Some(Box::new(outline));
@@ -81,9 +101,10 @@ impl<'a, Message, Theme, Renderer> ScrollKeys<'a, Message, Theme, Renderer> {
 /// Where a scrolling key moves the viewport.
 #[derive(Debug, Clone, Copy)]
 enum Scroll {
-    Start,
-    End,
-    By(f32),
+    /// The start of the vertical (or else horizontal) axis.
+    Start(bool),
+    End(bool),
+    By(Vector),
 }
 
 /// Applies a [`Scroll`] to the scrollables of the content.
@@ -114,19 +135,19 @@ impl Operation for ScrollOperation {
         };
 
         match self.scroll {
-            Scroll::Start => state.snap_to(RelativeOffset {
-                x: None,
-                y: Some(start),
+            Scroll::Start(vertical) => state.snap_to(RelativeOffset {
+                x: (!vertical).then_some(start),
+                y: vertical.then_some(start),
             }),
-            Scroll::End => state.snap_to(RelativeOffset {
-                x: None,
-                y: Some(end),
+            Scroll::End(vertical) => state.snap_to(RelativeOffset {
+                x: (!vertical).then_some(end),
+                y: vertical.then_some(end),
             }),
-            Scroll::By(y) => {
+            Scroll::By(by) => {
                 state.scroll_by(
                     AbsoluteOffset {
-                        x: 0.0,
-                        y: sign * y,
+                        x: sign * by.x,
+                        y: sign * by.y,
                     },
                     bounds,
                     content_bounds,
@@ -201,7 +222,9 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        if let Event::Mouse(mouse::Event::ButtonPressed(_)) = event {
+        if let Event::Mouse(mouse::Event::ButtonPressed(_))
+        | Event::Touch(touch::Event::FingerPressed { .. }) = event
+        {
             let status = tree.state.downcast_mut::<Status>();
             let focused = cursor.is_over(layout.bounds());
 
@@ -237,16 +260,42 @@ where
             return;
         }
 
-        let page = (layout.bounds().height - LINE).max(LINE);
+        let vertical = self.vertical;
+        let bounds = layout.bounds();
+        let along = |distance: f32| {
+            if vertical {
+                Vector::new(0.0, distance)
+            } else {
+                Vector::new(distance, 0.0)
+            }
+        };
+        let page = (if vertical {
+            bounds.height
+        } else {
+            bounds.width
+        } - LINE)
+            .max(LINE);
         let scroll = match key.as_ref() {
-            keyboard::Key::Named(key::Named::Home) => Scroll::Start,
-            keyboard::Key::Named(key::Named::End) => Scroll::End,
-            keyboard::Key::Named(key::Named::PageUp) => Scroll::By(-page),
-            keyboard::Key::Named(key::Named::PageDown) => Scroll::By(page),
-            keyboard::Key::Named(key::Named::Space) if modifiers.shift() => Scroll::By(-page),
-            keyboard::Key::Named(key::Named::Space) => Scroll::By(page),
-            keyboard::Key::Named(key::Named::ArrowUp) => Scroll::By(-LINE),
-            keyboard::Key::Named(key::Named::ArrowDown) => Scroll::By(LINE),
+            keyboard::Key::Named(key::Named::Home) => Scroll::Start(vertical),
+            keyboard::Key::Named(key::Named::End) => Scroll::End(vertical),
+            keyboard::Key::Named(key::Named::PageUp) => Scroll::By(along(-page)),
+            keyboard::Key::Named(key::Named::PageDown) => Scroll::By(along(page)),
+            keyboard::Key::Named(key::Named::Space) if modifiers.shift() => {
+                Scroll::By(along(-page))
+            }
+            keyboard::Key::Named(key::Named::Space) => Scroll::By(along(page)),
+            keyboard::Key::Named(key::Named::ArrowUp) if vertical => {
+                Scroll::By(Vector::new(0.0, -LINE))
+            }
+            keyboard::Key::Named(key::Named::ArrowDown) if vertical => {
+                Scroll::By(Vector::new(0.0, LINE))
+            }
+            keyboard::Key::Named(key::Named::ArrowLeft) if self.horizontal => {
+                Scroll::By(Vector::new(-LINE, 0.0))
+            }
+            keyboard::Key::Named(key::Named::ArrowRight) if self.horizontal => {
+                Scroll::By(Vector::new(LINE, 0.0))
+            }
             _ => return,
         };
 

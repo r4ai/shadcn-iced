@@ -4,6 +4,10 @@
 use super::Page;
 use crate::{Message, example};
 
+use shadcn_iced::prelude::scroll_area;
+
+use iced::Fill;
+
 pub const DASHBOARD: Page = Page {
     id: "dashboard",
     title: "Dashboard",
@@ -20,5 +24,13 @@ pub const SETTINGS: Page = Page {
     id: "settings",
     title: "Settings",
     description: "The settings of a fictional app: a profile, an account, the appearance and the notifications.",
-    view: |gallery| example("Settings", gallery.settings.view().map(Message::Settings)),
+    // Scrolled in a frame of a fixed height, like `cargo run -p settings`:
+    // grown to its natural height, the preview would change its height, and
+    // move the page below it, with each section.
+    view: |gallery| {
+        example(
+            "Settings",
+            scroll_area(gallery.settings.view().map(Message::Settings)).height(Fill),
+        )
+    },
 };

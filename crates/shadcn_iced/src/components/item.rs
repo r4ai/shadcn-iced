@@ -261,7 +261,7 @@ impl<'a, Message: Clone + 'a> From<Item<'a, Message>> for Element<'a, Message> {
         let variant = item.variant;
         let clickable = item.on_press.is_some();
 
-        Pressable::new(body)
+        let pressable = Pressable::new(body)
             .on_press_maybe(item.on_press)
             .padding(size.padding())
             .width(Length::Fill)
@@ -270,8 +270,24 @@ impl<'a, Message: Clone + 'a> From<Item<'a, Message>> for Element<'a, Message> {
             } else {
                 iced::mouse::Interaction::Idle
             })
-            .style(move |theme, status| self::style(theme, status, variant, clickable))
-            .into()
+            .focus_style(move |theme, status, focused| {
+                let mut style = self::style(theme, status, variant, clickable);
+
+                // `focus-visible:border-ring`
+                if focused {
+                    style.border.color = tokens(theme).palette.ring;
+                }
+
+                style
+            });
+
+        // An item with an action is a link (`asChild` with an `<a>`):
+        // focusable, with `focus-visible:ring-[3px] focus-visible:ring-ring/50`.
+        if clickable {
+            super::button::focus_ring(pressable, |t| t.radius_lg()).into()
+        } else {
+            pressable.into()
+        }
     }
 }
 

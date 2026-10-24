@@ -11,6 +11,7 @@
 //! [`Pressable`](super::Pressable) without a message of its own),
 //! <kbd>Enter</kbd> and <kbd>Space</kbd> toggle it too.
 use super::focus::{self, Focus};
+use super::pointer::{self, Gesture, Press};
 use crate::animation::{self, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -19,7 +20,7 @@ use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key::Named};
 
 use iced::time::Instant;
-use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, mouse, touch, window};
+use iced::{Element, Event, Length, Point, Rectangle, Size, Vector, mouse, window};
 
 /// A trigger that shows and hides some content.
 pub struct Disclosure<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
@@ -99,7 +100,11 @@ where
 #[derive(Debug)]
 struct State {
     open: bool,
-    pressed: bool,
+    /// The press of the pointer on the trigger, until it is released.
+    press: Option<Press>,
+    /// Whether <kbd>Space</kbd> went down on the focused trigger: it toggles
+    /// when released.
+    space: bool,
     presence: Transition,
     /// The progress of the animation when the layout was last computed.
     laid_out: f32,
@@ -171,7 +176,8 @@ where
 
         tree::State::new(State {
             open: self.default_open,
-            pressed: false,
+            press: None,
+            space: false,
             presence: Transition::new(if open { 1.0 } else { 0.0 }),
             laid_out: if open { 1.0 } else { 0.0 },
             laid_out_open: open,
@@ -311,6 +317,8 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         let open = self.is_open(tree.state.downcast_ref::<State>());
 
         if let Event::Window(window::Event::RedrawRequested(now)) = event {
@@ -389,24 +397,49 @@ where
         }
 
         if shell.is_event_captured() || self.disabled {
+            // A press handled by the trigger itself is over.
+            let state = tree.state.downcast_mut::<State>();
+            state.press = None;
+            state.space = false;
+
             return;
         }
 
         // <kbd>Enter</kbd> and <kbd>Space</kbd> toggle a disclosure whose
-        // trigger holds the focus (e.g. a focusable `Pressable`).
-        if let Event::Keyboard(keyboard::Event::KeyPressed {
-            key: keyboard::Key::Named(Named::Enter | Named::Space),
-            ..
-        }) = event
+        // trigger holds the focus (e.g. a focusable `Pressable`): like the
+        // `<button>` of the trigger, Enter as it goes down, Space as it goes
+        // up.
+        if let Event::Keyboard(
+            keyboard::Event::KeyPressed {
+                key: key @ keyboard::Key::Named(Named::Enter | Named::Space),
+                ..
+            }
+            | keyboard::Event::KeyReleased {
+                key: key @ keyboard::Key::Named(Named::Space),
+                ..
+            },
+        ) = event
         {
+            let released = matches!(event, Event::Keyboard(keyboard::Event::KeyReleased { .. }));
+
+            if released && !tree.state.downcast_ref::<State>().space {
+                return;
+            }
+
             let focused = if open {
                 focus::is_focus_within(&mut self.opened, &mut tree.children[1], trigger, renderer)
             } else {
                 focus::is_focus_within(&mut self.closed, &mut tree.children[0], trigger, renderer)
             };
 
+            let space = *key == keyboard::Key::Named(Named::Space);
+            tree.state.downcast_mut::<State>().space = focused && space && !released;
+
             if focused {
-                self.toggle(tree, trigger, renderer, shell, open);
+                if released || !space {
+                    self.toggle(tree, trigger, renderer, shell, open);
+                }
+
                 shell.capture_event();
             }
 
@@ -414,27 +447,41 @@ where
         }
 
         let over_trigger = cursor.is_over(trigger.bounds());
+        let state = tree.state.downcast_mut::<State>();
 
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerPressed { .. })
-                if over_trigger =>
-            {
-                tree.state.downcast_mut::<State>().pressed = true;
-                shell.capture_event();
+        let Some(press) = &mut state.press else {
+            if let Some(press) = Press::start(event, cursor, |_| over_trigger) {
+                state.press = Some(press);
+
+                // A finger may scroll a scrollable around instead: its press
+                // is left to it, and its tap is captured when it lifts.
+                if !press.is_touch() {
+                    shell.capture_event();
+                }
             }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerLifted { .. })
-                if tree.state.downcast_ref::<State>().pressed =>
-            {
-                tree.state.downcast_mut::<State>().pressed = false;
 
-                if over_trigger {
+            return;
+        };
+
+        match press.update(event, cursor) {
+            Some(Gesture::Tapped(position)) => {
+                // A mouse clicks where it is released, a finger where it
+                // lifts.
+                let inside = if press.is_touch() {
+                    trigger.bounds().contains(position)
+                } else {
+                    over_trigger
+                };
+
+                state.press = None;
+
+                if inside {
                     self.toggle(tree, trigger, renderer, shell, open);
                     shell.capture_event();
                 }
             }
-            _ => {}
+            Some(Gesture::Released) => state.press = None,
+            Some(Gesture::Pressed(_) | Gesture::Moved(_) | Gesture::Cancelled) | None => {}
         }
     }
 
@@ -503,7 +550,11 @@ where
                     ..bounds
                 };
 
-                renderer.with_layer(clip, draw);
+                // A layer does not clip to the one it is in: clipped to the
+                // viewport too, it stays inside a scroll area.
+                if let Some(clip) = clip.intersection(viewport) {
+                    renderer.with_layer(clip, draw);
+                }
             } else {
                 draw(renderer);
             }

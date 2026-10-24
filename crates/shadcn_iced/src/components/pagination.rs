@@ -114,7 +114,7 @@ fn step<'a, Message: Clone + 'a>(
         Row::new().push(label).push(icon)
     };
 
-    Pressable::new(
+    let pressable = Pressable::new(
         content
             .spacing(6)
             .align_y(Alignment::Center)
@@ -130,12 +130,21 @@ fn step<'a, Message: Clone + 'a>(
         ..Padding::ZERO
     })
     .press_offset(1.0)
-    .style(move |theme, status| {
+    .focus_style(move |theme, status, focused| {
+        let t = tokens(theme);
         let mut style = button::style(theme, status, Variant::Ghost);
-        style.border.radius = size.radius(&tokens(theme)).into();
+        style.border.radius = size.radius(&t).into();
+
+        // `focus-visible:border-ring`
+        if focused {
+            style.border.color = t.palette.ring;
+        }
+
         style
-    })
-    .into()
+    });
+
+    // A link styled as a button, focusable like one.
+    button::focus_ring(pressable, move |t| size.radius(t)).into()
 }
 
 impl<'a, Message: Clone + 'a> From<Pagination<'a, Message>> for Element<'a, Message> {

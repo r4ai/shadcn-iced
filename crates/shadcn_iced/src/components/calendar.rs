@@ -16,7 +16,7 @@
 use shadcn_iced_core::icon::lucide;
 use shadcn_iced_core::primitive::Pressable;
 use shadcn_iced_core::primitive::focus::Ring;
-use shadcn_iced_core::primitive::focus_grid::{Cell, focus_grid};
+use shadcn_iced_core::primitive::focus_grid::{Cell, Move, focus_grid};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -252,6 +252,7 @@ pub struct Calendar<'a, Message> {
     week_numbers: bool,
     dropdowns: Option<(i32, i32)>,
     leading: f32,
+    focus_on_show: bool,
 }
 
 /// Creates a [`Calendar`] displaying `month`.
@@ -277,6 +278,7 @@ pub fn calendar<'a, Message: Clone + 'a>(
         week_numbers: false,
         dropdowns: None,
         leading: 1.5,
+        focus_on_show: false,
     }
 }
 
@@ -381,6 +383,14 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
     /// one of `text-sm` in a popover.
     pub(crate) fn leading(mut self, leading: f32) -> Self {
         self.leading = leading;
+        self
+    }
+
+    /// Focuses the days once shown after
+    /// [`focus_when_shown`](shadcn_iced_core::primitive::focus_grid::focus_when_shown),
+    /// like the `autoFocus` of react-day-picker.
+    pub(crate) fn focus_on_show(mut self, focus: bool) -> Self {
+        self.focus_on_show = focus;
         self
     }
 }
@@ -848,12 +858,75 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
                 }
             });
 
+        let first = calendar.month;
+        let count = calendar.months;
+        let focus_on_show = calendar.focus_on_show;
+        let on_navigate = calendar.on_navigate;
+        let on_select = calendar.on_select;
+        let disabled: Option<Rc<dyn Fn(Date) -> bool + 'a>> = calendar.disabled.map(Rc::from);
+        let is_disabled = disabled.clone();
+        // `startMonth` and `endMonth`, which the dropdowns cover.
+        let limits = calendar.dropdowns.map(|(from, to)| {
+            (
+                Date {
+                    year: from,
+                    month: 1,
+                    day: 1,
+                },
+                Date {
+                    year: to,
+                    month: 12,
+                    day: 31,
+                },
+            )
+        });
+
         // Tracks the focused day like react-day-picker: a pressed day gets
         // the focus, which moves to another day when the months change, and
         // shows a ring (`group-data-[focused=true]/day:ring-[3px]
-        // ring-ring/50`).
+        // ring-ring/50`). The days are one tab stop, focusing the selected
+        // day, else today, else the first enabled day; the keys move the
+        // focus to other days, displaying their months.
         focus_grid(content, days)
             .fallback(target)
+            .focus_on_show(focus_on_show)
+            .on_move(move |(date, _), step| {
+                let disabled = |date| disabled.as_ref().is_some_and(|f| f(date));
+                let next = next_focus(*date, step, limits, disabled)?;
+                let month = next.month_of();
+                let mut last = first;
+
+                for _ in 1..count {
+                    last = last.next();
+                }
+
+                let message = (month < first || month > last).then(|| {
+                    // react-day-picker's `goToMonth`: the month of the day
+                    // comes first, within `startMonth` and `endMonth`.
+                    let mut first = month;
+
+                    if let Some((start, end)) = limits {
+                        let mut latest = end.month_of();
+
+                        for _ in 1..count {
+                            latest = latest.previous();
+                        }
+
+                        first = first.min(latest).max(start.month_of());
+                    }
+
+                    on_navigate(first)
+                });
+
+                Some(((next, month), message))
+            })
+            .on_activate(move |(date, _)| {
+                if is_disabled.as_ref().is_some_and(|f| f(*date)) {
+                    return None;
+                }
+
+                on_select.as_ref().map(|f| f(*date))
+            })
             .ring(|theme| {
                 let t = tokens(theme);
 
@@ -941,6 +1014,66 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
 
         (days.into_iter().map(|(day, _)| day).collect(), target)
     }
+}
+
+/// The date `months` months after `date` (possibly negative), on the same
+/// day or the last day of a shorter month (`addMonths` of date-fns).
+fn add_months(date: Date, months: i32) -> Date {
+    let index = date.year * 12 + date.month as i32 - 1 + months;
+    let year = index.div_euclid(12);
+    let month = index.rem_euclid(12) as u32 + 1;
+
+    Date {
+        year,
+        month,
+        day: date.day.min(days_in_month(year, month)),
+    }
+}
+
+/// The day a key moves the focus to from `date`, like react-day-picker's
+/// `getNextFocus`: a disabled day is skipped by moving again the same way,
+/// and the days stay within `limits` (`startMonth` and `endMonth`).
+/// Returns `None` when no day can take the focus that way.
+fn next_focus(
+    date: Date,
+    step: Move,
+    limits: Option<(Date, Date)>,
+    disabled: impl Fn(Date) -> bool,
+) -> Option<Date> {
+    let mut from = date;
+
+    // react-day-picker gives up after a year of disabled days.
+    for _ in 0..365 {
+        // The weeks start on Sunday.
+        let weekday = from.weekday() as i64;
+        let mut next = match step {
+            Move::Left => from.add_days(-1),
+            Move::Right => from.add_days(1),
+            Move::Up => from.add_days(-7),
+            Move::Down => from.add_days(7),
+            Move::Home => from.add_days(-weekday),
+            Move::End => from.add_days(6 - weekday),
+            Move::PageUp { far } => add_months(from, if far { -12 } else { -1 }),
+            Move::PageDown { far } => add_months(from, if far { 12 } else { 1 }),
+        };
+
+        if let Some((start, end)) = limits {
+            next = next.clamp(start, end);
+        }
+
+        if !disabled(next) {
+            return Some(next);
+        }
+
+        // Stuck on a disabled day (at a limit, or at the start of the week).
+        if next == from {
+            return None;
+        }
+
+        from = next;
+    }
+
+    None
 }
 
 /// Reports a text to operations, e.g. for content drawn as rich text.

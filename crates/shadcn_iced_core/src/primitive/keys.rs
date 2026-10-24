@@ -27,7 +27,7 @@ use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard;
-use iced::{Element, Event, Length, Rectangle, Size, Vector, mouse};
+use iced::{Element, Event, Length, Rectangle, Size, Vector, mouse, touch};
 
 /// A region turning the keys pressed once it was clicked, or while the focus
 /// is within it, into messages. See the [module documentation](self).
@@ -122,7 +122,11 @@ where
         let content = layout.children().next().unwrap();
 
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(_)) => {
+            // A tap inside makes the region active too (with a hardware
+            // keyboard, on a tablet). The cursor is at the finger, translated
+            // like the region when it scrolls (unlike the touch event).
+            Event::Mouse(mouse::Event::ButtonPressed(_))
+            | Event::Touch(touch::Event::FingerPressed { .. }) => {
                 tree.state.downcast_mut::<State>().active = cursor.is_over(layout.bounds());
             }
             Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) => {

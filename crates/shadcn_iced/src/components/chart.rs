@@ -16,7 +16,8 @@
 //! Like `ChartContainer`, a chart draws a faint grid, muted axis labels, the
 //! `--chart-*` colors (or [`Paint`]s of your own), a legend
 //! (`ChartLegendContent`) and a tooltip on hover (`ChartTooltipContent`,
-//! with its indicators, labels and formatters). The scales, the stacking, the
+//! with its indicators, labels and formatters), also shown by touch and by
+//! keyboard (see [`Chart::accessibility_layer`]). The scales, the stacking, the
 //! curves, the sectors and the hit testing live in
 //! [`shadcn_iced_core::primitive::plot`]; this module configures and draws
 //! them with the theme.
@@ -34,6 +35,7 @@
 use shadcn_iced_core::primitive::plot::{
     self, Bars, Categories, Linear, Offset, Pie, Sector, Spread,
 };
+use shadcn_iced_core::primitive::pointer;
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, Icon, Mode, Tokens, font, style, tokens};
 
@@ -41,7 +43,9 @@ pub use shadcn_iced_core::primitive::plot::Curve;
 
 use iced::advanced::graphics::geometry::Renderer as _;
 use iced::advanced::layout::{self, Layout};
+use iced::advanced::overlay;
 use iced::advanced::renderer::{self, Renderer as _};
+use iced::advanced::widget::operation::Focusable;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell};
 use iced::alignment;
@@ -53,7 +57,7 @@ use iced::widget::text::{Alignment as TextAlignment, LineHeight};
 use iced::widget::{Column, Row, Space, container, row, text};
 use iced::{
     Alignment, Background, Border, Color, Event, Length, Padding, Pixels, Point, Rectangle, Shadow,
-    Size, Theme, Vector, mouse,
+    Size, Theme, Vector, keyboard, mouse, touch,
 };
 
 /// A color of a chart: a fixed color, one of the `--chart-N` tokens, or a
@@ -289,6 +293,7 @@ pub struct Chart {
     tooltip_unit: Option<String>,
     tooltip_total: bool,
     default_index: Option<usize>,
+    accessibility_layer: bool,
 }
 
 fn chart(kind: Kind, categories: impl IntoIterator<Item = impl Into<String>>) -> Chart {
@@ -350,6 +355,7 @@ fn chart(kind: Kind, categories: impl IntoIterator<Item = impl Into<String>>) ->
         tooltip_unit: None,
         tooltip_total: false,
         default_index: None,
+        accessibility_layer: true,
     }
 }
 
@@ -760,6 +766,21 @@ impl Chart {
     /// (`defaultIndex`).
     pub fn default_index(mut self, index: usize) -> Self {
         self.default_index = Some(index);
+        self
+    }
+
+    /// Lets the keyboard show the tooltip (`accessibilityLayer`, on by
+    /// default like in Recharts 3).
+    ///
+    /// The chart is a Tab stop: its focus shows the tooltip of the first
+    /// category (or of the [default one](Self::default_index)),
+    /// <kbd>ArrowLeft</kbd> and <kbd>ArrowRight</kbd> move it to the
+    /// previous and the next one, <kbd>Home</kbd> and <kbd>End</kbd> to the
+    /// first and the last one, and leaving the chart hides it. Like
+    /// shadcn/ui (`[&_.recharts-surface]:outline-hidden`), no focus ring is
+    /// drawn: the tooltip and the active point show where the focus is.
+    pub fn accessibility_layer(mut self, accessibility_layer: bool) -> Self {
+        self.accessibility_layer = accessibility_layer;
         self
     }
 }
@@ -2494,13 +2515,44 @@ impl<'a, Message: 'a> From<Chart> for Element<'a, Message> {
     }
 }
 
-/// The state of a chart: the hovered category (or slice), the pointer, and
-/// the height of the legend.
+/// The state of a chart: the hovered category (or slice), the pointer, the
+/// height of the legend, the finger showing the tooltip, and the focus.
 #[derive(Debug, Default)]
 pub struct State {
     hovered: Option<usize>,
     cursor: Option<Point>,
     legend: f32,
+    finger: Option<Scrub>,
+    /// Whether the chart has the focus (`accessibilityLayer`).
+    focused: bool,
+    /// The focus the tooltip was last shown or hidden for: the focus moves
+    /// in operations, which cannot ask for a layout.
+    shown_focus: bool,
+}
+
+impl Focusable for State {
+    fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    fn focus(&mut self) {
+        self.focused = true;
+    }
+
+    fn unfocus(&mut self) {
+        self.focused = false;
+    }
+}
+
+/// A finger moving the tooltip, like the `touchmove` handler of Recharts.
+#[derive(Debug, Clone, Copy)]
+struct Scrub {
+    finger: touch::Finger,
+    origin: Point,
+    /// Whether the finger moved sideways (it scrubs through the categories)
+    /// or up and down (the page scrolls under it), once it moved more than
+    /// [`pointer::SLOP`].
+    sideways: Option<bool>,
 }
 
 /// Draws the plot, and lays out the legend and the tooltip of the hovered
@@ -2545,6 +2597,51 @@ impl<'a, Message: 'a> ChartWidget<'a, Message> {
         let target = self.shown_target(state)?;
 
         Some(target % self.chart.count().max(1))
+    }
+
+    /// Whether the keyboard can focus the chart.
+    fn is_focusable(&self) -> bool {
+        self.chart.accessibility_layer && self.chart.tooltip && self.chart.targets() > 0
+    }
+
+    /// Shows the tooltip of what is under `position`, relative to the chart,
+    /// or hides it.
+    fn point(
+        &self,
+        state: &mut State,
+        bounds: Rectangle,
+        position: Option<Point>,
+        shell: &mut Shell<'_, Message>,
+    ) {
+        let plot = self.chart.plot(bounds.size(), state.legend);
+        let hovered = position.and_then(|point| self.chart.hovered(plot, point));
+        let position = position.filter(|_| hovered.is_some());
+
+        // A new category shows another tooltip, which needs a layout; the
+        // pointer alone only moves it, which `draw` does.
+        if hovered != state.hovered {
+            state.hovered = hovered;
+            state.cursor = position;
+
+            shell.invalidate_layout();
+            shell.request_redraw();
+        } else if position != state.cursor {
+            state.cursor = position;
+
+            shell.request_redraw();
+        }
+    }
+
+    /// Shows the tooltip of a target, chosen with the keyboard: without a
+    /// pointer, it is placed like the one of `defaultIndex`.
+    fn activate(&self, state: &mut State, target: Option<usize>, shell: &mut Shell<'_, Message>) {
+        if target != state.hovered || state.cursor.is_some() {
+            state.hovered = target;
+            state.cursor = None;
+
+            shell.invalidate_layout();
+            shell.request_redraw();
+        }
     }
 }
 
@@ -2678,6 +2775,10 @@ impl<'a, Message: 'a> Widget<Message, Theme, iced::Renderer> for ChartWidget<'a,
         renderer: &iced::Renderer,
         operation: &mut dyn Operation,
     ) {
+        if self.is_focusable() {
+            operation.focusable(None, layout.bounds(), tree.state.downcast_mut::<State>());
+        }
+
         let shown = self.shown_target(tree.state.downcast_ref::<State>());
         let index = self.tooltip_child();
         let children: Vec<Layout<'_>> = layout.children().collect();
@@ -2715,31 +2816,116 @@ impl<'a, Message: 'a> Widget<Message, Theme, iced::Renderer> for ChartWidget<'a,
             return;
         }
 
-        let Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft) = event
-        else {
-            return;
-        };
-
         let bounds = layout.bounds();
         let state = tree.state.downcast_mut::<State>();
-        let position = cursor.position_in(bounds);
-        let plot = self.chart.plot(bounds.size(), state.legend);
+        let targets = self.chart.targets();
 
-        let hovered = position.and_then(|point| self.chart.hovered(plot, point));
-        let position = position.filter(|_| hovered.is_some());
+        // A press elsewhere takes the focus away (`blur`).
+        if state.focused
+            && matches!(
+                event,
+                Event::Mouse(mouse::Event::ButtonPressed(_))
+                    | Event::Touch(touch::Event::FingerPressed { .. })
+            )
+            && !cursor.is_over(bounds)
+        {
+            state.focused = false;
+        }
 
-        // A new category shows another tooltip, which needs a layout; the
-        // pointer alone only moves it, which `draw` does.
-        if hovered != state.hovered {
-            state.hovered = hovered;
-            state.cursor = position;
+        // Recharts' `accessibilityLayer`: the focus shows the tooltip of the
+        // first category, the blur hides it.
+        if state.focused != state.shown_focus {
+            state.shown_focus = state.focused;
 
-            shell.invalidate_layout();
-            shell.request_redraw();
-        } else if position != state.cursor {
-            state.cursor = position;
+            let target = state.focused.then(|| {
+                state
+                    .hovered
+                    .or(self.chart.default_index)
+                    .unwrap_or(0)
+                    .min(targets.saturating_sub(1))
+            });
 
-            shell.request_redraw();
+            self.activate(state, target, shell);
+        }
+
+        match event {
+            Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft) => {
+                let position = cursor.position_in(bounds);
+
+                // A pointer away from the chart leaves the tooltip of the
+                // keyboard (shown without a pointer) alone.
+                if position.is_some() || state.cursor.is_some() {
+                    self.point(state, bounds, position, shell);
+                }
+            }
+            // Recharts shows the tooltip on `touchstart` and `touchmove`, and
+            // keeps it after `touchend`. A press is not captured, so that
+            // the page still scrolls from the chart.
+            Event::Touch(touch::Event::FingerPressed { id, .. }) => {
+                let position = cursor.position_in(bounds);
+
+                state.finger = position.map(|origin| Scrub {
+                    finger: *id,
+                    origin,
+                    sideways: None,
+                });
+
+                // A press elsewhere hides the tooltip.
+                self.point(state, bounds, position, shell);
+            }
+            Event::Touch(touch::Event::FingerMoved { id, .. })
+                if state.finger.is_some_and(|scrub| scrub.finger == *id) =>
+            {
+                let position = cursor.position_in(bounds);
+
+                if let Some(scrub) = state.finger.as_mut()
+                    && scrub.sideways.is_none()
+                    && let Some(position) = position
+                    && position.distance(scrub.origin) > pointer::SLOP
+                {
+                    let delta = position - scrub.origin;
+                    scrub.sideways = Some(delta.x.abs() > delta.y.abs());
+                }
+
+                match state.finger.and_then(|scrub| scrub.sideways) {
+                    // The page scrolls: the tooltip stays where it was.
+                    Some(false) => {}
+                    Some(true) => {
+                        self.point(state, bounds, position, shell);
+
+                        // Scrubbing through the categories does not scroll.
+                        shell.capture_event();
+                    }
+                    None => self.point(state, bounds, position, shell),
+                }
+            }
+            Event::Touch(
+                touch::Event::FingerLifted { id, .. } | touch::Event::FingerLost { id, .. },
+            ) if state.finger.is_some_and(|scrub| scrub.finger == *id) => {
+                state.finger = None;
+            }
+            Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(key),
+                modifiers,
+                ..
+            }) if state.focused && targets > 0 && modifiers.is_empty() => {
+                use keyboard::key::Named;
+
+                let last = targets - 1;
+                let current = state.hovered.unwrap_or(0).min(last);
+
+                let target = match key {
+                    Named::ArrowLeft => current.saturating_sub(1),
+                    Named::ArrowRight => (current + 1).min(last),
+                    Named::Home => 0,
+                    Named::End => last,
+                    _ => return,
+                };
+
+                self.activate(state, Some(target), shell);
+                shell.capture_event();
+            }
+            _ => {}
         }
     }
 
@@ -2763,15 +2949,19 @@ impl<'a, Message: 'a> Widget<Message, Theme, iced::Renderer> for ChartWidget<'a,
         let t = tokens(theme);
         let active = self.active_category(state).filter(|_| self.chart.tooltip);
 
-        // Clipped to the bounds, like the `<svg>` of Recharts.
-        renderer.with_layer(bounds, |renderer| {
-            renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
-                let mut frame = Frame::new(renderer, bounds.size());
-                self.chart
-                    .draw_plot(&mut frame, &t, bounds.size(), state.legend, active);
-                renderer.draw_geometry(frame.into_geometry());
+        // Clipped to the bounds, like the `<svg>` of Recharts, and to the
+        // viewport: a layer does not clip to the one it is in, and the plot
+        // would cover what is outside of a scroll area (a header).
+        if let Some(clip) = bounds.intersection(viewport) {
+            renderer.with_layer(clip, |renderer| {
+                renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
+                    let mut frame = Frame::new(renderer, bounds.size());
+                    self.chart
+                        .draw_plot(&mut frame, &t, bounds.size(), state.legend, active);
+                    renderer.draw_geometry(frame.into_geometry());
+                });
             });
-        });
+        }
 
         let children: Vec<Layout<'_>> = layout.children().collect();
 
@@ -2786,51 +2976,100 @@ impl<'a, Message: 'a> Widget<Message, Theme, iced::Renderer> for ChartWidget<'a,
                 viewport,
             );
         }
+    }
 
-        if let (Some(target), Some(tooltip)) = (self.shown_target(state), self.shown_tooltip(state))
-        {
-            let index = self.tooltip_child();
-            let laid = children[index].bounds();
+    /// The tooltip, drawn as an overlay so that the widgets drawn after the
+    /// chart do not cover it (like the absolutely positioned tooltip of
+    /// Recharts).
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        _renderer: &iced::Renderer,
+        _viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        let state = tree.state.downcast_ref::<State>();
+        let target = self.shown_target(state)?;
+        self.shown_tooltip(state)?;
 
-            // The tooltip was laid out for the pointer of the last layout:
-            // follow the pointer since.
-            let category = if self.chart.kind == Kind::Pie {
-                target
-            } else {
-                target % self.chart.count().max(1)
-            };
-            let position = self.chart.tooltip_position(
-                self.chart.plot(bounds.size(), state.legend),
-                category,
-                state.cursor,
-                laid.size(),
+        let bounds = layout.bounds();
+        let index = self.tooltip_child();
+        let laid = layout.children().nth(index)?.bounds();
+
+        // The tooltip was laid out for the pointer of the last layout:
+        // follow the pointer since.
+        let category = if self.chart.kind == Kind::Pie {
+            target
+        } else {
+            target % self.chart.count().max(1)
+        };
+        let position = self.chart.tooltip_position(
+            self.chart.plot(bounds.size(), state.legend),
+            category,
+            state.cursor,
+            laid.size(),
+        );
+        let position = Point::new(
+            bounds.x + position.x + translation.x,
+            bounds.y + position.y + translation.y,
+        );
+
+        let (_, tooltip) = self.tooltip.as_mut()?;
+
+        Some(overlay::Element::new(Box::new(TooltipOverlay {
+            tooltip,
+            tree: &mut tree.children[index],
+            position,
+        })))
+    }
+}
+
+/// The tooltip of a chart, drawn above the rest of the interface.
+struct TooltipOverlay<'a, 'b, Message> {
+    tooltip: &'b mut Element<'a, Message>,
+    tree: &'b mut Tree,
+    /// Where the tooltip is shown, in window coordinates.
+    position: Point,
+}
+
+impl<Message> overlay::Overlay<Message, Theme, iced::Renderer> for TooltipOverlay<'_, '_, Message> {
+    fn layout(&mut self, renderer: &iced::Renderer, _bounds: Size) -> layout::Node {
+        self.tooltip
+            .as_widget_mut()
+            .layout(
+                self.tree,
+                renderer,
+                &layout::Limits::new(Size::ZERO, Size::INFINITE),
+            )
+            .move_to(self.position)
+    }
+
+    fn draw(
+        &self,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+    ) {
+        let bounds = layout.bounds();
+
+        // The layout of an overlay is only redone with the layout of the
+        // interface: the pointer may have moved the tooltip since.
+        let offset = self.position - bounds.position();
+
+        renderer.with_translation(offset, |renderer| {
+            self.tooltip.as_widget().draw(
+                self.tree,
+                renderer,
+                theme,
+                style,
+                layout,
+                cursor,
+                &Rectangle::INFINITE,
             );
-            let offset = Vector::new(
-                bounds.x + position.x - laid.x,
-                bounds.y + position.y - laid.y,
-            );
-
-            let layer = Rectangle {
-                x: bounds.x - 32.0,
-                y: bounds.y - 32.0,
-                width: bounds.width + 64.0,
-                height: bounds.height + 64.0,
-            };
-
-            renderer.with_layer(layer, |renderer| {
-                renderer.with_translation(offset, |renderer| {
-                    tooltip.as_widget().draw(
-                        &tree.children[index],
-                        renderer,
-                        theme,
-                        style,
-                        children[index],
-                        cursor,
-                        viewport,
-                    );
-                });
-            });
-        }
+        });
     }
 }
 

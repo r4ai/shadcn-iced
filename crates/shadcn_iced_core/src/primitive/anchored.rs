@@ -13,8 +13,16 @@
 //! - dismissing it on <kbd>Escape</kbd>, on a click outside, and (for menus)
 //!   once an item has been activated, with a click or <kbd>Enter</kbd>,
 //! - switching between the menus of a [`Group`] (a menubar) when another
-//!   trigger is hovered, or with <kbd>←</kbd> and <kbd>→</kbd>.
-use super::focus;
+//!   trigger is hovered or pressed, or with <kbd>←</kbd> and <kbd>→</kbd>,
+//! - touch screens, which have no hover and no right click: a tap opens
+//!   what a click opens (a drag that starts on the anchor scrolls instead),
+//!   a long press what a right click opens, and hover content opens with a
+//!   long press or a tap (see [`TouchOpen`]),
+//! - the keyboard: <kbd>Enter</kbd>, <kbd>Space</kbd> and <kbd>↓</kbd> on a
+//!   focused anchor open what a click opens, and focus its first control
+//!   (or highlight the first item of a menu, see [`Anchored::menu_keys`]);
+//!   <kbd>Tab</kbd> stays within open content, or closes a menu.
+use super::{focus, pointer, tab};
 use crate::animation::{self, Appearance, Fade, Transition};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -28,15 +36,28 @@ use iced::{
     touch, window,
 };
 
-use std::sync::atomic::{self, AtomicU64};
+use std::cell::Cell;
 
-/// Incremented whenever a menu closes because one of its items was
-/// selected. Menus opened before compare it on every event and close too,
-/// which closes a whole chain of submenus at once.
-static SELECT_EPOCH: AtomicU64 = AtomicU64::new(0);
+/// How long a tooltip opened with a long press stays once the finger lifted
+/// (like the tooltips of Android).
+const TOUCH_LINGER: Duration = Duration::from_millis(1500);
+
+thread_local! {
+    /// Incremented whenever a menu closes because one of its items was
+    /// selected. Menus opened before compare it on every event and close
+    /// too, which closes a whole chain of submenus at once. Per thread, like
+    /// the interface that runs on it: the menus of another one (a test
+    /// running in parallel) are not closed.
+    static SELECT_EPOCH: Cell<u64> = const { Cell::new(0) };
+}
 
 fn select_epoch() -> u64 {
-    SELECT_EPOCH.load(atomic::Ordering::Relaxed)
+    SELECT_EPOCH.get()
+}
+
+/// Closes the menus opened before an item was selected.
+fn bump_select_epoch() {
+    SELECT_EPOCH.set(SELECT_EPOCH.get().wrapping_add(1));
 }
 
 /// The side of the anchor the floating content is placed on.
@@ -91,6 +112,27 @@ enum Trigger<Message> {
     Input,
 }
 
+/// How hover content ([`Anchored::hover`]) opens on a touch screen, which has
+/// no hover: a tap on the anchor must still press it (a link, a button), so
+/// a plain tap only opens content that is not a preview of what the anchor
+/// does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TouchOpen {
+    /// A long press shows the content while the finger rests, and a little
+    /// longer (a tooltip). The next tap closes it.
+    #[default]
+    Hold,
+    /// A long press opens the content, until a tap outside of it (a hover
+    /// card, whose content can be pressed).
+    LongPress,
+    /// A tap on the anchor opens and closes the content, like a click opens
+    /// a submenu or the panel of a navigation menu in Radix. The keyboard
+    /// opens it too: <kbd>Enter</kbd>, <kbd>Space</kbd> or the arrow key
+    /// towards the content, on a focused anchor or on an anchor that is
+    /// the highlighted item of a list (see [`report_highlighted`]).
+    Tap,
+}
+
 /// Floating content anchored to another element.
 pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> {
     anchor: Element<'a, Message, Theme, Renderer>,
@@ -112,6 +154,8 @@ pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
     focus_ring: Option<Box<dyn Fn(&Theme) -> focus::Style + 'a>>,
     animate: bool,
     anchor_tracker: Option<AnchorTracker>,
+    touch_open: TouchOpen,
+    menu_keys: bool,
 }
 
 /// Where the anchor of open floating content is, for the content to point
@@ -166,6 +210,8 @@ where
             focus_ring: None,
             animate: true,
             anchor_tracker: None,
+            touch_open: TouchOpen::Hold,
+            menu_keys: false,
         }
     }
 
@@ -214,8 +260,28 @@ where
         self
     }
 
+    /// Sets how hover content opens on a touch screen. Defaults to
+    /// [`TouchOpen::Hold`], like a tooltip.
+    pub fn touch_open(mut self, touch_open: TouchOpen) -> Self {
+        self.touch_open = touch_open;
+        self
+    }
+
+    /// Makes the keyboard treat the content as a menu, like Radix: opened
+    /// with the keyboard, its first item is highlighted (its last one with
+    /// <kbd>↑</kbd>), <kbd>Tab</kbd> closes it and lets the focus move on,
+    /// and <kbd>←</kbd> closes a submenu ([`Side::Right`]). Otherwise,
+    /// content opened with the keyboard focuses its first control, and
+    /// <kbd>Tab</kbd> cycles through its controls while it is open.
+    pub fn menu_keys(mut self, menu: bool) -> Self {
+        self.menu_keys = menu;
+        self
+    }
+
     /// Opens the content at the cursor position when the anchor is right
-    /// clicked.
+    /// clicked, or long pressed on a touch screen; <kbd>Shift</kbd> +
+    /// <kbd>F10</kbd> and the context menu key open it at the anchor while
+    /// the focus is within it.
     pub fn context_menu(mut self) -> Self {
         self.trigger = Trigger::ContextMenu;
         self.side = Side::Bottom;
@@ -223,6 +289,7 @@ where
         self.offset = 2.0;
         self.close_on_select = true;
         self.modal = true;
+        self.menu_keys = true;
         self
     }
 
@@ -374,11 +441,121 @@ struct State {
     content_bounds: Option<Rectangle>,
     /// The area the pointer can cross on its way to the hover content.
     grace: Option<Grace>,
+    /// The press of a finger on the anchor, which opens click content once
+    /// it lifts as a tap.
+    press: Option<pointer::Press>,
+    /// The finger resting on the anchor, until it presses long.
+    long_press: Option<pointer::LongPress>,
+    /// The finger whose long press opened the content: its lift is not a
+    /// tap on the anchor.
+    swallow: Option<touch::Finger>,
+    /// Whether hover content stays open until it is dismissed: opened with
+    /// a tap, a long press or the keyboard.
+    pinned: bool,
+    /// Whether the content was pinned with the keyboard, which closes it
+    /// when the focus leaves the anchor.
+    pinned_by_keyboard: bool,
+    /// Whether the finger of the long press that opened a tooltip rests.
+    held: bool,
+    /// When the tooltip opened with a long press closes, once the finger
+    /// lifted.
+    linger: Option<Instant>,
+    /// Whether the anchor shows its keyboard focus (`:focus-visible`),
+    /// which opens tooltips and hover cards.
+    focused: bool,
+    /// Whether the focus last moved with `Tab`, rather than with a pointer
+    /// press.
+    tabbed: bool,
+    /// Whether the content was opened with the keyboard and focuses its
+    /// first control once shown.
+    focus_content: bool,
+    /// Whether the open content was opened with the keyboard, directly or
+    /// with the arrows from another menu of its group opened so: only then
+    /// do the arrows open the next menu with its first item highlighted.
+    keyboard: bool,
+    /// Whether the anchor is the highlighted item of a list, as reported
+    /// while it was last drawn (see [`report_highlighted`]).
+    highlighted: Cell<bool>,
 }
 
 thread_local! {
     /// The [`Grace`] area the pointer is in, if any.
     static GRACE: std::cell::Cell<Option<Grace>> = const { std::cell::Cell::new(None) };
+
+    /// Whether the anchor being drawn is highlighted, see
+    /// [`report_highlighted`].
+    static HIGHLIGHTED: Cell<Option<bool>> = const { Cell::new(None) };
+}
+
+thread_local! {
+    /// Whether an item of a list was just selected, see [`report_selected`].
+    static SELECTED: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Tells the open content an item in it was just selected (a
+/// [`Listbox`](super::listbox::Listbox) does, with a click, a tap,
+/// <kbd>Enter</kbd> or <kbd>Space</kbd>), which closes a menu (see
+/// [`Anchored::close_on_select`]).
+///
+/// A key captured by the content is not a selection: <kbd>Enter</kbd> on
+/// the trigger of a submenu opens it, and the menu stays.
+pub fn report_selected() {
+    SELECTED.set(true);
+}
+
+/// Tells the [`Anchored`] whose anchor is being drawn whether the anchor is
+/// the highlighted item of a [`Listbox`](super::listbox::Listbox), e.g.
+/// from [`ItemRow::trailing_color`](super::listbox::ItemRow::trailing_color).
+///
+/// The highlight of a list is not focus: a submenu trigger learns this way
+/// that <kbd>→</kbd>, <kbd>Enter</kbd> and <kbd>Space</kbd> are meant for it
+/// (see [`TouchOpen::Tap`]).
+pub fn report_highlighted(highlighted: bool) {
+    HIGHLIGHTED.with(|cell| {
+        if cell.get().is_some() {
+            cell.set(Some(highlighted));
+        }
+    });
+}
+
+/// When `event` happens: the time of a redraw (which tests advance), or
+/// now.
+fn event_time(event: &Event) -> Instant {
+    match event {
+        Event::Window(window::Event::RedrawRequested(at)) => *at,
+        _ => Instant::now(),
+    }
+}
+
+/// A press of `key` without modifiers, e.g. to replay into content opened
+/// with another key.
+fn key_event(named: key::Named) -> Event {
+    let key = keyboard::Key::Named(named);
+
+    Event::Keyboard(keyboard::Event::KeyPressed {
+        key: key.clone(),
+        modified_key: key,
+        physical_key: keyboard::key::Physical::Unidentified(
+            keyboard::key::NativeCode::Unidentified,
+        ),
+        location: keyboard::Location::Standard,
+        modifiers: keyboard::Modifiers::default(),
+        text: None,
+        repeat: false,
+    })
+}
+
+/// The named key pressed by `event`, if it is pressed without the modifiers
+/// of shortcuts.
+fn plain_key(event: &Event) -> Option<key::Named> {
+    match event {
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(named),
+            modifiers,
+            ..
+        }) if !modifiers.command() && !modifiers.alt() && !modifiers.logo() => Some(*named),
+        _ => None,
+    }
 }
 
 /// Whether `position` is in the pointer grace area of an open submenu: the
@@ -458,12 +635,27 @@ impl State {
 
     fn tick<Message>(
         &mut self,
+        now: Instant,
         open_delay: Duration,
         close_delay: Duration,
         shell: &mut Shell<'_, Message>,
     ) {
-        let now = Instant::now();
-        let mut hovered = self.anchor_hovered || self.content_hovered;
+        if let Some(linger) = self.linger {
+            if now < linger {
+                shell.request_redraw_at(linger);
+            } else {
+                self.linger = None;
+            }
+        }
+
+        // Content opened with a tap, a long press or the keyboard is open
+        // until dismissed, and does not wait for the delay of a hover.
+        let immediate = self.pinned || self.held;
+        let mut hovered = self.anchor_hovered
+            || self.content_hovered
+            || self.focused
+            || immediate
+            || self.linger.is_some();
 
         if self.suppressed {
             self.suppressed = hovered;
@@ -472,7 +664,7 @@ impl State {
 
         let next = match self.hover {
             Hover::Idle if hovered => {
-                if open_delay.is_zero() {
+                if open_delay.is_zero() || immediate {
                     Hover::Open
                 } else {
                     shell.request_redraw_at(now + open_delay);
@@ -480,7 +672,8 @@ impl State {
                 }
             }
             Hover::Opening(_) if !hovered => Hover::Idle,
-            Hover::Opening(at) if at.elapsed() >= open_delay => Hover::Open,
+            Hover::Opening(_) if immediate => Hover::Open,
+            Hover::Opening(at) if now >= at + open_delay => Hover::Open,
             Hover::Opening(at) => {
                 shell.request_redraw_at(at + open_delay);
                 Hover::Opening(at)
@@ -494,7 +687,7 @@ impl State {
                 }
             }
             Hover::Closing(_) if hovered => Hover::Open,
-            Hover::Closing(at) if at.elapsed() >= close_delay => Hover::Idle,
+            Hover::Closing(at) if now >= at + close_delay => Hover::Idle,
             Hover::Closing(at) => {
                 shell.request_redraw_at(at + close_delay);
                 Hover::Closing(at)
@@ -515,6 +708,74 @@ impl State {
             shell.invalidate_layout();
             shell.request_redraw();
         }
+    }
+
+    /// Closes hover content right away, e.g. on a second tap on its anchor.
+    fn close_hover<Message>(&mut self, shell: &mut Shell<'_, Message>) {
+        self.pinned = false;
+        self.pinned_by_keyboard = false;
+        self.held = false;
+        self.linger = None;
+        self.hover = Hover::Idle;
+        shell.invalidate_layout();
+        shell.request_redraw();
+    }
+}
+
+/// Opens self-managed click content.
+fn open_click<Message>(
+    state: &mut State,
+    shell: &mut Shell<'_, Message>,
+    on_open_change: Option<&dyn Fn(bool) -> Message>,
+) {
+    state.open = true;
+    state.keyboard = false;
+    state.epoch = select_epoch();
+    shell.invalidate_layout();
+    shell.request_redraw();
+
+    if let Some(f) = on_open_change {
+        shell.publish(f(true));
+    }
+}
+
+/// Opens a context menu at `position`.
+fn open_at<Message>(
+    state: &mut State,
+    position: Point,
+    shell: &mut Shell<'_, Message>,
+    on_open_change: Option<&dyn Fn(bool) -> Message>,
+) {
+    let was_open = state.open;
+
+    state.open = true;
+    state.keyboard = false;
+    state.epoch = select_epoch();
+    state.point = Some(position);
+    shell.invalidate_layout();
+    shell.request_redraw();
+
+    if !was_open && let Some(f) = on_open_change {
+        shell.publish(f(true));
+    }
+}
+
+/// Prepares content opened with `key`: a menu highlights its first item
+/// (its last one for <kbd>↑</kbd>), other content focuses its first control,
+/// once shown.
+fn opened_with_keyboard(state: &mut State, menu: bool, key: key::Named) {
+    state.keyboard = true;
+
+    if menu {
+        // `Home` and `End` rather than the arrows: a menu opened before may
+        // still have an item highlighted.
+        state.replay = Some(key_event(if key == key::Named::ArrowUp {
+            key::Named::End
+        } else {
+            key::Named::Home
+        }));
+    } else {
+        state.focus_content = true;
     }
 }
 
@@ -583,9 +844,30 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
+        let was_captured = shell.is_event_captured();
+        let bounds = layout.bounds();
+
+        // The lift of the finger whose long press opened the content: the
+        // anchor sees the finger lost instead, so that it is not pressed
+        // (a long press on a link of a mobile browser does not follow it).
+        let swallowed = match event {
+            Event::Touch(
+                touch::Event::FingerLifted { id, position }
+                | touch::Event::FingerLost { id, position },
+            ) if tree.state.downcast_ref::<State>().swallow == Some(*id) => {
+                Some(Event::Touch(touch::Event::FingerLost {
+                    id: *id,
+                    position: *position,
+                }))
+            }
+            _ => None,
+        };
+
         self.anchor.as_widget_mut().update(
             &mut tree.children[0],
-            event,
+            swallowed.as_ref().unwrap_or(event),
             layout,
             cursor,
             renderer,
@@ -594,8 +876,20 @@ where
             viewport,
         );
 
+        // A key the anchor handled itself (typed into an input, or a button
+        // pressed with `Enter`) does not open the content too.
+        let captured_by_anchor = shell.is_event_captured();
         let state = tree.state.downcast_mut::<State>();
-        let bounds = layout.bounds();
+
+        if swallowed.is_some() {
+            state.swallow = None;
+            shell.capture_event();
+        } else if let Event::Touch(touch::Event::FingerPressed { id, .. }) = event
+            && state.swallow == Some(*id)
+        {
+            // The system reused the id of a finger whose lift never came.
+            state.swallow = None;
+        }
 
         if let Event::Mouse(mouse::Event::ButtonPressed(_))
         | Event::Touch(touch::Event::FingerPressed { .. })
@@ -609,50 +903,334 @@ where
             shell.request_redraw();
         }
 
+        // A finger resting on the anchor long enough: what a right click or
+        // a hover opens with a mouse.
+        let long_pressed = match state.long_press {
+            Some(hold) => match hold.update(event) {
+                pointer::Hold::Long => {
+                    state.long_press = None;
+                    Some(hold)
+                }
+                pointer::Hold::Ended => {
+                    state.long_press = None;
+                    None
+                }
+                pointer::Hold::Waiting => {
+                    shell.request_redraw_at(hold.deadline);
+                    None
+                }
+            },
+            None => None,
+        };
+
+        if let Some(hold) = long_pressed {
+            state.swallow = Some(hold.finger);
+
+            // The anchor (a button) forgets the press now, so that the
+            // content does not open on top of a pressed anchor.
+            let lost = Event::Touch(touch::Event::FingerLost {
+                id: hold.finger,
+                position: hold.origin,
+            });
+            let mut messages = Vec::new();
+
+            self.anchor.as_widget_mut().update(
+                &mut tree.children[0],
+                &lost,
+                layout,
+                cursor,
+                renderer,
+                clipboard,
+                &mut Shell::new(&mut messages),
+                viewport,
+            );
+
+            // The anchor observed the made-up loss of the finger, which
+            // still rests on the screen.
+            pointer::observe(&Event::Touch(touch::Event::FingerMoved {
+                id: hold.finger,
+                position: hold.origin,
+            }));
+        }
+
+        let state = tree.state.downcast_mut::<State>();
+        let anchor = &mut self.anchor;
+        let anchor_tree = &mut tree.children[0];
+        let mut anchor_focused = || {
+            let mut focused = FindFocused(false);
+            anchor
+                .as_widget_mut()
+                .operate(anchor_tree, layout, renderer, &mut focused);
+            focused.0
+        };
+
         match &self.trigger {
             Trigger::Controlled { .. } => {}
             Trigger::Click => {
-                if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-                | Event::Touch(touch::Event::FingerPressed { .. }) = event
-                    && cursor.is_over(bounds)
-                    && !state.open
-                {
-                    state.open = true;
-                    state.epoch = select_epoch();
-                    shell.invalidate_layout();
-                    shell.request_redraw();
-
-                    if let Some(f) = &self.on_open_change {
-                        shell.publish(f(true));
+                match event {
+                    Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+                        if cursor.is_over(bounds) && !state.open =>
+                    {
+                        open_click(state, shell, self.on_open_change.as_deref());
                     }
+                    // A finger opens the content once it lifts as a tap:
+                    // a scroll that starts on the anchor does not, and the
+                    // press is left to a parent scrollable.
+                    Event::Touch(touch::Event::FingerPressed { .. }) => {
+                        state.press = (!was_captured && !state.open)
+                            .then(|| pointer::Press::start(event, cursor, |p| bounds.contains(p)))
+                            .flatten();
+                    }
+                    _ => {
+                        if let Some(press) = &mut state.press {
+                            match press.update(event, cursor) {
+                                Some(pointer::Gesture::Tapped(position)) => {
+                                    state.press = None;
+
+                                    if bounds.contains(position) && !state.open {
+                                        open_click(state, shell, self.on_open_change.as_deref());
+                                    }
+                                }
+                                Some(pointer::Gesture::Released | pointer::Gesture::Cancelled) => {
+                                    state.press = None;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                // `Enter`, `Space` and, for a menu, the arrows open the
+                // content of a focused trigger, like the trigger of a Radix
+                // menu (a popover opens with the first two only).
+                if !captured_by_anchor
+                    && !state.open
+                    && let Some(
+                        named @ (key::Named::Enter
+                        | key::Named::Space
+                        | key::Named::ArrowDown
+                        | key::Named::ArrowUp),
+                    ) = plain_key(event)
+                    && (self.menu_keys || matches!(named, key::Named::Enter | key::Named::Space))
+                    && anchor_focused()
+                {
+                    open_click(state, shell, self.on_open_change.as_deref());
+                    opened_with_keyboard(state, self.menu_keys, named);
+                    shell.capture_event();
                 }
             }
             Trigger::ContextMenu => {
                 if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) = event
                     && let Some(position) = cursor.position_over(bounds)
                 {
-                    let was_open = state.open;
-
-                    state.open = true;
-                    state.epoch = select_epoch();
-                    state.point = Some(position);
-                    shell.invalidate_layout();
-                    shell.request_redraw();
+                    open_at(state, position, shell, self.on_open_change.as_deref());
                     shell.capture_event();
+                }
 
-                    if !was_open && let Some(f) = &self.on_open_change {
-                        shell.publish(f(true));
+                // A long press is the right click of touch screens.
+                if let Event::Touch(touch::Event::FingerPressed { .. }) = event
+                    && !was_captured
+                {
+                    // The position of a touch event is not translated by a
+                    // scrollable around the anchor, unlike the cursor.
+                    state.long_press = pointer::LongPress::start(event, |_| cursor.is_over(bounds));
+
+                    if let Some(hold) = state.long_press {
+                        shell.request_redraw_at(hold.deadline);
                     }
+                }
+
+                if let Some(hold) = long_pressed {
+                    // The cursor rests on the finger, in the coordinates of
+                    // the anchor.
+                    let position = cursor.position().unwrap_or(hold.origin);
+
+                    open_at(state, position, shell, self.on_open_change.as_deref());
+                }
+
+                // `Shift+F10` and the context menu key open the menu at the
+                // anchor, like the `contextmenu` event of browsers.
+                if !captured_by_anchor
+                    && let Event::Keyboard(keyboard::Event::KeyPressed {
+                        key: keyboard::Key::Named(named),
+                        modifiers,
+                        ..
+                    }) = event
+                    && (*named == key::Named::ContextMenu
+                        || (*named == key::Named::F10 && modifiers.shift()))
+                    && anchor_focused()
+                {
+                    open_at(
+                        state,
+                        bounds.position(),
+                        shell,
+                        self.on_open_change.as_deref(),
+                    );
+                    opened_with_keyboard(state, true, key::Named::ArrowDown);
+                    shell.capture_event();
                 }
             }
             Trigger::Hover {
                 open_delay,
                 close_delay,
             } => {
-                if let Event::Mouse(_) | Event::Window(window::Event::RedrawRequested(_)) = event {
-                    let is_open = matches!(state.hover, Hover::Open | Hover::Closing(_));
-                    let over = cursor.is_over(bounds);
-                    let now = Instant::now();
+                let now = event_time(event);
+                // Touch screens have no hover: the cursor stays where a
+                // finger lifted, over nothing.
+                let touch = pointer::is_touch();
+                let is_open = state.is_open(&self.trigger);
+
+                match self.touch_open {
+                    TouchOpen::Tap => {
+                        if let Event::Touch(touch::Event::FingerPressed { .. }) = event {
+                            state.press = (!was_captured)
+                                .then(|| {
+                                    pointer::Press::start(event, cursor, |p| bounds.contains(p))
+                                })
+                                .flatten();
+                        } else if let Some(press) = &mut state.press {
+                            match press.update(event, cursor) {
+                                Some(pointer::Gesture::Tapped(position)) => {
+                                    state.press = None;
+
+                                    if bounds.contains(position) {
+                                        if is_open {
+                                            state.close_hover(shell);
+                                        } else {
+                                            state.pinned = true;
+                                            state.pinned_by_keyboard = false;
+                                        }
+                                    }
+                                }
+                                Some(pointer::Gesture::Released | pointer::Gesture::Cancelled) => {
+                                    state.press = None;
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        // The arrow towards the content (`ArrowRight` for a
+                        // submenu), `Enter` and `Space` open it.
+                        let towards = match self.side {
+                            Side::Top => key::Named::ArrowUp,
+                            Side::Right => key::Named::ArrowRight,
+                            Side::Bottom => key::Named::ArrowDown,
+                            Side::Left => key::Named::ArrowLeft,
+                        };
+
+                        if !captured_by_anchor
+                            && !is_open
+                            && let Some(named) = plain_key(event)
+                            && (named == key::Named::Enter
+                                || named == key::Named::Space
+                                || named == towards)
+                            && (state.highlighted.get() || anchor_focused())
+                        {
+                            state.pinned = true;
+                            state.pinned_by_keyboard = true;
+                            state.suppressed = false;
+                            opened_with_keyboard(state, self.menu_keys, key::Named::ArrowDown);
+                            shell.capture_event();
+                        } else if state.pinned_by_keyboard
+                            && let Event::Keyboard(_) = event
+                            && !state.highlighted.get()
+                            && !anchor_focused()
+                        {
+                            // The focus left the anchor (to another trigger).
+                            state.pinned = false;
+                            state.pinned_by_keyboard = false;
+                        }
+                    }
+                    TouchOpen::Hold | TouchOpen::LongPress => {
+                        if let Event::Touch(touch::Event::FingerPressed { .. }) = event {
+                            // The next tap closes a tooltip shown by a long
+                            // press.
+                            state.linger = None;
+
+                            if !was_captured {
+                                state.long_press =
+                                    pointer::LongPress::start(event, |_| cursor.is_over(bounds));
+
+                                if let Some(hold) = state.long_press {
+                                    shell.request_redraw_at(hold.deadline);
+                                }
+                            }
+                        }
+
+                        if long_pressed.is_some() {
+                            if self.touch_open == TouchOpen::Hold {
+                                state.held = true;
+                            } else {
+                                state.pinned = true;
+                            }
+                        }
+
+                        // The finger lifted (its lift may not reach the
+                        // anchor): the tooltip stays a little longer.
+                        if state.held && !pointer::is_touching() {
+                            state.held = false;
+                            state.linger = Some(now + TOUCH_LINGER);
+                        }
+
+                        // A focus moved with `Tab` shows the content; a
+                        // pointer focus does not, even once a key makes it
+                        // visible (a shortcut after a click).
+                        match event {
+                            Event::Keyboard(keyboard::Event::KeyPressed {
+                                key: keyboard::Key::Named(key::Named::Tab),
+                                ..
+                            }) => {
+                                state.tabbed = true;
+                            }
+                            Event::Mouse(mouse::Event::ButtonPressed(_))
+                            | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                                state.tabbed = false;
+
+                                // Like Radix, pressing the trigger of a
+                                // tooltip closes it, until the pointer
+                                // leaves.
+                                if self.touch_open == TouchOpen::Hold
+                                    && is_open
+                                    && cursor.is_over(bounds)
+                                {
+                                    state.close_hover(shell);
+                                    state.suppressed = true;
+                                }
+                            }
+                            _ => {}
+                        }
+
+                        // Like Radix, tooltips and hover cards open when
+                        // their trigger receives the keyboard focus, not
+                        // when it is clicked.
+                        if let Event::Keyboard(_)
+                        | Event::Window(window::Event::RedrawRequested(_))
+                        | Event::Mouse(mouse::Event::ButtonPressed(_))
+                        | Event::Touch(touch::Event::FingerPressed { .. }) = event
+                        {
+                            let mut visible = false;
+
+                            focus::for_each_control(
+                                anchor,
+                                anchor_tree,
+                                layout,
+                                renderer,
+                                |_, focus| {
+                                    visible |= focus.is_visible();
+                                },
+                            );
+
+                            state.focused = visible && state.tabbed;
+                        }
+                    }
+                }
+
+                if let Event::Mouse(_)
+                | Event::Touch(_)
+                | Event::Keyboard(_)
+                | Event::Window(window::Event::RedrawRequested(_)) = event
+                {
+                    let over = !touch && cursor.is_over(bounds);
 
                     // The pointer leaves the anchor towards the open
                     // content: it stays open while the pointer moves
@@ -660,6 +1238,7 @@ where
                     if state.anchor_over
                         && !over
                         && is_open
+                        && !touch
                         && let Some(position) = cursor.position()
                         && let Some(content) = state.content_bounds
                     {
@@ -671,6 +1250,7 @@ where
                     }
 
                     let in_grace = !over
+                        && !touch
                         && state.grace.is_some_and(|grace| {
                             now < grace.deadline
                                 && cursor
@@ -688,11 +1268,24 @@ where
 
                     // Another anchor under the grace area (the trigger of a
                     // sibling submenu) does not open its content.
-                    let blocked = !is_open && cursor.position().is_some_and(is_in_pointer_grace);
+                    let blocked =
+                        !is_open && !touch && cursor.position().is_some_and(is_in_pointer_grace);
+
+                    // Content opened with the keyboard closes like hovered
+                    // content once the mouse moves elsewhere.
+                    if state.pinned_by_keyboard
+                        && let Event::Mouse(mouse::Event::CursorMoved { .. }) = event
+                        && !over
+                        && !in_grace
+                        && !state.content_hovered
+                    {
+                        state.pinned = false;
+                        state.pinned_by_keyboard = false;
+                    }
 
                     state.anchor_over = over;
                     state.anchor_hovered = (over && !blocked) || in_grace;
-                    state.tick(*open_delay, *close_delay, shell);
+                    state.tick(now, *open_delay, *close_delay, shell);
                 }
             }
             Trigger::Input => {
@@ -825,6 +1418,9 @@ where
             );
         }
 
+        // The anchor may tell whether it is highlighted while drawn.
+        let outer = HIGHLIGHTED.replace(Some(false));
+
         self.anchor.as_widget().draw(
             &tree.children[0],
             renderer,
@@ -834,6 +1430,10 @@ where
             cursor,
             viewport,
         );
+
+        if let Some(highlighted) = HIGHLIGHTED.replace(outer) {
+            state.highlighted.set(highlighted);
+        }
 
         // `focus-visible:border-ring`
         if let Some(style) = focus_ring
@@ -957,6 +1557,7 @@ where
                 resolved_side: self.side,
                 group: group.filter(|_| open),
                 anchor_tracker: self.anchor_tracker.as_ref(),
+                menu_keys: self.menu_keys,
             })))
         } else {
             None
@@ -1018,6 +1619,7 @@ struct Floating<'a, 'b, Message, Theme, Renderer> {
     resolved_side: Side,
     group: Option<GroupLink<'b>>,
     anchor_tracker: Option<&'b AnchorTracker>,
+    menu_keys: bool,
 }
 
 /// What the open content of a [`Group`] knows about its siblings.
@@ -1026,8 +1628,9 @@ struct GroupLink<'b> {
     index: usize,
     /// The bounds of the anchors of the group.
     anchors: Vec<Rectangle>,
-    /// Where to ask the group to open another [`Anchored`].
-    request: &'b mut Option<usize>,
+    /// Where to ask the group to open another [`Anchored`], and whether
+    /// the keyboard asks.
+    request: &'b mut Option<(usize, bool)>,
 }
 
 impl<Message, Theme, Renderer> Floating<'_, '_, Message, Theme, Renderer>
@@ -1054,6 +1657,10 @@ where
             }
             Trigger::Hover { .. } => {
                 self.state.hover = Hover::Idle;
+                self.state.pinned = false;
+                self.state.pinned_by_keyboard = false;
+                self.state.held = false;
+                self.state.linger = None;
                 // Until the pointer leaves, or it would reopen right away.
                 self.state.suppressed = true;
                 // The content is gone and stops tracking the pointer: left
@@ -1298,6 +1905,8 @@ where
         clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
     ) {
+        pointer::observe(event);
+
         let bounds = layout.bounds();
         let was_captured = shell.is_event_captured();
 
@@ -1344,10 +1953,30 @@ where
             shell.request_redraw();
         }
 
-        // Another trigger of the group is hovered: open its menu instead.
+        // Content opened with the keyboard focuses its first control, like
+        // the `autoFocus` of a Radix popover.
+        if std::mem::take(&mut self.state.focus_content) {
+            let content = self.content.as_widget_mut();
+            let tree = &mut *self.tree;
+
+            let _ =
+                tab::focus_first(|operation| content.operate(tree, layout, renderer, operation));
+            shell.request_redraw();
+        }
+
+        // Another trigger of the group is hovered, or pressed (a finger
+        // hovers nothing): open its menu instead.
         if let Some(group) = &mut self.group
-            && let Event::Mouse(mouse::Event::CursorMoved { .. }) = event
-            && let Some(position) = cursor.position()
+            && let Some(position) = match event {
+                Event::Mouse(
+                    mouse::Event::CursorMoved { .. }
+                    | mouse::Event::ButtonPressed(mouse::Button::Left),
+                ) => cursor.position(),
+                // The cursor, translated like the anchors, rather than the
+                // position of the finger.
+                Event::Touch(touch::Event::FingerPressed { .. }) => cursor.position(),
+                _ => None,
+            }
             && !bounds.contains(position)
             && let Some(other) = group
                 .anchors
@@ -1355,17 +1984,21 @@ where
                 .position(|anchor| anchor.contains(position))
             && other != group.index
         {
-            *group.request = Some(other);
+            *group.request = Some((other, false));
             self.dismiss(shell);
             shell.capture_event();
             return;
         }
+
+        // A selection reported before is not one in this content.
+        SELECTED.set(false);
 
         self.content.as_widget_mut().update(
             self.tree, event, layout, cursor, renderer, clipboard, shell, &bounds,
         );
 
         let captured_by_content = !was_captured && shell.is_event_captured();
+        let selected = SELECTED.take();
 
         // `ArrowLeft` and `ArrowRight` move to the previous and next menus of
         // the group.
@@ -1379,11 +2012,13 @@ where
         {
             let count = group.anchors.len();
 
-            *group.request = Some(if *named == key::Named::ArrowRight {
+            let other = if *named == key::Named::ArrowRight {
                 (group.index + 1) % count
             } else {
                 (group.index + count - 1) % count
-            });
+            };
+
+            *group.request = Some((other, self.state.keyboard));
             self.dismiss(shell);
             shell.capture_event();
             return;
@@ -1393,11 +2028,61 @@ where
             open_delay,
             close_delay,
         } = *self.trigger
-            && let Event::Mouse(_) | Event::Window(window::Event::RedrawRequested(_)) = event
+            && let Event::Mouse(_)
+            | Event::Touch(_)
+            | Event::Keyboard(_)
+            | Event::Window(window::Event::RedrawRequested(_)) = event
         {
-            self.state.content_hovered = cursor.is_over(bounds);
+            // A finger on the content does not hover it: what opened it with
+            // a tap or a long press keeps it open.
+            self.state.content_hovered = !pointer::is_touch() && cursor.is_over(bounds);
             self.state.content_bounds = Some(bounds);
-            self.state.tick(open_delay, close_delay, shell);
+            self.state
+                .tick(event_time(event), open_delay, close_delay, shell);
+        }
+
+        if !captured_by_content && let Some(backwards) = tab::tab_pressed(event) {
+            if self.menu_keys {
+                // Like Radix, `Tab` closes a menu, and the focus moves on
+                // from its trigger.
+                self.dismiss(shell);
+            } else if !matches!(self.trigger, Trigger::Input) {
+                let content = self.content.as_widget_mut();
+                let tree = &mut *self.tree;
+                let mut operate = |operation: &mut dyn Operation| {
+                    content.operate(tree, layout, renderer, operation)
+                };
+
+                // The focus cycles through the controls of open content (a
+                // popover), instead of going on to the page behind it.
+                // Hover content keeps it only once it has it (a navigation
+                // menu opened with the keyboard).
+                if matches!(self.trigger, Trigger::Click | Trigger::Controlled { .. })
+                    || tab::has_focus(&mut operate)
+                {
+                    if tab::cycle(&mut operate, backwards) {
+                        shell.capture_event();
+                        shell.request_redraw();
+                    } else {
+                        // Nothing to focus in it: `Tab` closes it and moves
+                        // on from its trigger.
+                        self.dismiss(shell);
+                    }
+                }
+            }
+        }
+
+        // `ArrowLeft` closes a submenu, and the highlight stays on its
+        // trigger.
+        if self.menu_keys
+            && !captured_by_content
+            && matches!(self.trigger, Trigger::Hover { .. })
+            && self.side == Side::Right
+            && plain_key(event) == Some(key::Named::ArrowLeft)
+        {
+            self.dismiss(shell);
+            shell.capture_event();
+            return;
         }
 
         match event {
@@ -1407,6 +2092,23 @@ where
             }) => {
                 self.dismiss(shell);
                 self.state.focus_visible = true;
+                shell.capture_event();
+
+                // The focus returns to the anchor, which kept it.
+                if !self.menu_keys {
+                    self.content
+                        .as_widget_mut()
+                        .operate(self.tree, layout, renderer, &mut Unfocus);
+                }
+            }
+            // `Alt+ArrowUp` closes the list of a combobox (APG), the focus
+            // staying in its input.
+            Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(key::Named::ArrowUp),
+                modifiers,
+                ..
+            }) if modifiers.alt() && matches!(self.trigger, Trigger::Input) => {
+                self.dismiss(shell);
                 shell.capture_event();
             }
             Event::Mouse(mouse::Event::ButtonPressed(_))
@@ -1434,21 +2136,29 @@ where
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerLifted { .. })
-                if captured_by_content && self.close_on_select =>
+                if (captured_by_content || selected) && self.close_on_select =>
             {
-                let _ = SELECT_EPOCH.fetch_add(1, atomic::Ordering::Relaxed);
+                bump_select_epoch();
                 self.state.epoch = select_epoch();
                 self.dismiss(shell);
             }
-            // An item activated with the keyboard.
-            Event::Keyboard(keyboard::Event::KeyPressed {
-                key: keyboard::Key::Named(key::Named::Enter),
-                ..
-            }) if captured_by_content && self.close_on_select => {
-                let _ = SELECT_EPOCH.fetch_add(1, atomic::Ordering::Relaxed);
+            // An item selected with the keyboard (`Enter`, or `Space` in a
+            // list typed ahead).
+            Event::Keyboard(_) if selected && self.close_on_select => {
+                bump_select_epoch();
                 self.state.epoch = select_epoch();
                 self.dismiss(shell);
                 self.state.focus_visible = true;
+            }
+            // A finger pressing the content, which its items leave alone
+            // until it lifts as a tap (a drag scrolls the content, which has
+            // seen the press already). Uncaptured, the press would reach the
+            // content this one is nested in (the menu of a submenu) as a
+            // press outside of it, and close the whole chain before the tap.
+            Event::Touch(touch::Event::FingerPressed { .. })
+                if !captured_by_content && cursor.is_over(bounds) =>
+            {
+                shell.capture_event();
             }
             Event::Mouse(_) | Event::Touch(_) if self.modal => {
                 shell.capture_event();
@@ -1523,8 +2233,9 @@ impl<Message, Theme, Renderer> Group<'_, Message, Theme, Renderer> {
 
 #[derive(Debug, Default)]
 struct GroupState {
-    /// The menu to open, asked for by the open one.
-    request: Option<usize>,
+    /// The menu to open, asked for by the open one, and whether the
+    /// keyboard asked.
+    request: Option<(usize, bool)>,
 }
 
 impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -1697,12 +2408,44 @@ where
         let group = state.downcast_mut::<GroupState>();
 
         // Opens the menu the previously open one asked for.
-        if let Some(index) = group.request.take()
+        if let Some((index, keyboard)) = group.request.take()
             && let Some(tree) = children.get_mut(index)
         {
             let state = tree.state.downcast_mut::<State>();
             state.open = true;
             state.epoch = select_epoch();
+            state.keyboard = keyboard;
+
+            // Like Radix, a menu reached with the keyboard highlights its
+            // first item, and its trigger takes the focus (to return it on
+            // `Escape`).
+            if keyboard {
+                state.replay = Some(key_event(key::Named::Home));
+
+                for (i, ((child, tree), layout)) in self
+                    .children
+                    .iter_mut()
+                    .zip(children.iter_mut())
+                    .zip(layout.children())
+                    .enumerate()
+                {
+                    child.anchor.as_widget_mut().operate(
+                        &mut tree.children[0],
+                        layout,
+                        renderer,
+                        &mut focus::Controls {
+                            index: 0,
+                            f: |_, focus: &mut focus::Focus| {
+                                if i == index {
+                                    focus.focus_with_keyboard();
+                                } else {
+                                    focus.blur();
+                                }
+                            },
+                        },
+                    );
+                }
+            }
         }
 
         let anchors: Vec<Rectangle> = layout
@@ -1952,6 +2695,26 @@ impl Operation for FocusFirst {
         if !self.0 {
             state.focus();
             self.0 = true;
+        }
+    }
+}
+
+/// Takes the keyboard focus away from a widget tree.
+struct Unfocus;
+
+impl Operation for Unfocus {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+
+    fn focusable(
+        &mut self,
+        _id: Option<&widget::Id>,
+        _bounds: Rectangle,
+        state: &mut dyn widget::operation::Focusable,
+    ) {
+        if state.is_focused() {
+            state.unfocus();
         }
     }
 }

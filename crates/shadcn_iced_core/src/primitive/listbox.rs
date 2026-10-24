@@ -3,7 +3,13 @@
 //! [`Listbox`] is the headless building block behind menus, selects and
 //! command palettes. It keeps track of the highlighted item, which follows
 //! the mouse and can be moved with the arrow keys; <kbd>Enter</kbd> or a
-//! click selects it.
+//! click selects it. A finger selects an item with a tap, and a drag over
+//! the items scrolls their scrollable instead, like on mobile browsers.
+//!
+//! Lists that own the keyboard, like menus and selects, can also be
+//! [`typeahead`](Listbox::typeahead) lists: <kbd>Space</kbd> selects too,
+//! and typing moves the highlight to the item whose
+//! [`text_value`](Listbox::text_value) starts with what was typed.
 //!
 //! Items are plain elements: the listbox draws the highlight behind them and
 //! switches their text color.
@@ -12,12 +18,14 @@
 //! highlighted item into view when it is moved with the keyboard, and can
 //! hand the keyboard to the listbox only while the focus is within it.
 use super::focus;
+use super::pointer::{self, Gesture};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::operation::scrollable::{AbsoluteOffset, Scrollable};
 use iced::advanced::widget::{Id, Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::keyboard::{self, key};
+use iced::time::{Duration, Instant};
 use iced::{
     Background, Border, Color, Element, Event, Length, Padding, Point, Rectangle, Size, Vector,
     mouse, touch,
@@ -48,6 +56,7 @@ struct Child<'a, Message, Theme, Renderer> {
     on_select: Option<Message>,
     selectable: bool,
     style: Option<Box<dyn Fn(&Theme) -> Style + 'a>>,
+    text: Option<String>,
 }
 
 /// A vertical list of selectable items.
@@ -61,6 +70,8 @@ pub struct Listbox<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer> 
     highlight_first: bool,
     initial: Option<usize>,
     clear_on_leave: bool,
+    typeahead: bool,
+    vim_bindings: bool,
     key: u64,
     style: Box<dyn Fn(&Theme) -> Style + 'a>,
 }
@@ -81,6 +92,8 @@ where
             highlight_first: false,
             initial: None,
             clear_on_leave: true,
+            typeahead: false,
+            vim_bindings: false,
             key: 0,
             style: Box::new(style),
         }
@@ -99,6 +112,7 @@ where
             on_select,
             selectable,
             style: None,
+            text: None,
         });
         self
     }
@@ -118,6 +132,7 @@ where
             on_select,
             selectable,
             style: Some(Box::new(style)),
+            text: None,
         });
         self
     }
@@ -130,6 +145,7 @@ where
             on_select: None,
             selectable: true,
             style: None,
+            text: None,
         });
         self
     }
@@ -141,7 +157,19 @@ where
             on_select: None,
             selectable: false,
             style: None,
+            text: None,
         });
+        self
+    }
+
+    /// Sets the text of the last appended item, which
+    /// [typeahead](Self::typeahead) matches what was typed against (the
+    /// `textValue` of Radix items). Items without one are skipped by
+    /// typeahead.
+    pub fn text_value(mut self, text: impl Into<String>) -> Self {
+        if let Some(child) = self.children.last_mut() {
+            child.text = Some(text.into());
+        }
         self
     }
 
@@ -169,7 +197,9 @@ where
         self
     }
 
-    /// Sets whether the arrow keys and <kbd>Enter</kbd> are handled.
+    /// Sets whether the navigation keys (the arrows, <kbd>Home</kbd>,
+    /// <kbd>End</kbd>, <kbd>PageUp</kbd>, <kbd>PageDown</kbd>) and
+    /// <kbd>Enter</kbd> are handled.
     pub fn keyboard(mut self, keyboard: bool) -> Self {
         self.keyboard = keyboard;
         self
@@ -196,6 +226,31 @@ where
         self
     }
 
+    /// Makes the list behave like the content of a Radix menu or select,
+    /// which owns the keyboard: <kbd>Space</kbd> selects the highlighted
+    /// item like <kbd>Enter</kbd>, and typed characters highlight the next
+    /// item whose [`text_value`](Self::text_value) starts with them.
+    /// Characters typed less than a second apart make up one search, and
+    /// repeating a single character cycles through the items starting with
+    /// it; <kbd>Space</kbd> is part of a search while typing one.
+    ///
+    /// Lists driven by a text input (a combobox, a command) leave it off
+    /// (the default): there, <kbd>Space</kbd> and characters type into the
+    /// input.
+    pub fn typeahead(mut self, typeahead: bool) -> Self {
+        self.typeahead = typeahead;
+        self
+    }
+
+    /// Also moves the highlight with <kbd>Ctrl</kbd>+<kbd>N</kbd> or
+    /// <kbd>Ctrl</kbd>+<kbd>J</kbd> (next) and <kbd>Ctrl</kbd>+<kbd>P</kbd>
+    /// or <kbd>Ctrl</kbd>+<kbd>K</kbd> (previous), like the `vimBindings`
+    /// of cmdk. Defaults to `false`.
+    pub fn vim_bindings(mut self, vim_bindings: bool) -> Self {
+        self.vim_bindings = vim_bindings;
+        self
+    }
+
     /// Identifies the items, e.g. by the query filtering them. When it
     /// changes, or when the items do (their number, or which ones are
     /// selectable), the highlight goes back to where it starts: the
@@ -218,10 +273,30 @@ where
 struct State {
     active: Option<usize>,
     touched: bool,
+    /// The item pressed with the mouse.
     pressed: Option<usize>,
+    /// The item pressed with a finger.
+    touch: Option<TouchPress>,
+    typeahead: Typeahead,
     /// The [`Listbox::items`] the highlight is about.
     items: u64,
 }
+
+/// A finger pressing an item, which selects it when it lifts without
+/// moving (a tap), and leaves it to the scrollable around the list when it
+/// moves (a scroll).
+#[derive(Debug, Clone, Copy)]
+struct TouchPress {
+    press: pointer::Press,
+    item: usize,
+    /// The highlight before the press, restored when the press turns into
+    /// a scroll.
+    before: (Option<usize>, bool),
+}
+
+/// How many items <kbd>PageUp</kbd> and <kbd>PageDown</kbd> move the
+/// highlight by.
+const PAGE: usize = 10;
 
 impl<Message, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
     /// Identifies the items: their key, their number and which ones are
@@ -289,6 +364,148 @@ impl<Message, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
 
         None
     }
+
+    /// The highlight moved by up to `count` selectable items, stopping at
+    /// the ends rather than wrapping around.
+    fn page(&self, from: Option<usize>, forward: bool, count: usize) -> Option<usize> {
+        let Some(mut index) = from else {
+            return self.step(None, forward);
+        };
+
+        let mut moved = 0;
+        let mut next = index;
+
+        while moved < count {
+            next = match (forward, next) {
+                (true, next) if next + 1 < self.children.len() => next + 1,
+                (false, next) if next > 0 => next - 1,
+                _ => break,
+            };
+
+            if self.children[next].selectable {
+                index = next;
+                moved += 1;
+            }
+        }
+
+        Some(index)
+    }
+
+    /// The next item whose text starts with the `search` typed ahead, from
+    /// the `active` one.
+    fn find(&self, search: &str, active: Option<usize>) -> Option<usize> {
+        next_match(
+            search,
+            self.children
+                .iter()
+                .enumerate()
+                .filter(|(_, child)| child.selectable)
+                .filter_map(|(index, child)| Some((index, child.text.as_deref()?))),
+            active,
+        )
+    }
+
+    /// Adds `text` to the search typed ahead, and returns the item to
+    /// highlight: the next match, or the `active` item if nothing matches.
+    fn type_ahead(
+        &self,
+        state: &mut State,
+        text: &str,
+        active: Option<usize>,
+        now: Instant,
+    ) -> Option<usize> {
+        let search = state.typeahead.push(text, now);
+
+        self.find(search, active).or(active)
+    }
+}
+
+impl<Message: Clone, Theme, Renderer> Listbox<'_, Message, Theme, Renderer> {
+    /// Selects the `active` item with the keyboard.
+    fn select(&self, active: Option<usize>, shell: &mut Shell<'_, Message>) {
+        if let Some(message) = active.and_then(|index| self.children[index].on_select.clone()) {
+            shell.publish(message);
+            shell.capture_event();
+            super::anchored::report_selected();
+        }
+    }
+}
+
+/// How long the characters typed ahead make up a single search: like Radix,
+/// the search starts over a second after the last key.
+pub const TYPEAHEAD_TIMEOUT: Duration = Duration::from_millis(1000);
+
+/// The characters typed ahead in a list, to move to the item starting with
+/// them (Radix's `useTypeaheadSearch`). Used by [`Listbox::typeahead`], and
+/// by anything picking an item by typing its text, like the closed trigger
+/// of a select.
+#[derive(Debug, Clone, Default)]
+pub struct Typeahead {
+    search: String,
+    last: Option<Instant>,
+}
+
+impl Typeahead {
+    /// Whether a search is going on: something was typed less than
+    /// [`TYPEAHEAD_TIMEOUT`] ago. <kbd>Space</kbd> is then part of the
+    /// search rather than selecting.
+    pub fn is_typing(&self, now: Instant) -> bool {
+        !self.search.is_empty()
+            && self
+                .last
+                .is_some_and(|last| now.saturating_duration_since(last) < TYPEAHEAD_TIMEOUT)
+    }
+
+    /// Adds `text` to the search, which starts over when the previous key is
+    /// older than [`TYPEAHEAD_TIMEOUT`], and returns the search.
+    pub fn push(&mut self, text: &str, now: Instant) -> &str {
+        if !self.is_typing(now) {
+            self.search.clear();
+        }
+
+        self.search.push_str(text);
+        self.last = Some(now);
+
+        &self.search
+    }
+}
+
+/// The item to move to for a `search` typed ahead, among `items` (the
+/// index and the text of each enabled item, in order) from the `current`
+/// one, like Radix's `getNextMatch`: the first item after the current one
+/// (wrapping around) whose text starts with the search, ignoring case.
+///
+/// A single character skips the current item, and a character repeated
+/// (`"bbb"`) searches for that character alone: repeating it cycles
+/// through the items starting with it. Returns `None` when nothing else
+/// matches.
+pub fn next_match<'t>(
+    search: &str,
+    items: impl IntoIterator<Item = (usize, &'t str)>,
+    current: Option<usize>,
+) -> Option<usize> {
+    let items: Vec<_> = items.into_iter().collect();
+    let first = search.chars().next()?;
+
+    let repeated = search.chars().count() > 1 && search.chars().all(|c| c == first);
+    let search = if repeated {
+        first.to_lowercase().collect::<String>()
+    } else {
+        search.to_lowercase()
+    };
+    let exclude_current = search.chars().count() == 1;
+
+    let start = current
+        .and_then(|current| items.iter().position(|(index, _)| *index == current))
+        .unwrap_or(0);
+
+    items[start..]
+        .iter()
+        .chain(&items[..start])
+        .filter(|(index, _)| !(exclude_current && Some(*index) == current))
+        .find(|(_, text)| text.to_lowercase().starts_with(&search))
+        .map(|(index, _)| *index)
+        .filter(|index| Some(*index) != current)
 }
 
 impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -444,6 +661,8 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         for ((child, tree), layout) in self
             .children
             .iter_mut()
@@ -456,15 +675,30 @@ where
         }
 
         if shell.is_event_captured() {
+            if let Event::Touch(
+                touch::Event::FingerLifted { .. } | touch::Event::FingerLost { .. },
+            ) = event
+            {
+                tree.state.downcast_mut::<State>().touch = None;
+            }
+
             return;
         }
 
-        let hovered = cursor.position().and_then(|position| {
-            layout
-                .children()
-                .position(|layout| layout.bounds().contains(position))
-                .filter(|index| self.children[*index].selectable)
-        });
+        let item_at = |cursor: mouse::Cursor| {
+            cursor.position().and_then(|position| {
+                layout
+                    .children()
+                    .position(|layout| layout.bounds().contains(position))
+                    .filter(|index| self.children[*index].selectable)
+            })
+        };
+
+        // The item under the pointer, wherever it is (a finger that just
+        // lifted is still where it was), and the item hovered: never by a
+        // lifted finger.
+        let pointed = item_at(cursor);
+        let hovered = item_at(pointer::hover(cursor));
 
         let active = self.active(tree.state.downcast_ref::<State>());
         let state = tree.state.downcast_mut::<State>();
@@ -474,8 +708,7 @@ where
             // highlighted.
             Event::Mouse(mouse::Event::CursorMoved { position })
                 if super::anchored::is_in_pointer_grace(*position) => {}
-            Event::Mouse(mouse::Event::CursorMoved { .. })
-            | Event::Touch(touch::Event::FingerMoved { .. }) => {
+            Event::Mouse(mouse::Event::CursorMoved { .. }) => {
                 let next = match hovered {
                     Some(index) => Some(index),
                     None if self.clear_on_leave => None,
@@ -495,51 +728,153 @@ where
                 state.active = None;
                 shell.request_redraw();
             }
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerPressed { .. }) => {
-                if let Some(index) = hovered {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                if let Some(index) = pointed {
                     state.pressed = Some(index);
                     shell.capture_event();
                 }
             }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerLifted { .. }) => {
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 if let Some(pressed) = state.pressed.take()
-                    && hovered == Some(pressed)
+                    && pointed == Some(pressed)
                     && let Some(message) = &self.children[pressed].on_select
                 {
                     shell.publish(message.clone());
                     shell.capture_event();
+                    super::anchored::report_selected();
                 }
             }
-            Event::Keyboard(keyboard::Event::KeyPressed {
-                key: keyboard::Key::Named(named),
-                ..
-            }) if self.keyboard => match named {
-                key::Named::ArrowDown | key::Named::ArrowUp => {
-                    state.active = self.step(active, *named == key::Named::ArrowDown);
+            // A finger highlights the item it presses (like `:active`), but
+            // the press is not captured: the scrollable around the list
+            // scrolls if the finger moves. Like Radix, which leaves
+            // highlighting on `pointermove` to mice, a finger moving over
+            // the items does not highlight them.
+            Event::Touch(touch::Event::FingerPressed { .. }) => {
+                if state.touch.is_none()
+                    && let Some(item) = pointed
+                    && let Some(press) = pointer::Press::start(event, cursor, |_| true)
+                {
+                    state.touch = Some(TouchPress {
+                        press,
+                        item,
+                        before: (state.active, state.touched),
+                    });
+                    state.active = Some(item);
                     state.touched = true;
-                    reveal(layout, state.active, viewport);
                     shell.request_redraw();
-                    shell.capture_event();
                 }
-                key::Named::Home | key::Named::End => {
-                    state.active = self.step(None, *named == key::Named::Home);
-                    state.touched = true;
-                    reveal(layout, state.active, viewport);
-                    shell.request_redraw();
-                    shell.capture_event();
-                }
-                key::Named::Enter => {
-                    if let Some(message) =
-                        active.and_then(|index| self.children[index].on_select.clone())
-                    {
-                        shell.publish(message);
-                        shell.capture_event();
+            }
+            Event::Touch(
+                touch::Event::FingerMoved { .. }
+                | touch::Event::FingerLifted { .. }
+                | touch::Event::FingerLost { .. },
+            ) => {
+                if let Some(mut press) = state.touch {
+                    match press.press.update(event, cursor) {
+                        // A scroll: the item is not pressed anymore.
+                        Some(Gesture::Cancelled) => {
+                            (state.active, state.touched) = press.before;
+                            state.touch = Some(press);
+                            shell.request_redraw();
+                        }
+                        // Captured, so that a popup closes on the selection.
+                        Some(Gesture::Tapped(_)) => {
+                            state.touch = None;
+
+                            if pointed == Some(press.item)
+                                && let Some(message) = &self.children[press.item].on_select
+                            {
+                                shell.publish(message.clone());
+                                shell.capture_event();
+                                super::anchored::report_selected();
+                            }
+                        }
+                        Some(Gesture::Released) => {
+                            state.touch = None;
+
+                            if !press.press.moved {
+                                (state.active, state.touched) = press.before;
+                                shell.request_redraw();
+                            }
+                        }
+                        Some(Gesture::Pressed(_) | Gesture::Moved(_)) => {
+                            state.touch = Some(press);
+                        }
+                        // Another finger.
+                        None => {}
                     }
                 }
-                _ => {}
-            },
+
+                // The finger left the screen: the touch equivalent of the
+                // cursor leaving the list.
+                if let Event::Touch(
+                    touch::Event::FingerLifted { .. } | touch::Event::FingerLost { .. },
+                ) = event
+                    && state.touch.is_none()
+                    && self.clear_on_leave
+                    && state.active.is_some()
+                {
+                    state.active = None;
+                    shell.request_redraw();
+                }
+            }
+            Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
+                if self.keyboard =>
+            {
+                let now = Instant::now();
+                let typing = self.typeahead && state.typeahead.is_typing(now);
+                // `Alt` with an arrow opens or closes a combobox, without
+                // moving the highlight.
+                let plain = !modifiers.alt() && !modifiers.control() && !modifiers.logo();
+
+                let next =
+                    match key.as_ref() {
+                        keyboard::Key::Named(
+                            named @ (key::Named::ArrowDown | key::Named::ArrowUp),
+                        ) if plain => Some(self.step(active, named == key::Named::ArrowDown)),
+                        keyboard::Key::Named(named @ (key::Named::Home | key::Named::End)) => {
+                            Some(self.step(None, named == key::Named::Home))
+                        }
+                        keyboard::Key::Named(
+                            named @ (key::Named::PageUp | key::Named::PageDown),
+                        ) => Some(self.page(active, named == key::Named::PageDown, PAGE)),
+                        keyboard::Key::Character(c)
+                            if self.vim_bindings
+                                && modifiers.control()
+                                && !modifiers.alt()
+                                && !modifiers.logo()
+                                && matches!(c.to_lowercase().as_str(), "n" | "j" | "p" | "k") =>
+                        {
+                            Some(self.step(active, matches!(c.to_lowercase().as_str(), "n" | "j")))
+                        }
+                        // While typing ahead, `Space` is part of the search.
+                        keyboard::Key::Named(key::Named::Space) if typing => {
+                            Some(self.type_ahead(state, " ", active, now))
+                        }
+                        // Like any key of a menu, which owns the keyboard, the
+                        // characters are captured even when nothing matches.
+                        keyboard::Key::Character(c) if self.typeahead && plain => {
+                            Some(self.type_ahead(state, c, active, now))
+                        }
+                        keyboard::Key::Named(key::Named::Enter) => {
+                            self.select(active, shell);
+                            None
+                        }
+                        keyboard::Key::Named(key::Named::Space) if self.typeahead => {
+                            self.select(active, shell);
+                            None
+                        }
+                        _ => None,
+                    };
+
+                if let Some(next) = next {
+                    state.active = next;
+                    state.touched = true;
+                    reveal(layout, state.active, viewport);
+                    shell.request_redraw();
+                    shell.capture_event();
+                }
+            }
             _ => {}
         }
     }
@@ -718,7 +1053,9 @@ pub fn region<'a, Message, Theme, Renderer>(
 
 impl<Message, Theme, Renderer> Region<'_, Message, Theme, Renderer> {
     /// Hands the navigation keys (<kbd>↑</kbd>, <kbd>↓</kbd>,
-    /// <kbd>Home</kbd>, <kbd>End</kbd> and <kbd>Enter</kbd>) to the listbox
+    /// <kbd>Home</kbd>, <kbd>End</kbd>, <kbd>PageUp</kbd>,
+    /// <kbd>PageDown</kbd>, the [`vim_bindings`](Listbox::vim_bindings) and
+    /// <kbd>Enter</kbd>) to the listbox
     /// only while a control of the region (its search field) is focused,
     /// like the root of cmdk; otherwise, the listbox reacts to them
     /// anywhere in the window. Defaults to `false`, for listboxes in
@@ -726,6 +1063,28 @@ impl<Message, Theme, Renderer> Region<'_, Message, Theme, Renderer> {
     pub fn focus_within(mut self, focus_within: bool) -> Self {
         self.focus_within = focus_within;
         self
+    }
+}
+
+/// Whether a key moves the highlight of a listbox or selects its item, for
+/// [`Region::focus_within`].
+fn is_navigation(key: &keyboard::Key, modifiers: keyboard::Modifiers) -> bool {
+    match key.as_ref() {
+        keyboard::Key::Named(named) => matches!(
+            named,
+            key::Named::ArrowDown
+                | key::Named::ArrowUp
+                | key::Named::Home
+                | key::Named::End
+                | key::Named::PageUp
+                | key::Named::PageDown
+                | key::Named::Enter
+        ),
+        // The `vimBindings` of cmdk.
+        keyboard::Key::Character(c) => {
+            modifiers.control() && matches!(c.to_lowercase().as_str(), "n" | "j" | "p" | "k")
+        }
+        keyboard::Key::Unidentified => false,
     }
 }
 
@@ -820,17 +1179,8 @@ where
         viewport: &Rectangle,
     ) {
         if self.focus_within
-            && let Event::Keyboard(keyboard::Event::KeyPressed {
-                key:
-                    keyboard::Key::Named(
-                        key::Named::ArrowDown
-                        | key::Named::ArrowUp
-                        | key::Named::Home
-                        | key::Named::End
-                        | key::Named::Enter,
-                    ),
-                ..
-            }) = event
+            && let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event
+            && is_navigation(key, *modifiers)
             && !focus::is_focus_within(&mut self.content, &mut tree.children[0], layout, renderer)
         {
             return;
@@ -1247,5 +1597,43 @@ where
 {
     fn from(row: ItemRow<'a, Message, Theme, Renderer>) -> Self {
         Element::new(row)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FRUITS: [(usize, &str); 4] =
+        [(0, "Apple"), (1, "Banana"), (2, "Blueberry"), (4, "Cherry")];
+
+    #[test]
+    fn typing_moves_to_the_item_starting_with_the_search() {
+        assert_eq!(next_match("b", FRUITS, None), Some(1));
+        assert_eq!(next_match("BLU", FRUITS, None), Some(2));
+        assert_eq!(next_match("ch", FRUITS, Some(1)), Some(4));
+        assert_eq!(next_match("x", FRUITS, None), None);
+    }
+
+    #[test]
+    fn repeating_a_character_cycles_through_its_items() {
+        assert_eq!(next_match("b", FRUITS, Some(1)), Some(2));
+        assert_eq!(next_match("bb", FRUITS, Some(2)), Some(1));
+        // The only match is the current item: nothing to move to.
+        assert_eq!(next_match("a", FRUITS, Some(0)), None);
+        // A longer search keeps the current item when it still matches.
+        assert_eq!(next_match("ba", FRUITS, Some(1)), None);
+    }
+
+    #[test]
+    fn the_search_starts_over_after_a_second() {
+        let now = Instant::now();
+        let mut typeahead = Typeahead::default();
+
+        assert_eq!(typeahead.push("b", now), "b");
+        assert_eq!(typeahead.push("l", now + Duration::from_millis(500)), "bl");
+        assert!(typeahead.is_typing(now + Duration::from_millis(900)));
+        assert!(!typeahead.is_typing(now + Duration::from_millis(1600)));
+        assert_eq!(typeahead.push("c", now + Duration::from_millis(1600)), "c");
     }
 }

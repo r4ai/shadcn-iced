@@ -1,4 +1,5 @@
 //! Underlines some text while the pointer is over it (`hover:underline`).
+use super::pointer;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Operation, Tree, Widget, tree};
@@ -142,13 +143,17 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        pointer::observe(event);
+
         // The underline depends on the position of the cursor only: redraw
-        // when it enters or leaves the hover area.
+        // when it enters or leaves the hover area, or when a finger touches
+        // or lifts (a finger hovers only while it touches the screen).
         if !self.always
-            && let Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft) = event
+            && let Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft)
+            | Event::Touch(_) = event
         {
             let state = tree.state.downcast_mut::<State>();
-            let hovered = cursor.is_over(expand(layout.bounds(), self.hover_area));
+            let hovered = pointer::hover(cursor).is_over(expand(layout.bounds(), self.hover_area));
 
             if hovered != state.hovered {
                 state.hovered = hovered;
@@ -190,7 +195,7 @@ where
 
         let bounds = layout.bounds();
 
-        if !self.always && !cursor.is_over(expand(bounds, self.hover_area)) {
+        if !self.always && !pointer::hover(cursor).is_over(expand(bounds, self.hover_area)) {
             return;
         }
 

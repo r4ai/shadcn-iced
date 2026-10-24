@@ -51,7 +51,7 @@ jobs:
           }
           shared='^(Cargo\.(toml|lock)|mise\.(toml|lock)|\.github/workflows/ci\.yml)$'
           filter rust "$shared|^(crates|examples|conformance/iced|scripts)/|^\.github/workflows/rust\.yml$"
-          filter site "$shared|^(crates|examples|site)/|^\.github/workflows/site\.yml$"
+          filter site "$shared|^(crates|examples|site)/|^\.github/workflows/(site|lighthouse)\.yml$"
           filter conformance "$shared|^(crates|conformance)/|^\.github/workflows/conformance\.yml$"
           filter lint "$shared|^(\.github|scripts)/"
 
@@ -183,6 +183,18 @@ jobs:
             exit 1
           fi
           echo "Preview: $PREVIEW_URL" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # The performance of the site of a pull request against the one of `main`,
+  # as a comment. Informational: it is not a part of `Result`.
+  lighthouse:
+    name: Lighthouse
+    needs: site
+    if: github.event_name == 'pull_request' && needs.site.result == 'success'
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/lighthouse.yml
 
   conformance:
     name: Conformance

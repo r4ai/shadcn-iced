@@ -1,6 +1,11 @@
 [package]
 name = "shadcn_iced_core"
 description = "Theme tokens, fonts, icons and headless primitives for shadcn_iced"
+readme = "README.md"
+keywords = ["shadcn", "iced", "gui", "theme", "design-tokens"]
+categories = ["gui"]
+homepage = "https://shadcn-iced.r4ai.dev"
+documentation = "https://docs.rs/shadcn_iced_core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

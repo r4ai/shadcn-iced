@@ -20,28 +20,30 @@
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource/geist-mono": "5.3.0",
     "@kobalte/core": "^0.13.14",
-    "@tanstack/solid-router": "1.170.39",
-    "@tanstack/solid-start": "^1.168.58",
+    "@tanstack/solid-router": "1.170.42",
+    "@tanstack/solid-start": "^1.169.3",
     "clsx": "^2.1.1",
-    "lucide-solid": "^1.55.0",
+    "lucide-solid": "^1.58.0",
     "solid-js": "^1.9.17",
     "tailwind-merge": "^3.7.0",
     "tailwind-variants": "^3.3.1",
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.0",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.5",
     "binaryen": "^132.0.0",
-    "oxfmt": "^0.72.0",
-    "oxlint": "^1.87.0",
+    "chrome-launcher": "^1.2.2",
+    "lighthouse": "13.3.0",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
     "shiki": "^4.5.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vite-plugin-solid": "^2.11.14",
-    "wrangler": "^4.149.0"
+    "wrangler": "^4.151.1"
   },
-  "packageManager": "pnpm@12.12.0+sha512.2ee06ac86db554cf384421461220f0e336a487bfd41b2acd04e17a86b1487832fe45e8d1743f7fc52acc77de12d2356b536fedf8229fc483239e40b13d474449"
+  "packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6"
 }
