@@ -3,10 +3,11 @@ name: Lighthouse
 # The performance of the site of a pull request against the one of `main`
 # (`site/scripts/lighthouse.mjs`), run by `ci.yml` once `site.yml` built it.
 # The site of `main` is the `site` artifact of its last successful run of
-# `ci.yml`, measured in turns with the site of the pull request on the same
-# runner. The report goes to the summary of the run and to a comment of the
-# pull request, updated on each push. It reports and does not fail: the
-# timings of a shared runner vary too much to gate a merge on them.
+# `ci.yml`. Each page of `site/scripts/lighthouse-pages.json` is measured by a
+# job of its own, in parallel, with both builds in turns on the same runner;
+# `report` merges their runs. The report goes to the summary of the run and to
+# a comment of the pull request, updated on each push. It reports and does not
+# fail: the timings of a shared runner vary too much to gate a merge on them.
 
 on:
   workflow_call:
@@ -14,16 +15,48 @@ on:
 permissions: {}
 
 jobs:
-  lighthouse:
-    name: Lighthouse
+  prepare:
+    name: Prepare
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # The runs of `ci.yml` on `main`.
+      actions: read
+    outputs:
+      pages: ${{ steps.pages.outputs.pages }}
+      run: ${{ steps.base.outputs.run }}
+      sha: ${{ steps.base.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: site/scripts/lighthouse-pages.json
+          sparse-checkout-cone-mode: false
+      - id: pages
+        run: echo "pages=$(jq -c . site/scripts/lighthouse-pages.json)" >> "$GITHUB_OUTPUT"
+      - id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh run list --repo "$REPO" --workflow ci.yml --branch main --event push \
+            --status success --limit 1 --json databaseId,headSha \
+            --jq '.[0] // empty | "run=\(.databaseId)\nsha=\(.headSha[:7])"' >> "$GITHUB_OUTPUT"
+
+  measure:
+    name: Measure ${{ matrix.page }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       # The `site` artifact of `main`, from another run.
       actions: read
-      # The comment.
-      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        page: ${{ fromJSON(needs.prepare.outputs.pages) }}
     defaults:
       run:
         working-directory: site
@@ -40,27 +73,65 @@ jobs:
           path: site/dist
       - name: The site of main
         id: base
+        if: needs.prepare.outputs.run != ''
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          RUN: ${{ needs.prepare.outputs.run }}
         run: |
-          run="$(gh run list --repo "$REPO" --workflow ci.yml --branch main --event push \
-            --status success --limit 1 --json databaseId,headSha \
-            --jq '.[0] | "\(.databaseId) \(.headSha)"')"
-          read -r id sha <<< "$run"
-          if [ -n "$id" ] && gh run download "$id" --repo "$REPO" --name site --dir ../base/dist; then
-            echo "sha=${sha:0:7}" >> "$GITHUB_OUTPUT"
+          if gh run download "$RUN" --repo "$REPO" --name site --dir ../base/dist; then
+            echo "dir=../base/dist" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::No site of main to compare with: the report has the values of the pull request alone."
+            echo "::warning::The site of main (run $RUN) could not be downloaded."
           fi
       # Google Chrome comes with the runner image.
       - name: Lighthouse
+        id: lighthouse
         env:
-          BASE_SHA: ${{ steps.base.outputs.sha }}
+          BASE: ${{ steps.base.outputs.dir }}
+          PAGE: ${{ matrix.page }}
+        run: |
+          node scripts/lighthouse.mjs --head dist ${BASE:+--base "$BASE"} --page "$PAGE" --out lighthouse
+          # An artifact name of the page.
+          echo "name=lighthouse-$(tr -c 'a-z0-9\n' - <<< "$PAGE")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.lighthouse.outputs.name }}
+          path: site/lighthouse/results.json
+          retention-days: 7
+
+  report:
+    name: Report
+    needs: [prepare, measure]
+    # The pages that were measured, even when another failed.
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # The comment.
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm
+        with:
+          directory: site
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: lighthouse-*
+          path: site/runs
+      - name: Report
+        env:
+          BASE_SHA: ${{ needs.prepare.outputs.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          node scripts/lighthouse.mjs --head dist --head-label "${HEAD_SHA:0:7}" \
-            ${BASE_SHA:+--base ../base/dist --base-label "main@$BASE_SHA"} --out lighthouse
+          node scripts/lighthouse.mjs --merge runs --head-label "${HEAD_SHA:0:7}" \
+            --base-label "main${BASE_SHA:+@$BASE_SHA}" --out lighthouse
           cat lighthouse/report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
