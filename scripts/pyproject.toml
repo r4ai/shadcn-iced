@@ -9,7 +9,7 @@ dependencies = [
   # gen_fonts.py
   "fonttools>=4.60",
   # grid.py, montage.py
-  "pillow>=12",
+  "pillow>=13.0.0",
 ]
 
 [tool.uv]
