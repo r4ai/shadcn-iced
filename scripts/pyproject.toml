@@ -7,7 +7,7 @@ version = "0.0.0"
 requires-python = ">=3.13"
 dependencies = [
   # gen_fonts.py
-  "fonttools>=4.60",
+  "fonttools>=4.68.0",
   # grid.py, montage.py
   "pillow>=12",
 ]
