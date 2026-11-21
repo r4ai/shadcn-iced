@@ -8,6 +8,11 @@
 //! active (the one the next character goes to) and blinks the caret. The
 //! slots are drawn by you, from a [`Status`].
 //!
+//! A code can be typed with an input method editor (IME) on, like a
+//! Japanese one: the text being composed is shown over the active slot,
+//! where the IME is asked for, and the full-width characters committed
+//! (`１２３`) are taken as their ASCII forms (`123`).
+//!
 //! ```no_run
 //! # use shadcn_iced_core::primitive::otp::{Otp, Status};
 //! # use iced::{Point, Rectangle, Size};
@@ -26,6 +31,7 @@
 //!     .into()
 //! # }
 //! ```
+use iced::advanced::InputMethod;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{Id, Operation, Tree, Widget, operation, tree};
@@ -33,8 +39,8 @@ use iced::advanced::{Clipboard, Shell};
 use iced::time::{Duration, Instant};
 use iced::widget::text_input::{self, TextInput};
 use iced::{
-    Background, Border, Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme,
-    mouse, window,
+    Background, Border, Color, Element, Event, Length, Pixels, Point, Rectangle, Renderer, Size,
+    Theme, mouse, window,
 };
 
 /// How long the caret stays visible, then hidden.
@@ -62,6 +68,7 @@ pub struct Otp<'a, Message> {
     length: usize,
     slots: Vec<Rectangle>,
     size: Size,
+    text_size: Pixels,
     #[allow(clippy::type_complexity)]
     draw: Option<Box<dyn Fn(&mut Renderer, &Theme, Rectangle, Status<'_>) + 'a>>,
 }
@@ -80,6 +87,7 @@ impl<'a, Message: Clone + 'a> Otp<'a, Message> {
                         value
                             .chars()
                             .filter(|c| !c.is_whitespace())
+                            .map(half_width)
                             .take(length)
                             .collect(),
                     )
@@ -98,6 +106,7 @@ impl<'a, Message: Clone + 'a> Otp<'a, Message> {
             length,
             slots: Vec::new(),
             size: Size::ZERO,
+            text_size: Pixels(16.0),
             draw: None,
         }
     }
@@ -108,6 +117,13 @@ impl<'a, Message: Clone + 'a> Otp<'a, Message> {
     pub fn slots(mut self, slots: Vec<Rectangle>, size: Size) -> Self {
         self.slots = slots;
         self.size = size;
+        self
+    }
+
+    /// Sets the size of the text the slots show, for the text composed with
+    /// an IME. 16px by default.
+    pub fn text_size(mut self, size: impl Into<Pixels>) -> Self {
+        self.text_size = size.into();
         self
     }
 
@@ -243,6 +259,7 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, Renderer> for Otp<'a, Messa
         viewport: &Rectangle,
     ) {
         let input_layout = layout.children().next().unwrap();
+        let had_input_method = shell.input_method().is_enabled();
 
         Widget::<Message, Theme, Renderer>::update(
             &mut self.input,
@@ -277,6 +294,25 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, Renderer> for Otp<'a, Messa
             && let Event::Window(window::Event::RedrawRequested(now)) = event
         {
             shell.request_redraw_at(*now + BLINK);
+
+            // The input is invisible and its text tiny: the IME is asked for
+            // at the active slot, and its text shown at the size of the
+            // slots.
+            if !had_input_method
+                && let InputMethod::Enabled {
+                    cursor, preedit, ..
+                } = shell.input_method_mut()
+            {
+                let active = active_slot(true, self.value.len(), self.length);
+
+                if let Some(slot) = active.and_then(|active| self.slots.get(active)) {
+                    *cursor = *slot + (layout.bounds().position() - Point::ORIGIN);
+                }
+
+                if let Some(preedit) = preedit {
+                    preedit.text_size = Some(self.text_size);
+                }
+            }
         }
     }
 
@@ -330,7 +366,17 @@ impl<'a, Message: Clone + 'a> Widget<Message, Theme, Renderer> for Otp<'a, Messa
 
 impl<'a, Message: Clone + 'a> From<Otp<'a, Message>> for Element<'a, Message> {
     fn from(otp: Otp<'a, Message>) -> Self {
-        Element::new(otp)
+        // The keys of a text composed with an IME are left to the IME.
+        super::composition(Element::new(otp)).into()
+    }
+}
+
+/// The ASCII form of a full-width character (`１` is `1`, `Ａ` is `A`), as
+/// typed with a Japanese IME on.
+fn half_width(c: char) -> char {
+    match c {
+        '\u{FF01}'..='\u{FF5E}' => char::from_u32(c as u32 - 0xFEE0).unwrap_or(c),
+        _ => c,
     }
 }
 
@@ -342,7 +388,15 @@ fn active_slot(focused: bool, filled: usize, length: usize) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::active_slot;
+    use super::{active_slot, half_width};
+
+    #[test]
+    fn full_width_characters_are_ascii() {
+        let code: String = "１２３ａＢ９".chars().map(half_width).collect();
+
+        assert_eq!(code, "123aB9");
+        assert_eq!(half_width('あ'), 'あ');
+    }
 
     #[test]
     fn the_active_slot_follows_the_value() {

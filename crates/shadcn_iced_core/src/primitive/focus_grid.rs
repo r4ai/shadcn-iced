@@ -502,6 +502,7 @@ where
             Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
                 if tree.state.downcast_ref::<State<K>>().focused.is_some()
                     && !shell.is_event_captured()
+                    && !super::composition::is_composing()
                     // A focused control of the content (a navigation
                     // button) handles its keys.
                     && !focus::is_focus_within(

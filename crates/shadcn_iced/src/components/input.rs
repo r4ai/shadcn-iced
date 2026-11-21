@@ -10,9 +10,9 @@
 //! # }
 //! ```
 use shadcn_iced_core::icon::Icon;
-use shadcn_iced_core::primitive::FocusWithin;
 use shadcn_iced_core::primitive::breakpoint::{self, adaptive};
 use shadcn_iced_core::primitive::focus;
+use shadcn_iced_core::primitive::{FocusWithin, composition};
 use shadcn_iced_core::theme::{alpha, tokens};
 use shadcn_iced_core::{Element, font, style};
 
@@ -131,18 +131,25 @@ impl<'a, Message: Clone + 'a> Input<'a, Message> {
     /// Returns the underlying iced [`TextInput`], styled, adapted to the
     /// width of the window (`text-base md:text-sm`) unless its font size
     /// was set.
+    ///
+    /// The keys pressed while a text is composed with an IME (the Japanese
+    /// one, for example) are left to the IME (see [`composition`]).
     pub fn into_adaptive(self) -> Element<'a, Message> {
         if self.fixed_size {
-            return self.into_text_input().into();
+            return composition(self.into_text_input()).into();
         }
 
-        adaptive(self.into_text_input(), breakpoint::MD, |input, wide| {
-            input.size(if wide {
-                style::text::SM
-            } else {
-                style::text::BASE
-            })
-        })
+        composition(adaptive(
+            self.into_text_input(),
+            breakpoint::MD,
+            |input, wide| {
+                input.size(if wide {
+                    style::text::SM
+                } else {
+                    style::text::BASE
+                })
+            },
+        ))
         .into()
     }
 

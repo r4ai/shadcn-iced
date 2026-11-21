@@ -246,7 +246,7 @@ where
             viewport,
         );
 
-        if shell.is_event_captured() {
+        if shell.is_event_captured() || super::composition::is_for_ime(event) {
             return;
         }
 

@@ -117,6 +117,9 @@ impl<'a, Message: Clone + 'a> From<Textarea<'a, Message>> for Element<'a, Messag
             .into()
         };
 
+        // The keys of a text composed with an IME are left to the IME.
+        let raw = shadcn_iced_core::primitive::composition(raw);
+
         shadcn_iced_core::primitive::FocusWithin::new(raw, move |theme, status| {
             super::input::ring(theme, status, invalid)
         })

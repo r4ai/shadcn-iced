@@ -88,7 +88,11 @@ pub fn tab_pressed(event: &Event) -> Option<bool> {
             key: keyboard::Key::Named(Named::Tab),
             modifiers,
             ..
-        }) if !modifiers.control() && !modifiers.alt() && !modifiers.logo() => {
+        }) if !modifiers.control()
+            && !modifiers.alt()
+            && !modifiers.logo()
+            && !super::composition::is_composing() =>
+        {
             Some(modifiers.shift())
         }
         _ => None,
