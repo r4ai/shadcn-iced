@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/r4ai/shadcn-iced/compare/v0.3.0...v0.3.1) - 2026-11-21
+
+### Added
+
+- *(shadcn_iced_core)* update the Lucide icons to 1.73.0, and follow shadcn 4.23.0 ([#93](https://github.com/r4ai/shadcn-iced/pull/93))
+
+### Fixed
+
+- make Japanese (and other) IME input work in every text input, and update dependencies ([#89](https://github.com/r4ai/shadcn-iced/pull/89))
+
 ## [0.3.0](https://github.com/r4ai/shadcn-iced/compare/v0.2.0...v0.3.0) - 2026-10-24
 
 ### Added
