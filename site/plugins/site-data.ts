@@ -9,6 +9,9 @@
 //   highlighted code,
 // - `virtual:site/apps`: the example apps (`/examples`), with their
 //   highlighted code,
+// - `virtual:site/search`: the titles of the chart pages, of their examples
+//   and of the example apps, for the search of the header (without their
+//   code: every page loads it),
 // - `./file.rs?highlight` (or `.toml`, `.sh`): a snippet next to the page that
 //   shows it, as `{ code, html }`.
 import { readFileSync } from "node:fs";
@@ -21,6 +24,7 @@ const LIST = "virtual:site/components";
 const COMPONENT = "virtual:site/component/";
 const CHARTS = "virtual:site/charts";
 const APPS = "virtual:site/apps";
+const SEARCH = "virtual:site/search";
 const HIGHLIGHT = "?highlight";
 
 const LANGS: Record<string, string> = { ".rs": "rust", ".toml": "toml", ".sh": "shellscript" };
@@ -106,7 +110,7 @@ export function siteData(): Plugin {
     enforce: "pre",
 
     resolveId(id) {
-      if (id === LIST || id === CHARTS || id === APPS || id.startsWith(COMPONENT)) return `\0${id}`;
+      if (id === LIST || id === CHARTS || id === APPS || id === SEARCH || id.startsWith(COMPONENT)) return `\0${id}`;
     },
 
     async load(id) {
@@ -183,6 +187,19 @@ export function siteData(): Plugin {
         );
 
         return `export const apps = ${JSON.stringify(apps)};`;
+      }
+
+      if (id === `\0${SEARCH}`) {
+        this.addWatchFile(file);
+        const data = read();
+        const charts = (data.charts ?? []).map((page) => ({
+          id: page.id,
+          title: page.title,
+          examples: page.examples.map((e) => e.title),
+        }));
+        const apps = (data.apps ?? []).map((app) => ({ id: app.id, title: app.title, description: app.description }));
+
+        return `export const charts = ${JSON.stringify(charts)};\nexport const apps = ${JSON.stringify(apps)};`;
       }
 
       if (id.endsWith(HIGHLIGHT)) {
