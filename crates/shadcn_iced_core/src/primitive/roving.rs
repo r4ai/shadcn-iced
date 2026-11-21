@@ -173,6 +173,7 @@ where
         // newly focused one activates itself while handling it.
         if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event
             && !shell.is_event_captured()
+            && !super::composition::is_composing()
             && !modifiers.alt()
             && !modifiers.control()
             && !modifiers.logo()

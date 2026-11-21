@@ -818,8 +818,10 @@ where
                     shell.request_redraw();
                 }
             }
+            // The keys of a composition (in the input of a command) are
+            // the IME's.
             Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
-                if self.keyboard =>
+                if self.keyboard && !super::composition::is_composing() =>
             {
                 let now = Instant::now();
                 let typing = self.typeahead && state.typeahead.is_typing(now);

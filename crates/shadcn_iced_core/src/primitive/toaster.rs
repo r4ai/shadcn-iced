@@ -1017,6 +1017,10 @@ impl<'a, Message, Theme, Renderer> Toaster<'a, Message, Theme, Renderer> {
     ) where
         Renderer: iced::advanced::Renderer,
     {
+        if super::composition::is_for_ime(event) {
+            return;
+        }
+
         let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event else {
             return;
         };

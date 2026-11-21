@@ -129,7 +129,9 @@ where
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
                 tree.state.downcast_mut::<State>().active = cursor.is_over(layout.bounds());
             }
-            Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) => {
+            Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
+                if !super::composition::is_composing() =>
+            {
                 let active = tree.state.downcast_ref::<State>().active
                     || focus::is_focus_within(
                         &mut self.content,

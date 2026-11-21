@@ -22,8 +22,9 @@
 //!   focused anchor open what a click opens, and focus its first control
 //!   (or highlight the first item of a menu, see [`Anchored::menu_keys`]);
 //!   <kbd>Tab</kbd> stays within open content, or closes a menu.
-use super::{focus, pointer, tab};
+use super::{composition, focus, pointer, tab};
 use crate::animation::{self, Appearance, Fade, Transition};
+use iced::advanced::input_method;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::{self, Operation, Tree, Widget, tree};
@@ -876,6 +877,11 @@ where
             viewport,
         );
 
+        // The keys of a text composed in the anchor are the IME's.
+        if composition::is_for_ime(event) {
+            return;
+        }
+
         // A key the anchor handled itself (typed into an input, or a button
         // pressed with `Enter`) does not open the content too.
         let captured_by_anchor = shell.is_event_captured();
@@ -1345,6 +1351,21 @@ where
                         }
 
                         opens
+                    }
+                    // Text composed or committed with an IME is typed too.
+                    Event::InputMethod(
+                        input_method::Event::Preedit(text, _) | input_method::Event::Commit(text),
+                    ) if !state.open && !text.is_empty() => {
+                        let mut focused = FindFocused(false);
+
+                        self.anchor.as_widget_mut().operate(
+                            &mut tree.children[0],
+                            layout,
+                            renderer,
+                            &mut focused,
+                        );
+
+                        focused.0
                     }
                     _ => false,
                 };
@@ -1996,6 +2017,11 @@ where
         self.content.as_widget_mut().update(
             self.tree, event, layout, cursor, renderer, clipboard, shell, &bounds,
         );
+
+        // The keys of a text composed in the content are the IME's.
+        if composition::is_for_ime(event) {
+            return;
+        }
 
         let captured_by_content = !was_captured && shell.is_event_captured();
         let selected = SELECTED.take();
