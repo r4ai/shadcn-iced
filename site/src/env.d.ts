@@ -25,6 +25,11 @@ declare module "virtual:site/apps" {
   export const apps: AppPage[];
 }
 
+declare module "virtual:site/search" {
+  export const charts: { id: string; title: string; examples: string[] }[];
+  export const apps: { id: string; title: string; description: string }[];
+}
+
 declare module "virtual:site/components" {
   import type { ComponentDetail, ComponentSummary } from "~/lib/components";
 
