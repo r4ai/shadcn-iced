@@ -52,6 +52,10 @@ Some differences come from iced itself and cannot be compensated for in `shadcn_
 - **Backdrop blur** of modal overlays (`backdrop-blur-xs`): iced cannot blur what is drawn behind a layer; the backdrop is dimmed and washed out a little instead (`dialog::backdrop`).
 - **Snapping to pixels** of boxes at fractional positions: the `tiny-skia` renderer of the runner ignores `snap`, which the `wgpu` renderer of applications honors.
 
+One difference is on purpose:
+
+- **Long lists of a select** (`select/long-*`): Base UI sizes the positioner of an aligned list to keep the selected item over the trigger, but the `max-h-(--available-height)` of shadcn/ui then cuts the popup to the space next to the trigger, which can leave the item out of it (`select/long-bottom`). `shadcn_iced` fills the positioner, like Radix. It also shows a scrollbar rather than scroll arrows, and the list does not grow when it is scrolled.
+
 ## Determinism
 
 Snapshots must not depend on the machine running the suite:

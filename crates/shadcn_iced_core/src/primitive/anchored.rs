@@ -27,6 +27,7 @@ use crate::animation::{self, Appearance, Fade, Transition};
 use iced::advanced::input_method;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
+use iced::advanced::widget::operation::scrollable::AbsoluteOffset;
 use iced::advanced::widget::{self, Operation, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 
@@ -148,6 +149,7 @@ pub struct Anchored<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
     match_anchor_width: bool,
     anchor_width: Option<f32>,
     fallback_offset: Option<f32>,
+    aligned_item: Option<ItemSpan>,
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<Box<dyn Fn(bool) -> Message + 'a>>,
@@ -203,6 +205,7 @@ where
             outset: 0.0,
             anchor_width: None,
             fallback_offset: None,
+            aligned_item: None,
             match_anchor_width: false,
             close_on_select: false,
             modal: false,
@@ -359,6 +362,22 @@ where
         self
     }
 
+    /// Places the content over the anchor, vertically, with the item `top`
+    /// below the top of the content and `height` tall centered on the
+    /// anchor: the `alignItemWithTrigger` of a Base UI select
+    /// (`position="item-aligned"` in Radix).
+    ///
+    /// Content that does not fit in the window that way is cut at its edges
+    /// and scrolled (the first scrollable in it) when it opens, so that the
+    /// item stays over the anchor. When the anchor is too close to an edge
+    /// of the window, or too little of the content would be left, the
+    /// content is placed on its [`side`](Self::side) with its
+    /// [`offset`](Self::offset) instead, no taller than the space there.
+    pub fn align_item(mut self, top: f32, height: f32) -> Self {
+        self.aligned_item = Some(ItemSpan { top, height });
+        self
+    }
+
     /// Makes the content at least as wide as the anchor.
     pub fn match_anchor_width(mut self, match_width: bool) -> Self {
         self.match_anchor_width = match_width;
@@ -438,6 +457,9 @@ struct State {
     /// The key event that opened the content, replayed into it once it is
     /// shown (<kbd>↓</kbd> highlights the first item).
     replay: Option<Event>,
+    /// How far the open content was scrolled to keep its item over the
+    /// anchor (see [`Anchored::align_item`]).
+    item_scroll: Option<f32>,
     /// The bounds of the hover content, once shown.
     content_bounds: Option<Rectangle>,
     /// The area the pointer can cross on its way to the hover content.
@@ -1534,6 +1556,10 @@ where
         let now = Instant::now();
         let open = state.is_open(&self.trigger);
 
+        if !open {
+            state.item_scroll = None;
+        }
+
         state.presence.go(
             if open { 1.0 } else { 0.0 },
             // `duration-100`
@@ -1570,6 +1596,7 @@ where
                 outset: self.outset,
                 anchor_width: self.anchor_width,
                 fallback_offset: self.fallback_offset,
+                aligned_item: self.aligned_item,
                 match_anchor_width: self.match_anchor_width,
                 close_on_select: self.close_on_select,
                 modal: self.modal,
@@ -1633,6 +1660,7 @@ struct Floating<'a, 'b, Message, Theme, Renderer> {
     match_anchor_width: bool,
     anchor_width: Option<f32>,
     fallback_offset: Option<f32>,
+    aligned_item: Option<ItemSpan>,
     close_on_select: bool,
     modal: bool,
     on_open_change: Option<&'b (dyn Fn(bool) -> Message + 'a)>,
@@ -1724,6 +1752,94 @@ fn place(
     }
 }
 
+/// An item of floating content, see [`Anchored::align_item`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ItemSpan {
+    /// The distance from the top of the (unscrolled) content.
+    top: f32,
+    height: f32,
+}
+
+/// Where content sits to keep one of its items over the anchor.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ItemAligned {
+    y: f32,
+    /// The height left to the content.
+    height: f32,
+    /// How far the content is scrolled.
+    scroll: f32,
+}
+
+/// Places content `natural` tall with `item` centered on the anchor, cut at
+/// the edges of the window, or returns `None` when the content is better
+/// placed next to the anchor. The rules and the distances are the ones of
+/// the `alignItemWithTrigger` of Base UI.
+fn align_item(
+    anchor: Rectangle,
+    natural: f32,
+    item: ItemSpan,
+    viewport_height: f32,
+) -> Option<ItemAligned> {
+    /// The distance kept from the edges of the window (the default margins
+    /// of the positioner).
+    const MARGIN: f32 = 10.0;
+    /// `triggerCollisionThreshold`
+    const THRESHOLD: f32 = 20.0;
+    /// The default `minHeight`.
+    const MIN_HEIGHT: f32 = 100.0;
+    /// `SCROLL_EDGE_TOLERANCE_PX`
+    const TOLERANCE: f32 = 1.0;
+
+    // Base UI measures the threshold from `viewportHeight`, which excludes
+    // both margins, at the bottom only.
+    if anchor.y < THRESHOLD || anchor.y + anchor.height > viewport_height - MARGIN * 2.0 - THRESHOLD
+    {
+        return None;
+    }
+
+    let ideal = anchor.center_y() - item.height / 2.0 - item.top;
+    let cut_top = (MARGIN - ideal).max(0.0);
+    let cut_bottom = (ideal + natural - (viewport_height - MARGIN)).max(0.0);
+    let height = natural - cut_top - cut_bottom;
+
+    // An item taller than its anchor may be cut too.
+    let item_fits = cut_top <= item.top && cut_bottom <= natural - item.top - item.height;
+
+    if !item_fits || height.ceil() + TOLERANCE < natural.min(MIN_HEIGHT) {
+        return None;
+    }
+
+    Some(ItemAligned {
+        y: ideal + cut_top,
+        height,
+        scroll: cut_top,
+    })
+}
+
+/// The height between the anchor and the edge of the window on `side`, or
+/// between the edges of the window on the left and the right of the anchor.
+fn available_height(
+    anchor: Rectangle,
+    viewport_height: f32,
+    side: Side,
+    offset: f32,
+    padding: f32,
+) -> f32 {
+    let height = match side {
+        Side::Bottom => viewport_height - padding - (anchor.y + anchor.height + offset),
+        Side::Top => anchor.y - offset - padding,
+        Side::Left | Side::Right => viewport_height - padding * 2.0,
+    };
+
+    height.max(0.0)
+}
+
+/// How far to scroll content `height` tall to show `item`, as little as
+/// possible.
+fn reveal_scroll(item: ItemSpan, height: f32) -> f32 {
+    (item.top + item.height - height).clamp(0.0, item.top.max(0.0))
+}
+
 /// Computes the position of floating content of the given size.
 ///
 /// Exposed for components that want to position things themselves.
@@ -1784,6 +1900,110 @@ pub fn position(
     (point, side)
 }
 
+impl<Message, Theme, Renderer> Floating<'_, '_, Message, Theme, Renderer>
+where
+    Renderer: iced::advanced::Renderer,
+{
+    /// Lays the content out with `item` over the anchor, see
+    /// [`Anchored::align_item`].
+    fn layout_item(
+        &mut self,
+        renderer: &Renderer,
+        bounds: Size,
+        anchor: Rectangle,
+        item: ItemSpan,
+        min_width: f32,
+        max_width: f32,
+    ) -> layout::Node {
+        let padding = self.collision_padding;
+        let outset = self.outset;
+
+        // The whole content, as if the window were tall enough.
+        let mut node = self.content.as_widget_mut().layout(
+            self.tree,
+            renderer,
+            &layout::Limits::new(
+                Size::new(min_width, 0.0),
+                Size::new(max_width, f32::INFINITY),
+            ),
+        );
+        let natural = Size::new(
+            (node.size().width - outset * 2.0).max(0.0),
+            (node.size().height - outset * 2.0).max(0.0),
+        );
+
+        let aligned = align_item(anchor, natural.height, item, bounds.height);
+        let place = |size: Size, side: Side| {
+            position(
+                anchor,
+                size,
+                bounds,
+                side,
+                self.align,
+                self.offset,
+                self.align_offset,
+                padding,
+            )
+        };
+        let (mut origin, side) = place(natural, self.side);
+
+        let height = match aligned {
+            Some(aligned) => {
+                origin.y = aligned.y;
+                aligned.height
+            }
+            None => {
+                let height = natural.height.min(available_height(
+                    anchor,
+                    bounds.height,
+                    side,
+                    self.offset,
+                    padding,
+                ));
+
+                (origin, _) = place(Size::new(natural.width, height), side);
+                height
+            }
+        };
+
+        if height < natural.height {
+            node = self.content.as_widget_mut().layout(
+                self.tree,
+                renderer,
+                &layout::Limits::new(
+                    Size::new(min_width, 0.0),
+                    Size::new(max_width, height + outset * 2.0),
+                ),
+            );
+        }
+
+        self.resolved_side = side;
+
+        let node = node.move_to(origin - Vector::new(outset, outset));
+        let scroll = match aligned {
+            Some(aligned) => aligned.scroll,
+            None => reveal_scroll(item, height),
+        };
+
+        // When it opens, or when the window is resized: the list is not
+        // scrolled back while it is scrolled.
+        if !self.closing && self.state.item_scroll != Some(scroll) {
+            self.state.item_scroll = Some(scroll);
+            self.content.as_widget_mut().operate(
+                self.tree,
+                Layout::new(&node),
+                renderer,
+                &mut ScrollTo {
+                    y: scroll,
+                    done: false,
+                },
+            );
+        }
+
+        node
+    }
+}
+
 impl<Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
     for Floating<'_, '_, Message, Theme, Renderer>
 where
@@ -1812,12 +2032,6 @@ where
             _ => (0.0, max),
         };
 
-        let node = self.content.as_widget_mut().layout(
-            self.tree,
-            renderer,
-            &layout::Limits::new(Size::new(min_width, 0.0), max),
-        );
-
         let anchor = match self.point {
             Some(point) => Rectangle::new(point, Size::ZERO),
             None => self.anchor_bounds,
@@ -1826,6 +2040,16 @@ where
         if let Some(tracker) = self.anchor_tracker {
             tracker.0.set(Some(anchor));
         }
+
+        if let Some(item) = self.aligned_item {
+            return self.layout_item(renderer, bounds, anchor, item, min_width, max.width);
+        }
+
+        let node = self.content.as_widget_mut().layout(
+            self.tree,
+            renderer,
+            &layout::Limits::new(Size::new(min_width, 0.0), max),
+        );
 
         let size = node.size();
         let size = Size::new(
@@ -2725,6 +2949,37 @@ impl Operation for FocusFirst {
     }
 }
 
+/// Scrolls the first scrollable it meets to `y`.
+struct ScrollTo {
+    y: f32,
+    done: bool,
+}
+
+impl Operation for ScrollTo {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        if !self.done {
+            operate(self);
+        }
+    }
+
+    fn scrollable(
+        &mut self,
+        _id: Option<&widget::Id>,
+        _bounds: Rectangle,
+        _content_bounds: Rectangle,
+        _translation: Vector,
+        state: &mut dyn widget::operation::Scrollable,
+    ) {
+        if !self.done {
+            state.scroll_to(AbsoluteOffset {
+                x: None,
+                y: Some(self.y),
+            });
+            self.done = true;
+        }
+    }
+}
+
 /// Takes the keyboard focus away from a widget tree.
 struct Unfocus;
 
@@ -2785,6 +3040,136 @@ mod tests {
 
         assert_eq!(side, Side::Bottom);
         assert_eq!(point, Point::new(40.0, 140.0));
+    }
+
+    /// A list of 30 options, like the one of a select: `p-1`, then 28px each.
+    const LONG: f32 = 4.0 + 30.0 * 28.0 + 4.0;
+
+    fn option(index: u8) -> ItemSpan {
+        ItemSpan {
+            top: 4.0 + f32::from(index) * 28.0,
+            height: 28.0,
+        }
+    }
+
+    /// A trigger 32px tall at `y`.
+    fn trigger(y: f32) -> Rectangle {
+        Rectangle::new(Point::new(100.0, y), Size::new(192.0, 32.0))
+    }
+
+    /// Aligns a long list in `VIEWPORT`, and checks that the item is
+    /// centered on the trigger.
+    fn align_long(y: f32, index: u8) -> Option<ItemAligned> {
+        let aligned = align_item(trigger(y), LONG, option(index), VIEWPORT.height)?;
+        let item = aligned.y + option(index).top - aligned.scroll;
+
+        assert_eq!(item + 14.0, y + 16.0);
+        assert!(aligned.height <= LONG - aligned.scroll);
+
+        Some(aligned)
+    }
+
+    fn item_aligned(y: f32, height: f32, scroll: f32) -> Option<ItemAligned> {
+        Some(ItemAligned { y, height, scroll })
+    }
+
+    #[test]
+    fn aligns_an_item_of_a_long_list_near_the_top() {
+        // The first option: the list runs down to the margin.
+        assert_eq!(align_long(40.0, 0), item_aligned(38.0, 552.0, 0.0));
+        // In the list: cut at the top and at the bottom.
+        assert_eq!(align_long(40.0, 10), item_aligned(10.0, 580.0, 252.0));
+        // Further: the list ends before the margin.
+        assert_eq!(align_long(40.0, 15), item_aligned(10.0, 456.0, 392.0));
+        // The last one leaves 64px, less than the minimum.
+        assert_eq!(align_long(40.0, 29), None);
+        // With 100px, it opens: 10px of margin, down to the end of the list.
+        assert_eq!(align_long(76.0, 29), item_aligned(10.0, 100.0, 748.0));
+    }
+
+    #[test]
+    fn aligns_an_item_of_a_long_list_in_the_middle() {
+        assert_eq!(align_long(284.0, 0), item_aligned(282.0, 308.0, 0.0));
+        assert_eq!(align_long(284.0, 1), item_aligned(254.0, 336.0, 0.0));
+        assert_eq!(align_long(284.0, 15), item_aligned(10.0, 580.0, 148.0));
+        assert_eq!(align_long(284.0, 29), item_aligned(10.0, 308.0, 540.0));
+    }
+
+    #[test]
+    fn aligns_an_item_of_a_long_list_near_the_bottom() {
+        assert_eq!(align_long(492.0, 0), item_aligned(490.0, 100.0, 0.0));
+        assert_eq!(align_long(492.0, 15), item_aligned(70.0, 520.0, 0.0));
+        assert_eq!(align_long(520.0, 0), None);
+        assert_eq!(align_long(520.0, 15), item_aligned(98.0, 492.0, 0.0));
+        assert_eq!(align_long(520.0, 29), item_aligned(10.0, 544.0, 304.0));
+    }
+
+    #[test]
+    fn aligns_an_item_of_a_list_that_fits() {
+        let aligned = align_item(trigger(284.0), 92.0, option(2), VIEWPORT.height);
+
+        assert_eq!(aligned, item_aligned(226.0, 92.0, 0.0));
+
+        // A short list must be whole, or almost (Base UI tolerates 1px).
+        let y = |cut: f32| 10.0 + 4.0 + 28.0 * 2.0 - 2.0 - cut;
+        let short = |cut: f32| align_item(trigger(y(cut)), 92.0, option(2), VIEWPORT.height);
+
+        assert_eq!(short(0.0), item_aligned(10.0, 92.0, 0.0));
+        assert_eq!(short(1.0), item_aligned(10.0, 91.0, 1.0));
+        assert_eq!(short(2.0), None);
+    }
+
+    #[test]
+    fn does_not_align_an_item_at_the_edges_of_the_window() {
+        assert_eq!(align_long(19.0, 5), None);
+        assert_eq!(align_long(20.0, 5), item_aligned(10.0, 580.0, 132.0));
+        // 600 - 2 * 10 - 20 = 560 at the bottom of the trigger.
+        assert_eq!(align_long(528.0, 15), item_aligned(106.0, 484.0, 0.0));
+        assert_eq!(align_long(529.0, 15), None);
+    }
+
+    #[test]
+    fn does_not_align_an_item_that_would_be_cut() {
+        let item = ItemSpan {
+            top: 0.0,
+            height: 60.0,
+        };
+
+        // Centered on 41, its top would be at 11, then at 9.
+        assert!(align_item(trigger(25.0), LONG, item, VIEWPORT.height).is_some());
+        assert_eq!(align_item(trigger(23.0), LONG, item, VIEWPORT.height), None);
+
+        let item = ItemSpan {
+            top: LONG - 94.0,
+            height: 94.0,
+        };
+
+        // Centered on 543, its bottom would be at 590, then at 591.
+        assert!(align_item(trigger(527.0), LONG, item, VIEWPORT.height).is_some());
+        assert_eq!(
+            align_item(trigger(528.0), LONG, item, VIEWPORT.height),
+            None
+        );
+    }
+
+    #[test]
+    fn falls_back_to_the_space_next_to_the_anchor() {
+        let available = |side| available_height(trigger(100.0), VIEWPORT.height, side, 4.0, 8.0);
+
+        assert_eq!(available(Side::Bottom), 456.0);
+        assert_eq!(available(Side::Top), 88.0);
+        assert_eq!(available(Side::Right), 584.0);
+        assert_eq!(
+            available_height(trigger(0.0), VIEWPORT.height, Side::Top, 4.0, 8.0),
+            0.0
+        );
+
+        // The item is at the bottom of the list, unless it was visible.
+        assert_eq!(reveal_scroll(option(0), 456.0), 0.0);
+        assert_eq!(reveal_scroll(option(15), 456.0), 0.0);
+        assert_eq!(reveal_scroll(option(16), 456.0), 24.0);
+        // The top of an item taller than the list.
+        assert_eq!(reveal_scroll(option(16), 20.0), 452.0);
     }
 
     #[test]
