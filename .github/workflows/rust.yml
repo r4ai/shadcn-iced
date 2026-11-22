@@ -122,3 +122,67 @@ jobs:
       - run: cargo package --locked -p shadcn_iced_core -p shadcn-iced --no-verify
       # `--allow-dirty`: the copy of the components is not committed.
       - run: cargo package --locked --allow-dirty -p cargo-shadcn-iced
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-llvm-cov
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: llvm-cov
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Measure coverage and enforce thresholds
+        run: |
+          cargo llvm-cov \
+            --package shadcn_iced_core \
+            --package shadcn-iced \
+            --package cargo-shadcn-iced \
+            --locked \
+            --no-report
+          cargo llvm-cov report \
+            --ignore-filename-regex "shadcn_iced_core|shadcn_iced/" \
+            --fail-under-lines 90 \
+            --summary-only
+          cargo llvm-cov report \
+            --ignore-filename-regex "components/|icon/|presets|font|anchored|animated_width|breakpoint|composition|dashed|disclosure|focus|keys|labelled|layer|listbox|otp|pressable|roving|scroll|split|tab|toaster|track|typeset|underline|wheel" \
+            --fail-under-lines 85 \
+            --summary-only
+          {
+            echo "## Coverage summary"
+            echo '```text'
+            cargo llvm-cov report --summary-only
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  mutants:
+    name: Mutation tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-mutants
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: mutants
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Run mutation tests
+        run: cargo mutants -p cargo-shadcn-iced --no-times -- --locked
