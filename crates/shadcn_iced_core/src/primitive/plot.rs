@@ -437,7 +437,7 @@ impl Bars {
 
         let mut width = (band - 2.0 * offset - (groups - 1.0) * gap) / groups;
         if width > 1.0 {
-            width = width.floor();
+            width = width.round();
         }
 
         Self { offset, width, gap }
