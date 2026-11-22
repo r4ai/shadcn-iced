@@ -186,7 +186,9 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> Select<'a, T, Message> 
 
     /// Sets whether the list opens over the trigger, with the selected item
     /// (or the first one) on top of the trigger (`alignItemWithTrigger`,
-    /// the default). Otherwise it opens below the trigger.
+    /// the default). A list that does not fit in the window is cut at its
+    /// edges and scrolled to keep the item there. Otherwise, or when the
+    /// trigger is at an edge of the window, it opens below the trigger.
     pub fn align_item_with_trigger(mut self, align: bool) -> Self {
         self.align_item_with_trigger = align;
         self
@@ -290,17 +292,18 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
 
         for entry in &select.entries {
             if let Entry::Option(value, ..) = entry {
-                first.get_or_insert(item_top);
+                let item = (item_top, entry.height());
+                first.get_or_insert(item);
 
                 if select.selected.as_ref() == Some(value) {
-                    aligned = Some(item_top);
+                    aligned = Some(item);
                 }
             }
 
             item_top += entry.height();
         }
 
-        let aligned_top = aligned.or(first).unwrap_or(0.0);
+        let (aligned_top, aligned_height) = aligned.or(first).unwrap_or_default();
 
         // The selected option is highlighted when the list opens.
         let selected_index = select.entries.iter().position(|entry| {
@@ -377,20 +380,25 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
 
         // `w-(--anchor-width) min-w-36 rounded-lg shadow-md ring-1`, `p-1`
         // groups.
-        let content = menu::shadow(
-            container(listbox::region(
-                scrollable(list.padding(4).width(Length::Fill))
-                    .width(Length::Fill)
-                    .direction(scrollable::Direction::Vertical(
-                        super::scroll_area::scrollbar(),
-                    ))
-                    .style(super::scroll_area::style),
-            ))
-            .padding(1)
-            .max_height(600)
-            .style(menu::panel),
-            false,
-        );
+        let panel = container(listbox::region(
+            scrollable(list.padding(4).width(Length::Fill))
+                .width(Length::Fill)
+                .direction(scrollable::Direction::Vertical(
+                    super::scroll_area::scrollbar(),
+                ))
+                .style(super::scroll_area::style),
+        ))
+        .padding(1)
+        .style(menu::panel);
+
+        // An aligned list is only limited by the window.
+        let panel = if select.align_item_with_trigger {
+            panel
+        } else {
+            panel.max_height(600)
+        };
+
+        let content = menu::shadow(panel, false);
 
         let anchored = Anchored::new(trigger, content)
             .align(Align::Start)
@@ -417,11 +425,12 @@ impl<'a, T: Clone + PartialEq + 'a, Message: Clone + 'a> From<Select<'a, T, Mess
 
         let anchored = if select.align_item_with_trigger {
             // The item centered on the trigger, its text aligned with the
-            // value, or below the trigger when there is no room for it.
+            // value, or `sideOffset` below the trigger when there is no room
+            // for it.
             anchored
                 .side(Side::Bottom)
-                .offset(-(size.height() + 28.0) / 2.0 - aligned_top)
-                .fallback_offset(4.0)
+                .offset(4.0)
+                .align_item(aligned_top, aligned_height)
                 .animate(false)
         } else {
             anchored.side(Side::Bottom).offset(4.0)
