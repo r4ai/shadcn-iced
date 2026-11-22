@@ -603,6 +603,10 @@ fn plot_bars_and_sector_contains() {
     assert_eq!(bars.x(0.0, 0), 10.0);
     assert_eq!(bars.x(0.0, 1), 52.0);
 
+    // Fractional widths >= 0.5 round up (matching Recharts 3.10.1+).
+    let rounded = Bars::new(16.0, 1, 0.1, 4.0);
+    assert_eq!(rounded.width, 13.0);
+
     // When bars don't fit, gap drops to 0.
     let tight = Bars::new(10.0, 4, 0.1, 10.0);
     assert_eq!(tight.gap, 0.0);
