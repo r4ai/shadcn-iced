@@ -25,7 +25,7 @@ impl Position {
         match (index, count) {
             (_, 0 | 1) => Position::Alone,
             (0, _) => Position::First,
-            (i, n) if i + 1 == n => Position::Last,
+            (i, n) if i >= n - 1 => Position::Last,
             _ => Position::Middle,
         }
     }

@@ -69,8 +69,13 @@ impl<'a, Message: Clone + 'a> Pagination<'a, Message> {
 /// Returns the page numbers to display, with `None` standing for an
 /// ellipsis.
 pub fn pages(current: usize, total: usize, siblings: usize) -> Vec<Option<usize>> {
+    if total == 0 {
+        return Vec::new();
+    }
+
+    let current = current.clamp(1, total);
     let start = current.saturating_sub(siblings).max(1);
-    let end = (current + siblings).min(total);
+    let end = current.saturating_add(siblings).min(total);
 
     let mut pages = Vec::new();
 
@@ -84,7 +89,7 @@ pub fn pages(current: usize, total: usize, siblings: usize) -> Vec<Option<usize>
     pages.extend((start..=end).map(Some));
 
     if end < total {
-        if end + 1 < total {
+        if total - end > 1 {
             pages.push(None);
         }
         pages.push(Some(total));

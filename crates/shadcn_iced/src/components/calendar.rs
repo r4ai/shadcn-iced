@@ -65,11 +65,7 @@ impl Date {
     /// The number of days since 1970-01-01.
     pub fn to_days(self) -> i64 {
         // Howard Hinnant's `days_from_civil`.
-        let y = if self.month <= 2 {
-            self.year - 1
-        } else {
-            self.year
-        } as i64;
+        let y = i64::from(self.year) - i64::from(self.month <= 2);
         let era = y.div_euclid(400);
         let yoe = y - era * 400;
         let m = self.month as i64;

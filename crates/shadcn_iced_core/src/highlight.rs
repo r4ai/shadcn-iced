@@ -319,8 +319,9 @@ pub fn color(theme: &Theme, token: Token) -> Color {
 fn previous_word(code: &str) -> Option<&str> {
     let code = code.trim_end();
     let start = code
-        .rfind(|c: char| !(c.is_alphanumeric() || c == '_'))
-        .map_or(0, |i| i + 1);
+        .char_indices()
+        .rfind(|(_, c)| !(c.is_alphanumeric() || *c == '_'))
+        .map_or(0, |(i, c)| i + c.len_utf8());
 
     (start < code.len()).then(|| &code[start..])
 }

@@ -786,8 +786,13 @@ impl Chart {
 }
 
 /// Formats a value like `toLocaleString()` does in English.
+fn round_millis(value: f32) -> f64 {
+    let rounded = (f64::from(value) * 1000.0).round() / 1000.0;
+    if rounded == 0.0 { 0.0 } else { rounded }
+}
+
 fn format_value(value: f32) -> String {
-    let rounded = (value * 1000.0).round() / 1000.0;
+    let rounded = round_millis(value);
     let formatted = format!("{rounded}");
 
     let (sign, formatted) = match formatted.strip_prefix('-') {
@@ -809,7 +814,7 @@ fn format_value(value: f32) -> String {
 
 /// Formats a tick of a value axis like SVG text shows a number.
 fn format_tick(value: f32) -> String {
-    let rounded = (value * 1000.0).round() / 1000.0;
+    let rounded = round_millis(value);
     format!("{rounded}")
 }
 
@@ -3233,7 +3238,7 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Rows<'_, Message> {
 
 #[cfg(test)]
 mod tests {
-    use super::format_value;
+    use super::{format_tick, format_value};
 
     #[test]
     fn values_are_grouped() {
@@ -3241,5 +3246,9 @@ mod tests {
         assert_eq!(format_value(1234.0), "1,234");
         assert_eq!(format_value(-1234567.5), "-1,234,567.5");
         assert_eq!(format_value(0.25), "0.25");
+        assert_eq!(format_value(-0.0), "0");
+        assert_eq!(format_value(-0.0001), "0");
+        assert_eq!(format_tick(-0.0001), "0");
+        assert_eq!(format_tick(12.3456), "12.346");
     }
 }
