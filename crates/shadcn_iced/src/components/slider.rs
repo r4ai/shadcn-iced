@@ -202,7 +202,7 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
     fn snap(&self, value: f32) -> f32 {
         let (start, end) = (*self.range.start(), *self.range.end());
 
-        let value = if self.step > 0.0 {
+        let value = if self.step > 0.0 && self.step.is_finite() {
             let (start, step) = (f64::from(start), f64::from(self.step));
             let snapped = start + ((f64::from(value) - start) / step).round() * step;
             let decimals = decimals(self.step).max(decimals(*self.range.start()));
@@ -760,5 +760,19 @@ mod tests {
         assert_eq!(slider.move_to(0, 70.0), (1, Some(70.0)));
         assert_eq!(slider.move_to(1, 30.0), (0, Some(30.0)));
         assert_eq!(slider.move_to(0, 50.0), (0, None));
+    }
+
+    #[test]
+    fn non_positive_or_infinite_step_still_clamps_without_nan() {
+        let infinite = Slider::<()>::new(0.0..=100.0, vec![50.0]).step(f32::INFINITY);
+        assert_eq!(infinite.snap(42.5), 42.5);
+        assert_eq!(infinite.snap(150.0), 100.0);
+
+        let zero = Slider::<()>::new(0.0..=100.0, vec![50.0]).step(0.0);
+        assert_eq!(zero.snap(33.3), 33.3);
+        assert_eq!(zero.snap(-5.0), 0.0);
+
+        let degenerate = Slider::<()>::new(10.0..=10.0, vec![10.0]);
+        assert_eq!(degenerate.ratio(10.0), 0.0);
     }
 }

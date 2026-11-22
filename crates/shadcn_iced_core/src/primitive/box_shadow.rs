@@ -90,7 +90,7 @@ pub fn quads(
             border: iced::Border {
                 radius: (radius + layer.spread)
                     .max(0.0)
-                    .min(bounds.width.min(bounds.height) / 2.0)
+                    .min((bounds.width.min(bounds.height) / 2.0).max(0.0))
                     .into(),
                 ..iced::Border::default()
             },

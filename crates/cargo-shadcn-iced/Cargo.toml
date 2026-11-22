@@ -18,6 +18,9 @@ include = ["/build.rs", "/src", "/components/*.rs", "/README.md"]
 name = "cargo-shadcn-iced"
 path = "src/main.rs"
 
+[dev-dependencies]
+proptest.workspace = true
+
 [lints]
 workspace = true
 

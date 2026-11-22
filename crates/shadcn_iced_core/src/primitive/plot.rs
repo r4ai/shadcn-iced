@@ -38,8 +38,8 @@ use iced::{Point, Rectangle};
 ///
 /// The ticks always include 0 when the range crosses it.
 pub fn ticks(min: f32, max: f32, count: usize) -> Vec<f32> {
-    let count = count.max(2);
     let (min, max) = (f64::from(min.min(max)), f64::from(max.max(min)));
+    let count = count.max(if min < 0.0 && max > 0.0 { 3 } else { 2 });
 
     // A single value: an axis of unit steps around it.
     let (min, max) = if max - min <= f64::EPSILON {
@@ -57,7 +57,7 @@ pub fn ticks(min: f32, max: f32, count: usize) -> Vec<f32> {
     loop {
         let step = format_step((max - min) / (count - 1) as f64, correction);
 
-        if step <= 0.0 {
+        if step <= 0.0 || !step.is_finite() {
             return vec![min as f32, max as f32];
         }
 
@@ -108,12 +108,16 @@ fn format_step(rough: f64, correction: f64) -> f64 {
 /// Rounds away the error of floating point arithmetic (like `Decimal` does in
 /// Recharts), so that ticks are e.g. `0.3` and not `0.30000000000000004`.
 fn clean(value: f64) -> f64 {
-    if value == 0.0 {
-        return 0.0;
+    if value == 0.0 || !value.is_finite() {
+        return value;
     }
 
     let digits = 12 - value.abs().log10().ceil() as i32;
     let factor = 10f64.powi(digits);
+
+    if !factor.is_finite() || factor == 0.0 {
+        return value;
+    }
 
     (value * factor).round() / factor
 }
@@ -400,8 +404,9 @@ impl Linear {
     /// top.
     pub fn ticks(&self, ticks: usize) -> impl Iterator<Item = f32> + use<> {
         let plot = self.plot;
+        let denom = ticks.max(1) as f32;
 
-        (0..=ticks).map(move |step| plot.y + plot.height * step as f32 / ticks as f32)
+        (0..=ticks).map(move |step| plot.y + plot.height * step as f32 / denom)
     }
 }
 
@@ -894,9 +899,13 @@ impl Pie {
     /// right, counterclockwise). Empty when the values do not add up to a
     /// positive total.
     pub fn sectors(&self, values: &[f32], start: f32, end: f32) -> Vec<Sector> {
-        let total: f32 = values.iter().filter(|value| **value > 0.0).sum();
+        let total: f32 = values
+            .iter()
+            .copied()
+            .filter(|value| value.is_finite() && *value > 0.0)
+            .sum();
 
-        if total <= 0.0 {
+        if total <= 0.0 || !total.is_finite() {
             return Vec::new();
         }
 
@@ -907,7 +916,12 @@ impl Pie {
             .iter()
             .map(|value| {
                 let from = angle;
-                angle += value.max(0.0) / total * sweep;
+                let share = if value.is_finite() && *value > 0.0 {
+                    *value / total
+                } else {
+                    0.0
+                };
+                angle += share * sweep;
 
                 Sector {
                     center: self.center,

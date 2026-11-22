@@ -297,6 +297,15 @@ fn has_dependency(name: &str) -> bool {
     fs::read_to_string("Cargo.toml").is_ok_and(|manifest| manifest.contains(name))
 }
 
+fn diff_lines(local: &str, upstream: &str) -> usize {
+    local
+        .lines()
+        .zip(upstream.lines())
+        .filter(|(a, b)| a != b)
+        .count()
+        + local.lines().count().abs_diff(upstream.lines().count())
+}
+
 fn diff(options: Options) -> Result<(), String> {
     let names: Vec<String> = if options.names.is_empty() || options.all {
         registry::COMPONENTS
@@ -315,12 +324,7 @@ fn diff(options: Options) -> Result<(), String> {
         match fs::read_to_string(&path) {
             Ok(local) if local == upstream => println!("  same     {name}"),
             Ok(local) => {
-                let changed = local
-                    .lines()
-                    .zip(upstream.lines())
-                    .filter(|(a, b)| a != b)
-                    .count()
-                    + local.lines().count().abs_diff(upstream.lines().count());
+                let changed = diff_lines(&local, &upstream);
                 println!("  modified {name} (~{changed} lines differ)");
             }
             Err(_) => println!("  missing  {name}"),
@@ -333,11 +337,26 @@ fn diff(options: Options) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn temp_dir(label: &str) -> PathBuf {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = env::temp_dir().join(format!(
+            "cargo-shadcn-iced-test-{}-{id}-{label}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
 
     #[test]
     fn registry_is_complete() {
         assert!(registry::COMPONENTS.len() >= 66);
         assert!(source("button").is_ok());
+        assert!(source("does_not_exist").is_err());
     }
 
     #[test]
@@ -367,6 +386,8 @@ mod tests {
         for name in ["toast", "trace"] {
             assert!(resolve(&[name.to_owned()]).unwrap().contains(name));
         }
+
+        assert!(resolve(&["unknown_widget".to_owned()]).is_err());
     }
 
     #[test]
@@ -382,6 +403,182 @@ mod tests {
                     "{name} uses `shadcn_iced`: {line}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn parse_handles_options_flags_and_errors() {
+        let args: Vec<String> = [
+            "--dir",
+            "custom/ui",
+            "--overwrite",
+            "--all",
+            "input-otp",
+            "date-picker",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+        let opts = parse(&args).unwrap();
+        assert_eq!(opts.dir, PathBuf::from("custom/ui"));
+        assert!(opts.overwrite);
+        assert!(opts.all);
+        assert_eq!(opts.names, vec!["input_otp", "date_picker"]);
+
+        assert!(parse(&["--dir".to_owned()]).is_err());
+        assert!(parse(&["--bogus".to_owned()]).is_err());
+        assert!(parse(&["-z".to_owned()]).is_err());
+    }
+
+    #[test]
+    fn run_dispatches_all_commands() {
+        assert!(run(vec![]).is_ok());
+        assert!(run(vec!["-h".to_owned()]).is_ok());
+        assert!(run(vec!["--help".to_owned()]).is_ok());
+        assert!(run(vec!["help".to_owned()]).is_ok());
+        assert!(run(vec!["list".to_owned()]).is_ok());
+        assert!(run(vec!["view".to_owned(), "button".to_owned()]).is_ok());
+        assert!(run(vec!["view".to_owned()]).is_err());
+        assert!(run(vec!["view".to_owned(), "nope".to_owned()]).is_err());
+        assert!(run(vec!["unknown".to_owned()]).is_err());
+        assert!(run(vec!["add".to_owned()]).is_err());
+    }
+
+    #[test]
+    fn summary_and_localize_and_dependencies_word_boundaries() {
+        assert_eq!(
+            summary("//! First line\n//! second line\n\n//! ignored"),
+            "First line second line"
+        );
+        assert_eq!(summary("fn no_doc() {}"), "");
+
+        let raw = "//! ```no_run\n//! code()\n//! ```";
+        assert_eq!(localize(raw), "//! ```ignore\n//! code()\n//! ```");
+
+        // `super::button_group` must not match `button` (word boundary check).
+        let deps = dependencies("use super::button_group::ButtonGroup;\n// super::card::Card\n");
+        assert!(deps.contains("button_group"));
+        assert!(!deps.contains("button"));
+        assert!(!deps.contains("card"));
+
+        let deps_alnum = dependencies("use super::button2::Foo;\nuse super::button::Button;\n");
+        assert!(deps_alnum.contains("button"));
+    }
+
+    #[test]
+    fn add_update_mod_and_diff_lifecycle() {
+        let dir = temp_dir("lifecycle");
+
+        // Adding pagination pulls in button and creates mod.rs.
+        run(vec![
+            "add".to_owned(),
+            "--dir".to_owned(),
+            dir.to_string_lossy().into_owned(),
+            "pagination".to_owned(),
+        ])
+        .unwrap();
+
+        let button_path = dir.join("button.rs");
+        let pagination_path = dir.join("pagination.rs");
+        let mod_path = dir.join("mod.rs");
+
+        assert!(button_path.exists());
+        assert!(pagination_path.exists());
+        let mod_content = fs::read_to_string(&mod_path).unwrap();
+        assert!(mod_content.contains("pub mod button;\n"));
+        assert!(mod_content.contains("pub mod pagination;\n"));
+
+        // Modifying button.rs without --overwrite preserves local edit.
+        fs::write(&button_path, "// local edit\n").unwrap();
+        run(vec![
+            "add".to_owned(),
+            "--dir".to_owned(),
+            dir.to_string_lossy().into_owned(),
+            "button".to_owned(),
+        ])
+        .unwrap();
+        assert_eq!(fs::read_to_string(&button_path).unwrap(), "// local edit\n");
+
+        // diff works for modified, same, and missing components.
+        assert!(
+            run(vec![
+                "diff".to_owned(),
+                "--dir".to_owned(),
+                dir.to_string_lossy().into_owned(),
+            ])
+            .is_ok()
+        );
+        assert!(
+            run(vec![
+                "diff".to_owned(),
+                "--dir".to_owned(),
+                dir.to_string_lossy().into_owned(),
+                "card".to_owned(),
+            ])
+            .is_ok()
+        );
+
+        // --overwrite replaces the local edit.
+        run(vec![
+            "add".to_owned(),
+            "--dir".to_owned(),
+            dir.to_string_lossy().into_owned(),
+            "--overwrite".to_owned(),
+            "button".to_owned(),
+        ])
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(&button_path).unwrap(),
+            localize(source("button").unwrap())
+        );
+
+        // update_mod handles files without trailing newline and avoids duplicates.
+        fs::write(&mod_path, "pub mod button;").unwrap();
+        let set: BTreeSet<&str> = ["button", "card"].into_iter().collect();
+        update_mod(&dir, &set).unwrap();
+        assert_eq!(
+            fs::read_to_string(&mod_path).unwrap(),
+            "pub mod button;\npub mod card;\n"
+        );
+        // Calling again is a no-op.
+        update_mod(&dir, &set).unwrap();
+        assert_eq!(
+            fs::read_to_string(&mod_path).unwrap(),
+            "pub mod button;\npub mod card;\n"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn diff_lines_counts_substitutions_and_length_differences() {
+        assert_eq!(diff_lines("a\nb\n", "a\nb\n"), 0);
+        assert_eq!(diff_lines("a\nb\n", "a\nc\n"), 1);
+        assert_eq!(diff_lines("a\n", "a\nb\nc\n"), 2);
+        assert_eq!(diff_lines("x\nb\nc\n", "a\n"), 3);
+    }
+
+    proptest! {
+        #[test]
+        fn resolve_is_idempotent_and_transitively_closed(
+            idx in 0..registry::COMPONENTS.len(),
+        ) {
+            let name = registry::COMPONENTS[idx].0.to_owned();
+            let first = resolve(std::slice::from_ref(&name)).unwrap();
+            prop_assert!(first.contains(name.as_str()));
+
+            let names: Vec<String> = first.iter().map(|s| (*s).to_owned()).collect();
+            let second = resolve(&names).unwrap();
+            prop_assert_eq!(first, second);
+        }
+
+        #[test]
+        fn diff_lines_is_symmetric_and_zero_iff_equal(
+            a in "[a-c\n]{0,30}",
+            b in "[a-c\n]{0,30}",
+        ) {
+            prop_assert_eq!(diff_lines(&a, &b), diff_lines(&b, &a));
+            prop_assert_eq!(diff_lines(&a, &a), 0);
         }
     }
 }

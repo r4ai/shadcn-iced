@@ -12,6 +12,7 @@ rust-version = "1.88"
 [workspace.dependencies]
 iced = { version = "0.14", features = ["advanced", "advanced-shaping", "svg", "canvas", "image", "tokio"] }
 iced_test = "0.14"
+proptest = "1"
 
 [workspace.lints.clippy]
 type_complexity = "allow"
