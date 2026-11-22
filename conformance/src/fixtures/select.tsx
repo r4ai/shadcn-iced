@@ -39,6 +39,31 @@ const basic = () => (
   </Select>
 )
 
+const numbers = Array.from({ length: 30 }, (_, i) => ({
+  label: `Item ${i + 1}`,
+  value: `${i + 1}`,
+}))
+
+/** 30 items, which do not fit in the window, `top` pixels down the page. */
+const long = (top: number, defaultValue: string) => () => (
+  <div style={{ paddingTop: top }}>
+    <Select items={numbers} defaultValue={defaultValue}>
+      <SelectTrigger className="w-48">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {numbers.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  </div>
+)
+
 export default {
   basic,
   reopen: basic,
@@ -64,6 +89,9 @@ export default {
       </SelectContent>
     </Select>
   ),
+  "long-top": long(48, "12"),
+  "long-middle": long(168, "2"),
+  "long-bottom": long(304, "30"),
   "trigger-states": () => (
     <div className="flex flex-col items-start gap-2">
       <Select>

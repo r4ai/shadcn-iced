@@ -84,6 +84,39 @@
       ]
     },
     {
+      "id": "long-top",
+      "viewport": [320, 400],
+      "steps": [
+        { "click": "Item 12" },
+        {
+          "expect": { "visible": ["Item 14"], "hidden": ["Item 1", "Item 30"] }
+        },
+        { "snapshot": "open" },
+        { "click": "Item 14" },
+        { "expect": { "visible": ["Item 14"], "hidden": ["Item 12"] } }
+      ]
+    },
+    {
+      "id": "long-middle",
+      "viewport": [320, 400],
+      "steps": [
+        { "click": "Item 2" },
+        {
+          "expect": { "visible": ["Item 1", "Item 3"], "hidden": ["Item 30"] }
+        },
+        { "snapshot": "open" }
+      ]
+    },
+    {
+      "id": "long-bottom",
+      "viewport": [320, 400],
+      "steps": [
+        { "click": "Item 30" },
+        { "expect": { "visible": ["Item 29"], "hidden": ["Item 1"] } },
+        { "snapshot": "open" }
+      ]
+    },
+    {
       "id": "trigger-states",
       "viewport": [240, 190],
       "steps": [
