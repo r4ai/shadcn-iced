@@ -14,6 +14,7 @@
 //! like the `touch-action: none` of the handles of react-resizable-panels,
 //! the drag follows the finger that started it and ignores the others.
 use super::pointer::{self, Pointer};
+use crate::math;
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -114,7 +115,8 @@ where
         self
     }
 
-    /// Sets the bounds of the ratio.
+    /// Sets the bounds of the ratio, in either order. A `NaN` bound is no
+    /// bound.
     pub fn limits(mut self, min: f32, max: f32) -> Self {
         self.min_ratio = min;
         self.max_ratio = max;
@@ -179,9 +181,25 @@ const HIT: f32 = 8.0;
 
 impl<Message, Theme, Renderer> Split<'_, Message, Theme, Renderer> {
     fn current(&self, state: &State) -> f32 {
-        self.ratio
-            .unwrap_or(state.ratio)
-            .clamp(self.min_ratio, self.max_ratio)
+        self.clamp(self.ratio.unwrap_or(state.ratio))
+    }
+
+    /// Keeps a ratio within the limits, and within the panes.
+    fn clamp(&self, ratio: f32) -> f32 {
+        let (min, max) = self.bounds();
+
+        math::clamp(ratio, min, max)
+    }
+
+    /// The limits of the ratio, ordered, within `0..=1`.
+    fn bounds(&self) -> (f32, f32) {
+        let min = math::clamp(self.min_ratio, 0.0, 1.0);
+        let max = math::clamp(self.max_ratio, 0.0, 1.0);
+        // A `NaN` bound is no bound.
+        let min = if self.min_ratio.is_nan() { 0.0 } else { min };
+        let max = if self.max_ratio.is_nan() { 1.0 } else { max };
+
+        (min.min(max), max.max(min))
     }
 
     fn divider(&self, bounds: Rectangle, ratio: f32) -> Rectangle {
@@ -396,15 +414,17 @@ where
 
             // Other fingers neither move nor end the drag.
             if let Some(position) = dragged(state.dragging) {
-                let next = match self.axis {
-                    Axis::Horizontal => {
-                        (position.x - state.grab - bounds.x - 0.5) / (bounds.width - 1.0)
-                    }
-                    Axis::Vertical => {
-                        (position.y - state.grab - bounds.y - 0.5) / (bounds.height - 1.0)
-                    }
-                }
-                .clamp(self.min_ratio, self.max_ratio);
+                // The space of the panes, without the divider: none leaves
+                // the divider where it is.
+                let (offset, space) = match self.axis {
+                    Axis::Horizontal => (position.x - bounds.x, bounds.width - 1.0),
+                    Axis::Vertical => (position.y - bounds.y, bounds.height - 1.0),
+                };
+                let next = if space > 0.0 {
+                    self.clamp((offset - state.grab - 0.5) / space)
+                } else {
+                    ratio
+                };
 
                 if self.ratio.is_none() {
                     state.ratio = next;
@@ -442,13 +462,13 @@ where
                         | (keyboard::Key::Named(key::Named::ArrowUp), Axis::Vertical) => {
                             Some(current - KEYBOARD_STEP)
                         }
-                        (keyboard::Key::Named(key::Named::Home), _) => Some(self.min_ratio),
-                        (keyboard::Key::Named(key::Named::End), _) => Some(self.max_ratio),
+                        (keyboard::Key::Named(key::Named::Home), _) => Some(self.bounds().0),
+                        (keyboard::Key::Named(key::Named::End), _) => Some(self.bounds().1),
                         _ => None,
                     };
 
                     if let Some(next) = next {
-                        let next = next.clamp(self.min_ratio, self.max_ratio);
+                        let next = self.clamp(next);
 
                         if self.ratio.is_none() {
                             state.ratio = next;
@@ -699,5 +719,37 @@ where
 {
     fn from(widget: Split<'a, Message, Theme, Renderer>) -> Self {
         Element::new(widget)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use iced::widget::space;
+
+    fn split(min: f32, max: f32) -> Split<'static, ()> {
+        Split::new(space(), space(), |_: &iced::Theme| Style {
+            divider: Color::BLACK,
+            divider_active: Color::BLACK,
+            grip: Color::BLACK,
+            grip_border: Color::BLACK,
+            focus_ring: None,
+        })
+        .limits(min, max)
+    }
+
+    #[test]
+    fn limits_in_any_order_or_nan_do_not_panic() {
+        assert_eq!(split(0.1, 0.9).clamp(0.95), 0.9);
+        assert_eq!(split(0.9, 0.1).clamp(0.95), 0.9);
+        assert_eq!(split(0.9, 0.1).clamp(0.05), 0.1);
+        assert_eq!(split(f32::NAN, 0.8).clamp(0.0), 0.0);
+        assert_eq!(split(f32::NAN, 0.8).clamp(0.9), 0.8);
+        assert_eq!(split(0.2, f32::NAN).clamp(1.5), 1.0);
+        assert_eq!(split(0.2, 0.8).clamp(f32::NAN), 0.2);
+        // Within the panes.
+        assert_eq!(split(-1.0, 2.0).clamp(-0.5), 0.0);
+        assert_eq!(split(-1.0, 2.0).clamp(1.5), 1.0);
+        assert_eq!(split(-1.0, 2.0).bounds(), (0.0, 1.0));
     }
 }

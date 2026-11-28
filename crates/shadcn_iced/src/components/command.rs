@@ -157,7 +157,9 @@ impl<'a, Message: Clone + 'a> Command<'a, Message> {
         self
     }
 
-    /// Sets the minimum height of the search field. Defaults to `h-8`.
+    /// Sets the minimum height of the area of the search field (its
+    /// `command-input-wrapper`), the field staying `h-8` in its middle.
+    /// Defaults to `h-8`.
     pub fn input_height(mut self, height: f32) -> Self {
         self.input_height = height;
         self

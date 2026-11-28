@@ -812,10 +812,13 @@ fn format_value(value: f32) -> String {
     format!("{sign}{grouped}{decimals}")
 }
 
-/// Formats a tick of a value axis like SVG text shows a number.
+/// Formats a tick of a value axis like SVG text shows a number: in full,
+/// since the ticks of a small domain differ past the thousandths
+/// (`0.0001`, `0.0002`). The ticks are already rounded to their steps.
 fn format_tick(value: f32) -> String {
-    let rounded = round_millis(value);
-    format!("{rounded}")
+    // Not `-0`.
+    let value = if value == 0.0 { 0.0 } else { value };
+    format!("{value}")
 }
 
 /// The height of the category axis (`XAxis`).
@@ -951,6 +954,12 @@ struct Polar {
 impl Chart {
     fn count(&self) -> usize {
         self.categories.len()
+    }
+
+    /// The values of a series that have a category: the others are not
+    /// shown, like in the cartesian charts.
+    fn shown<'v>(&self, values: &'v [f32]) -> &'v [f32] {
+        &values[..values.len().min(self.count())]
     }
 
     fn is_cartesian(&self) -> bool {
@@ -1217,7 +1226,7 @@ impl Chart {
 
                 self.series.iter().enumerate().find_map(|(index, series)| {
                     self.ring(polar, index)
-                        .sector_at(&series.values, start, end, point)
+                        .sector_at(self.shown(&series.values), start, end, point)
                         .map(|category| index * count + category)
                 })
             }
@@ -1295,7 +1304,7 @@ impl Chart {
             self.series
                 .get(series)
                 .and_then(|series| {
-                    ring.sectors(&series.values, start, end)
+                    ring.sectors(self.shown(&series.values), start, end)
                         .get(category)
                         .copied()
                 })
@@ -1477,7 +1486,8 @@ impl Chart {
                 .iter()
                 .enumerate()
                 .map(|(series, ranges)| (series, ranges[category]))
-                .filter(|(_, [low, high])| low != high)
+                // Neither empty nor missing (`NaN`).
+                .filter(|(_, [low, high])| low != high && low.is_finite() && high.is_finite())
                 .collect();
 
             for &(series, [low, high]) in &segments {
@@ -1815,7 +1825,7 @@ impl Chart {
             let ring = self.ring(polar, index);
 
             for (category, sector) in ring
-                .sectors(&series.values, start, end)
+                .sectors(self.shown(&series.values), start, end)
                 .into_iter()
                 .enumerate()
             {
@@ -3248,7 +3258,26 @@ mod tests {
         assert_eq!(format_value(0.25), "0.25");
         assert_eq!(format_value(-0.0), "0");
         assert_eq!(format_value(-0.0001), "0");
-        assert_eq!(format_tick(-0.0001), "0");
-        assert_eq!(format_tick(12.3456), "12.346");
+        assert_eq!(format_tick(-0.0), "0");
+        assert_eq!(format_tick(-0.0001), "-0.0001");
+        assert_eq!(format_tick(12.5), "12.5");
+        assert_eq!(format_tick(0.3), "0.3");
+        assert_eq!(format_tick(1_000_000.0), "1000000");
+
+        // The ticks of a small domain keep apart.
+        let ticks: Vec<String> = shadcn_iced_core::primitive::plot::ticks(0.0, 0.0004, 5)
+            .into_iter()
+            .map(format_tick)
+            .collect();
+        assert_eq!(ticks, ["0", "0.0001", "0.0002", "0.0003", "0.0004"]);
+    }
+
+    #[test]
+    fn pies_show_a_slice_per_category() {
+        let chart = super::pie(["a", "b"], [1.0, 2.0, 3.0]);
+
+        // The value without a category is not a slice (whose label would
+        // be out of the categories).
+        assert_eq!(chart.shown(&chart.series[0].values), [1.0, 2.0]);
     }
 }

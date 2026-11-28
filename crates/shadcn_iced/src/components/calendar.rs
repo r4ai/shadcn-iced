@@ -18,7 +18,7 @@ use shadcn_iced_core::primitive::Pressable;
 use shadcn_iced_core::primitive::focus::Ring;
 use shadcn_iced_core::primitive::focus_grid::{Cell, Move, focus_grid};
 use shadcn_iced_core::theme::alpha;
-use shadcn_iced_core::{Element, font, style, tokens};
+use shadcn_iced_core::{Element, font, math, style, tokens};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -64,41 +64,26 @@ impl Date {
 
     /// The number of days since 1970-01-01.
     pub fn to_days(self) -> i64 {
-        // Howard Hinnant's `days_from_civil`.
-        let y = i64::from(self.year) - i64::from(self.month <= 2);
-        let era = y.div_euclid(400);
-        let yoe = y - era * 400;
-        let m = self.month as i64;
-        let doy = (153 * (m + if m > 2 { -3 } else { 9 }) + 2) / 5 + self.day as i64 - 1;
-        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-
-        era * 146_097 + doe - 719_468
+        math::days_from_civil(self.year, self.month, self.day)
     }
 
-    /// The date `days` days after 1970-01-01.
+    /// The date `days` days after 1970-01-01, or the first or last date of
+    /// an `i32` year beyond them.
     pub fn from_days(days: i64) -> Self {
-        // Howard Hinnant's `civil_from_days`.
-        let z = days + 719_468;
-        let era = z.div_euclid(146_097);
-        let doe = z - era * 146_097;
-        let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        let mp = (5 * doy + 2) / 153;
-        let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
-        let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-        let year = (yoe + era * 400 + i64::from(month <= 2)) as i32;
+        let (year, month, day) = math::civil_from_days(days);
 
         Self { year, month, day }
     }
 
-    /// Adds a number of days (possibly negative).
+    /// Adds a number of days (possibly negative), stopping at the first or
+    /// last date of an `i32` year.
     pub fn add_days(self, days: i64) -> Self {
-        Self::from_days(self.to_days() + days)
+        Self::from_days(self.to_days().saturating_add(days))
     }
 
     /// The day of the week, from 0 (Sunday) to 6 (Saturday).
     pub fn weekday(self) -> u32 {
-        (self.to_days() + 4).rem_euclid(7) as u32
+        math::weekday(self.to_days())
     }
 
     /// The month of the date.
@@ -113,13 +98,7 @@ impl Date {
 impl fmt::Display for Date {
     /// Formats like `October 16, 2026`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {}, {}",
-            MONTHS[self.month as usize - 1],
-            self.day,
-            self.year
-        )
+        write!(f, "{} {}, {}", month_name(self.month), self.day, self.year)
     }
 }
 
@@ -138,34 +117,20 @@ impl Month {
         Date::today().month_of()
     }
 
-    /// The next month.
+    /// The next month (the last month of an `i32` year stays).
     pub fn next(self) -> Self {
-        if self.month == 12 {
-            Self {
-                year: self.year + 1,
-                month: 1,
-            }
-        } else {
-            Self {
-                month: self.month + 1,
-                ..self
-            }
-        }
+        self.add(1)
     }
 
-    /// The previous month.
+    /// The previous month (the first month of an `i32` year stays).
     pub fn previous(self) -> Self {
-        if self.month == 1 {
-            Self {
-                year: self.year - 1,
-                month: 12,
-            }
-        } else {
-            Self {
-                month: self.month - 1,
-                ..self
-            }
-        }
+        self.add(-1)
+    }
+
+    fn add(self, months: i64) -> Self {
+        let (year, month) = math::add_months(self.year, self.month, months);
+
+        Self { year, month }
     }
 
     /// The first day of the month.
@@ -181,7 +146,7 @@ impl Month {
 impl fmt::Display for Month {
     /// Formats like `October 2026`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}", MONTHS[self.month as usize - 1], self.year)
+        write!(f, "{} {}", month_name(self.month), self.year)
     }
 }
 
@@ -200,6 +165,16 @@ const MONTHS: [&str; 12] = [
     "December",
 ];
 
+/// The name of a month, from 1 to 12, or `"?"` for another number (the
+/// fields of a [`Date`] are public).
+fn month_name(month: u32) -> &'static str {
+    month
+        .checked_sub(1)
+        .and_then(|index| MONTHS.get(index as usize))
+        .copied()
+        .unwrap_or("?")
+}
+
 const WEEKDAYS: [&str; 7] = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 /// `text-[0.8rem]`, which keeps the line height of its context:
@@ -214,13 +189,7 @@ const MONTH_GAP: f32 = 16.0;
 
 /// The number of days in a month.
 pub fn days_in_month(year: i32, month: u32) -> u32 {
-    match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 => 29,
-        2 => 28,
-        _ => 0,
-    }
+    math::days_in_month(year, month)
 }
 
 enum Selection {
@@ -475,9 +444,11 @@ fn day_style(
     }
 }
 
+/// A button of the navigation, disabled without a message (past
+/// `startMonth` or `endMonth`).
 fn nav_button<'a, Message: Clone + 'a>(
     icon: shadcn_iced_core::Icon,
-    message: Message,
+    message: Option<Message>,
     cell: f32,
 ) -> Element<'a, Message> {
     // `buttonVariants({ variant: "ghost" }) size-(--cell-size) p-0`
@@ -485,7 +456,7 @@ fn nav_button<'a, Message: Clone + 'a>(
         .variant(super::button::Variant::Ghost)
         .size(super::button::Size::IconSm)
         .width(cell)
-        .on_press(message)
+        .on_press_maybe(message)
         .into()
 }
 
@@ -785,23 +756,33 @@ fn dropdown<'a, Message: Clone + 'a>(
 }
 
 impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Message> {
-    fn from(calendar: Calendar<'a, Message>) -> Self {
+    fn from(mut calendar: Calendar<'a, Message>) -> Self {
+        // The days out of `startMonth` and `endMonth` (the outside days of
+        // their months) are disabled, like in react-day-picker.
+        if let Some((from, to)) = calendar.dropdowns {
+            let disabled = calendar.disabled.take();
+
+            calendar.disabled = Some(Box::new(move |date: Date| {
+                !(from..=to).contains(&date.year) || disabled.as_ref().is_some_and(|f| f(date))
+            }));
+        }
+
         let cell = calendar.cell;
         let count = calendar.months;
         let grid_width = cell * if calendar.week_numbers { 8.0 } else { 7.0 };
         let mut months = Row::new().spacing(MONTH_GAP);
         let mut month = calendar.month;
 
+        let (previous, next) = navigation(calendar.month, count, calendar.dropdowns);
+        let previous = previous.map(|month| (calendar.on_navigate)(month));
+        let next = next.map(|month| (calendar.on_navigate)(month));
+
         for index in 0..count {
             // `month_caption: h-(--cell-size) px-(--cell-size)`, with the
             // navigation at both ends of the months (`nav: absolute`).
             let header = Row::new()
                 .push(if index == 0 {
-                    nav_button(
-                        lucide::CHEVRON_LEFT,
-                        (calendar.on_navigate)(calendar.month.previous()),
-                        cell,
-                    )
+                    nav_button(lucide::CHEVRON_LEFT, previous.clone(), cell)
                 } else {
                     iced::widget::space().width(cell).into()
                 })
@@ -811,11 +792,7 @@ impl<'a, Message: Clone + 'a> From<Calendar<'a, Message>> for Element<'a, Messag
                         .center_y(cell),
                 )
                 .push(if index + 1 == count {
-                    nav_button(
-                        lucide::CHEVRON_RIGHT,
-                        (calendar.on_navigate)(calendar.month.next()),
-                        cell,
-                    )
+                    nav_button(lucide::CHEVRON_RIGHT, next.clone(), cell)
                 } else {
                     iced::widget::space().width(cell).into()
                 })
@@ -1012,12 +989,34 @@ impl<'a, Message: Clone + 'a> Calendar<'a, Message> {
     }
 }
 
+/// The months the navigation buttons go to from the months shown from
+/// `month` (`count` of them), if any: it stops at the years of the
+/// dropdowns (`startMonth` and `endMonth`), like react-day-picker, and at
+/// the ends of the `i32` years.
+fn navigation(
+    month: Month,
+    count: usize,
+    years: Option<(i32, i32)>,
+) -> (Option<Month>, Option<Month>) {
+    let last = Month::add(
+        month,
+        count.saturating_sub(1).try_into().unwrap_or(i64::MAX),
+    );
+    let within = |shown: Month| years.is_none_or(|(from, to)| (from..=to).contains(&shown.year));
+
+    let previous = month.previous();
+    let next = last.next();
+
+    (
+        (previous != month && within(previous)).then_some(previous),
+        (next != last && within(next)).then(|| month.next()),
+    )
+}
+
 /// The date `months` months after `date` (possibly negative), on the same
 /// day or the last day of a shorter month (`addMonths` of date-fns).
-fn add_months(date: Date, months: i32) -> Date {
-    let index = date.year * 12 + date.month as i32 - 1 + months;
-    let year = index.div_euclid(12);
-    let month = index.rem_euclid(12) as u32 + 1;
+fn add_months(date: Date, months: i64) -> Date {
+    let (year, month) = math::add_months(date.year, date.month, months);
 
     Date {
         year,
@@ -1162,6 +1161,123 @@ mod tests {
         assert_eq!(week_number(Date::new(2026, 1, 3).unwrap()), 1);
         assert_eq!(week_number(Date::new(2026, 1, 10).unwrap()), 2);
         assert_eq!(date.to_string(), "October 16, 2026");
+    }
+
+    #[test]
+    fn keys_move_the_focus_like_react_day_picker() {
+        let date = |year, month, day| Date::new(year, month, day).unwrap();
+        let none = |_: Date| false;
+        // Wednesday, October 14th, 2026.
+        let from = date(2026, 10, 14);
+
+        assert_eq!(
+            next_focus(from, Move::Left, None, none),
+            Some(date(2026, 10, 13))
+        );
+        assert_eq!(
+            next_focus(from, Move::Right, None, none),
+            Some(date(2026, 10, 15))
+        );
+        assert_eq!(
+            next_focus(from, Move::Up, None, none),
+            Some(date(2026, 10, 7))
+        );
+        assert_eq!(
+            next_focus(from, Move::Down, None, none),
+            Some(date(2026, 10, 21))
+        );
+        assert_eq!(
+            next_focus(from, Move::Home, None, none),
+            Some(date(2026, 10, 11))
+        );
+        assert_eq!(
+            next_focus(from, Move::End, None, none),
+            Some(date(2026, 10, 17))
+        );
+        assert_eq!(
+            next_focus(from, Move::PageUp { far: false }, None, none),
+            Some(date(2026, 9, 14))
+        );
+        assert_eq!(
+            next_focus(from, Move::PageDown { far: true }, None, none),
+            Some(date(2027, 10, 14))
+        );
+        assert_eq!(
+            next_focus(from, Move::PageUp { far: true }, None, none),
+            Some(date(2025, 10, 14))
+        );
+        assert_eq!(
+            next_focus(date(2026, 1, 31), Move::PageDown { far: false }, None, none),
+            Some(date(2026, 2, 28))
+        );
+
+        // Disabled days are skipped the same way.
+        let weekends = |date: Date| date.weekday() == 0 || date.weekday() == 6;
+        assert_eq!(
+            next_focus(date(2026, 10, 16), Move::Right, None, weekends),
+            Some(date(2026, 10, 19))
+        );
+        // Stuck on a disabled day at the start of the week.
+        assert_eq!(next_focus(from, Move::Home, None, weekends), None);
+
+        // The limits stop the focus.
+        let limits = Some((date(2026, 1, 1), date(2026, 12, 31)));
+        assert_eq!(
+            next_focus(date(2026, 12, 31), Move::Right, limits, none),
+            Some(date(2026, 12, 31))
+        );
+        assert_eq!(
+            next_focus(date(2026, 1, 2), Move::Up, limits, none),
+            Some(date(2026, 1, 1))
+        );
+        let all = |_: Date| true;
+        assert_eq!(
+            next_focus(date(2026, 12, 30), Move::Right, limits, all),
+            None
+        );
+    }
+
+    #[test]
+    fn week_numbers_count_from_the_week_of_january_1st() {
+        // The week of December 27th, 2026 to January 2nd, 2027 is the first
+        // one of 2027.
+        assert_eq!(week_number(Date::new(2027, 1, 2).unwrap()), 1);
+        assert_eq!(week_number(Date::new(2022, 12, 31).unwrap()), 53);
+        assert_eq!(week_number(Date::new(2026, 12, 26).unwrap()), 52);
+    }
+
+    #[test]
+    fn add_months_keeps_the_day_or_the_last_one() {
+        let date = |year, month, day| Date::new(year, month, day).unwrap();
+
+        assert_eq!(add_months(date(2024, 1, 31), 1), date(2024, 2, 29));
+        assert_eq!(add_months(date(2024, 3, 31), -1), date(2024, 2, 29));
+        assert_eq!(add_months(date(2024, 2, 29), 12), date(2025, 2, 28));
+        assert_eq!(add_months(date(2026, 5, 15), -17), date(2024, 12, 15));
+    }
+
+    #[test]
+    fn navigation_stops_at_the_dropdowns() {
+        let month = |year, month| Month { year, month };
+
+        assert_eq!(
+            navigation(month(2026, 5), 1, None),
+            (Some(month(2026, 4)), Some(month(2026, 6)))
+        );
+        assert_eq!(
+            navigation(month(2020, 1), 1, Some((2020, 2025))),
+            (None, Some(month(2020, 2)))
+        );
+        // The last month shown is the last one of the dropdowns.
+        assert_eq!(
+            navigation(month(2025, 11), 2, Some((2020, 2025))),
+            (Some(month(2025, 10)), None)
+        );
+        assert_eq!(
+            navigation(month(i32::MAX, 12), 1, None),
+            (Some(month(i32::MAX, 11)), None)
+        );
+        assert_eq!(navigation(month(i32::MIN, 1), 1, None).0, None);
     }
 
     #[test]

@@ -117,6 +117,10 @@ impl<'a, Message, Theme, Renderer> Track<'a, Message, Theme, Renderer> {
             None => cursor.levitate() + translation,
         };
 
+        // The viewport of the items, in their coordinates: the one they are
+        // drawn in too.
+        let visible = bounds + translation;
+
         for ((item, tree), layout) in self
             .items
             .iter_mut()
@@ -124,7 +128,7 @@ impl<'a, Message, Theme, Renderer> Track<'a, Message, Theme, Renderer> {
             .zip(layout.children())
         {
             item.as_widget_mut().update(
-                tree, event, layout, cursor, renderer, clipboard, shell, &bounds,
+                tree, event, layout, cursor, renderer, clipboard, shell, &visible,
             );
         }
     }

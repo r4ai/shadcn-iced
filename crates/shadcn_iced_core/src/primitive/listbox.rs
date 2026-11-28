@@ -272,6 +272,8 @@ where
 #[derive(Debug, Default)]
 struct State {
     active: Option<usize>,
+    /// The item under the cursor at its last move.
+    hovered: Option<usize>,
     touched: bool,
     /// The item pressed with the mouse.
     pressed: Option<usize>,
@@ -711,9 +713,14 @@ where
             Event::Mouse(mouse::Event::CursorMoved { .. }) => {
                 let next = match hovered {
                     Some(index) => Some(index),
-                    None if self.clear_on_leave => None,
+                    // Leaving an item clears the highlight (its
+                    // `pointerleave`), not any move away from the list: a
+                    // highlight moved with the keyboard stays.
+                    None if self.clear_on_leave && state.hovered.is_some() => None,
                     None => state.active,
                 };
+
+                state.hovered = hovered;
 
                 if hovered.is_some() {
                     state.touched = true;
@@ -725,6 +732,7 @@ where
                 }
             }
             Event::Mouse(mouse::Event::CursorLeft) if self.clear_on_leave => {
+                state.hovered = None;
                 state.active = None;
                 shell.request_redraw();
             }

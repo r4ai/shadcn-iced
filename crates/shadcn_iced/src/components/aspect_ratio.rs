@@ -18,14 +18,19 @@ pub struct AspectRatio<'a, Message> {
 }
 
 /// Displays `content` with the given width-to-height `ratio` (e.g.
-/// `16.0 / 9.0`), filling the available width.
+/// `16.0 / 9.0`), filling the available width. A ratio that is not a
+/// positive number (0, negative, infinite or `NaN`) makes it square.
 pub fn aspect_ratio<'a, Message: 'a>(
     ratio: f32,
     content: impl Into<Element<'a, Message>>,
 ) -> AspectRatio<'a, Message> {
     AspectRatio {
         content: content.into(),
-        ratio: ratio.max(f32::EPSILON),
+        ratio: if ratio > 0.0 && ratio.is_finite() {
+            ratio
+        } else {
+            1.0
+        },
         width: Length::Fill,
     }
 }

@@ -504,6 +504,15 @@ impl State {
         }
     }
 
+    /// Stops the timer of a toast without a duration (a loading one): once
+    /// it gets one (replaced by a success with the same id, like sonner's
+    /// `toast.success(.., { id })`), its time starts from 0.
+    fn stop(&mut self, id: u64) {
+        if let Some(entry) = self.entries.get_mut(&id) {
+            entry.elapsed = Duration::ZERO;
+        }
+    }
+
     /// Keeps an entry for each of the `ids`, and only for them.
     ///
     /// The timers are advanced to `now` first, so that the new toasts start
@@ -1585,6 +1594,10 @@ where
         };
 
         for toast in &self.toasts {
+            if toast.duration.is_none() {
+                state.stop(toast.id);
+            }
+
             let Some(entry) = state.entries.get(&toast.id) else {
                 continue;
             };
@@ -1841,5 +1854,22 @@ mod tests {
 
         assert_eq!(state.entries[&1].elapsed, Duration::from_millis(1100));
         assert_eq!(state.entries[&2].elapsed, Duration::from_millis(100));
+    }
+
+    #[test]
+    fn a_toast_gets_its_whole_duration_once_it_has_one() {
+        let start = Instant::now();
+        let mut state = State::default();
+
+        // A loading toast, shown for 5 seconds.
+        state.sync(&[1], start);
+        for second in 1..=5 {
+            state.tick(start + Duration::from_secs(second));
+            state.stop(1);
+        }
+
+        // Replaced by a success with the same id.
+        state.tick(start + Duration::from_millis(5016));
+        assert_eq!(state.entries[&1].elapsed, Duration::from_millis(16));
     }
 }

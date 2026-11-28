@@ -259,11 +259,11 @@ proptest! {
     ) {
         let count = s1.len().max(s2.len());
         let stacked = plot::stack([s1.as_slice(), s2.as_slice()], count, Offset::None);
-        for i in 0..count {
+        for (i, (first, second)) in stacked[0].iter().zip(&stacked[1]).enumerate() {
             let expected = plot::value(&s1, i) + plot::value(&s2, i);
-            prop_assert_eq!(stacked[0][i][0], 0.0);
-            prop_assert_eq!(stacked[0][i][1], stacked[1][i][0]);
-            prop_assert!((stacked[1][i][1] - expected).abs() < 1e-3);
+            prop_assert_eq!(first[0], 0.0);
+            prop_assert_eq!(first[1], second[0]);
+            prop_assert!((second[1] - expected).abs() < 1e-3);
         }
 
         let expanded = plot::stack([s1.as_slice(), s2.as_slice()], count, Offset::Expand);
@@ -273,6 +273,46 @@ proptest! {
                 prop_assert!((bar[1] - 1.0).abs() < 1e-4);
             }
         }
+    }
+
+    #[test]
+    fn plot_stack_skips_missing_values(
+        s1 in prop::collection::vec(prop_oneof![Just(f32::NAN), Just(f32::INFINITY), -1000.0f32..1000.0], 1..10),
+        s2 in prop::collection::vec(-1000.0f32..1000.0, 1..10),
+        offset in prop_oneof![Just(Offset::None), Just(Offset::Sign), Just(Offset::Expand)],
+    ) {
+        let count = s1.len().max(s2.len());
+        let stacked = plot::stack([s1.as_slice(), s2.as_slice()], count, offset);
+
+        // A missing value does not hide the series stacked on it.
+        for bars in &stacked {
+            for bar in bars {
+                prop_assert!(bar[0].is_finite() && bar[1].is_finite(), "{stacked:?}");
+            }
+        }
+        for (i, bar) in stacked[0].iter().enumerate() {
+            if !plot::value(&s1, i).is_finite() {
+                prop_assert_eq!(bar[0], bar[1]);
+            }
+        }
+
+        let (min, max) = plot::extent([s1.as_slice(), s2.as_slice()], count, Some(offset));
+        prop_assert!(min <= 0.0 && max >= 0.0);
+        for bar in stacked.iter().flatten() {
+            prop_assert!(bar[0] >= min && bar[1] <= max);
+        }
+    }
+
+    #[test]
+    fn plot_bars_have_no_negative_width(
+        band in -10.0f32..500.0,
+        groups in 0usize..20,
+        category_gap in -1.0f32..2.0,
+        gap in 0.0f32..20.0,
+    ) {
+        let bars = plot::Bars::new(band, groups, category_gap, gap);
+        prop_assert!(bars.width >= 0.0, "{bars:?}");
+        prop_assert!(bars.offset >= 0.0 || band < 0.0);
     }
 
     #[test]
@@ -857,4 +897,14 @@ fn pointer_mouse_and_touch_lifecycle() {
         ),
         Some(Gesture::Released)
     );
+}
+
+#[test]
+fn plot_ticks_are_bounded() {
+    for count in [plot::MAX_TICKS + 1, usize::MAX] {
+        let ticks = plot::ticks(0.0, 100.0, count);
+        assert!(ticks.len() <= plot::MAX_TICKS);
+        assert_eq!(ticks.first(), Some(&0.0));
+        assert!(ticks.last().is_some_and(|last| *last >= 100.0));
+    }
 }

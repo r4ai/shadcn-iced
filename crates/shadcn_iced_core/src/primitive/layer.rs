@@ -1145,6 +1145,26 @@ where
 
                 shell.capture_event();
             }
+            // A non-modal layer lets the events through, and is dismissed
+            // all the same (a `DismissableLayer`).
+            Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(key::Named::Escape),
+                ..
+            }) if !self.modal => {
+                if let Some(message) = self.on_dismiss {
+                    shell.publish(message.clone());
+                }
+            }
+            Event::Mouse(mouse::Event::ButtonPressed(_))
+            | Event::Touch(touch::Event::FingerPressed { .. })
+                if !self.modal && !cursor.is_over(content_bounds) =>
+            {
+                if self.dismiss_on_backdrop
+                    && let Some(message) = self.on_dismiss
+                {
+                    shell.publish(message.clone());
+                }
+            }
             Event::Window(window::Event::RedrawRequested(_)) => {}
             _ if self.modal => {
                 shell.capture_event();

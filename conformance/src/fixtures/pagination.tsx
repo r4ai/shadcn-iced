@@ -11,19 +11,27 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 
-/** The pages to display; `null` stands for an ellipsis. */
+/**
+ * The pages to display; `null` stands for an ellipsis, which stands for two
+ * pages or more: a single hidden page is shown instead (`math::pages` of
+ * `shadcn_iced_core`).
+ */
 function pages(current: number, total: number, siblings: number) {
   const start = Math.max(current - siblings, 1)
   const end = Math.min(current + siblings, total)
   const result: (number | null)[] = []
+  const gap = (from: number, to: number) => {
+    if (to - from === 2) result.push(from + 1)
+    else if (to - from > 2) result.push(null)
+  }
 
   if (start > 1) {
     result.push(1)
-    if (start > 2) result.push(null)
+    gap(1, start)
   }
   for (let page = start; page <= end; page++) result.push(page)
   if (end < total) {
-    if (end + 1 < total) result.push(null)
+    gap(end, total)
     result.push(total)
   }
 

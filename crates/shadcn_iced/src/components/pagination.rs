@@ -13,7 +13,7 @@ use super::button::{self, Button, Variant};
 
 use shadcn_iced_core::icon::{Icon, lucide};
 use shadcn_iced_core::primitive::Pressable;
-use shadcn_iced_core::{Element, font, tokens};
+use shadcn_iced_core::{Element, font, math, tokens};
 
 use iced::widget::{Row, container, text};
 use iced::{Alignment, Length, Padding, Theme};
@@ -67,35 +67,9 @@ impl<'a, Message: Clone + 'a> Pagination<'a, Message> {
 }
 
 /// Returns the page numbers to display, with `None` standing for an
-/// ellipsis.
+/// ellipsis (see [`math::pages`]).
 pub fn pages(current: usize, total: usize, siblings: usize) -> Vec<Option<usize>> {
-    if total == 0 {
-        return Vec::new();
-    }
-
-    let current = current.clamp(1, total);
-    let start = current.saturating_sub(siblings).max(1);
-    let end = current.saturating_add(siblings).min(total);
-
-    let mut pages = Vec::new();
-
-    if start > 1 {
-        pages.push(Some(1));
-        if start > 2 {
-            pages.push(None);
-        }
-    }
-
-    pages.extend((start..=end).map(Some));
-
-    if end < total {
-        if total - end > 1 {
-            pages.push(None);
-        }
-        pages.push(Some(total));
-    }
-
-    pages
+    math::pages(current, total, siblings)
 }
 
 /// `PaginationPrevious` / `PaginationNext`: a ghost button of the default
