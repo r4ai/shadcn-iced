@@ -127,13 +127,15 @@ jobs:
   # linked from the pull request as a deployment of the `preview`
   # environment; `preview.yml` deletes it when the pull request closes. It
   # needs the same secrets as `deploy`, in that environment. Pull requests
-  # from forks get no secrets, and have no preview.
+  # from forks, and runs of Dependabot (which only get the secrets of
+  # Dependabot), get no secrets, and have no preview.
   preview:
     name: Preview site
     needs: site
     if: >-
       github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]'
       && needs.site.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -87,7 +87,7 @@ jobs:
         id: bindgen
         working-directory: .
         run: echo "version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/version = "\(.*\)"/\1/p')" >> "$GITHUB_OUTPUT"
-      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+      - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
         with:
           tool: wasm-bindgen@${{ steps.bindgen.outputs.version }}
       # wasm-opt comes from the `binaryen` package.
