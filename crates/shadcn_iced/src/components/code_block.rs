@@ -320,12 +320,29 @@ fn code<'a, Message: 'a>(
     };
 
     // Each piece is a text of its own: the font is monospaced, so they line
-    // up like a single text.
-    let pieces = tokens.into_iter().flat_map(|(range, token)| {
+    // up like a single text. Spaces are invisible whatever their color:
+    // they join the previous piece (or the next one, for the indentation)
+    // rather than make a text (to lay out and shape) of their own.
+    let mut pieces: Vec<(String, Token)> = Vec::with_capacity(tokens.len());
+    let mut indentation = String::new();
+    let mut push = |word: &str, token: Token| {
+        let blank = word.chars().all(char::is_whitespace);
+
+        match pieces.last_mut() {
+            Some((last, _)) if blank => last.push_str(word),
+            None if blank => indentation.push_str(word),
+            _ => {
+                let mut piece = std::mem::take(&mut indentation);
+                piece.push_str(word);
+                pieces.push((piece, token));
+            }
+        }
+    };
+
+    for (range, token) in tokens {
         let part = &content[range];
 
         // Wrapped lines break after the spaces that end a word.
-        let mut words = Vec::new();
         let mut start = 0;
         if wrap {
             let mut in_space = false;
@@ -333,21 +350,21 @@ fn code<'a, Message: 'a>(
                 if c.is_whitespace() {
                     in_space = true;
                 } else if in_space {
-                    words.push(&part[start..offset]);
+                    push(&part[start..offset], token);
                     start = offset;
                     in_space = false;
                 }
             }
         }
-        words.push(&part[start..]);
+        push(&part[start..], token);
+    }
 
-        words
-            .into_iter()
-            .map(move |word| (word.to_owned(), token))
-            .collect::<Vec<_>>()
-    });
+    // A line of spaces only (the content is not empty).
+    if pieces.is_empty() {
+        pieces.push((indentation, Token::Plain));
+    }
 
-    let row = Row::with_children(pieces.map(|(word, token)| {
+    let row = Row::with_children(pieces.into_iter().map(|(word, token)| {
         piece(word)
             .wrapping(text::Wrapping::None)
             .style(move |theme: &Theme| text::Style {
