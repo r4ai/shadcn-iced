@@ -34,6 +34,32 @@ cargo test --workspace
 bash scripts/check-copy.sh
 ```
 
+### Property Tests, Mutation Tests, Coverage and Proofs
+
+CI (`.github/workflows/rust.yml`) checks the tests themselves, in parallel jobs:
+
+```sh
+# Property tests (proptest) with many more cases than `cargo test`
+PROPTEST_CASES=4096 cargo test --release -p shadcn_iced_core -p shadcn-iced -p cargo-shadcn-iced -p shadcn_iced_verify
+
+# Mutation tests (`cargo install cargo-mutants`, `.cargo/mutants.toml`): the
+# tests must catch every change of the CLI and of the arithmetic of `math.rs`
+cargo mutants -p cargo-shadcn-iced
+cargo mutants -p shadcn_iced_verify
+
+# Coverage (`cargo install cargo-llvm-cov`)
+cargo llvm-cov -p shadcn_iced_core -p shadcn-iced -p cargo-shadcn-iced --summary-only
+
+# Kani proofs of `math.rs`, for every input (`cargo install kani-verifier`,
+# then `cargo kani setup` once)
+cd crates/verify && cargo kani
+```
+
+The arithmetic behind the components (clamping, dates, pagination) lives in
+`shadcn_iced_core::math`, which depends on `core` alone: `crates/verify`
+includes it without `iced` (which Kani cannot compile) so that Kani proves it
+for every input, and builds it in seconds for the mutation tests.
+
 ---
 
 ## Running the Desktop Gallery

@@ -1,0 +1,9 @@
+# The configuration of cargo-mutants (https://mutants.rs), run by the
+# `mutants` jobs of `.github/workflows/rust.yml`.
+
+exclude_re = [
+  # The proofs of Kani (`#[cfg(kani)]`) never run as code.
+  "verification::",
+  # Equivalent mutants: swapping two equal bounds changes nothing.
+  "math.rs:.*replace > with >= in clamp",
+]

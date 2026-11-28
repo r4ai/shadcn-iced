@@ -1,0 +1,19 @@
+[package]
+name = "shadcn_iced_verify"
+description = "The Kani proofs of the arithmetic of shadcn_iced"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+# No dependency: Kani compiles every dependency with its own compiler, and
+# it cannot compile the ones of `iced`. The modules proven here depend on
+# `core` alone, and are included from their crates (`src/lib.rs`).
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
