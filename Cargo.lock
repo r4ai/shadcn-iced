@@ -576,7 +576,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-shadcn-iced"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "proptest",
 ]
@@ -3633,7 +3633,7 @@ dependencies = [
 
 [[package]]
 name = "shadcn-iced"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "iced",
  "proptest",
@@ -3642,7 +3642,7 @@ dependencies = [
 
 [[package]]
 name = "shadcn_iced_core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "iced",
  "proptest",
