@@ -356,6 +356,13 @@ fn fill(spans: &mut Vec<(Range<usize>, Token)>, len: usize) {
     *spans = filled;
 }
 
+/// Whether `code` starts with three `quote`s.
+fn triple_at(code: &str, quote: char) -> bool {
+    let mut chars = code.chars();
+
+    (0..3).all(|_| chars.next() == Some(quote))
+}
+
 struct Lexer<'a> {
     language: Language,
     line: &'a str,
@@ -365,8 +372,8 @@ struct Lexer<'a> {
     command: bool,
 }
 
-impl Lexer<'_> {
-    fn rest(&self) -> &str {
+impl<'a> Lexer<'a> {
+    fn rest(&self) -> &'a str {
         &self.line[self.position..]
     }
 
@@ -424,8 +431,7 @@ impl Lexer<'_> {
             }
 
             if self.language.quotes().contains(&c) && !self.is_lifetime(c) {
-                let triple = self.language == Language::Toml
-                    && self.rest().starts_with(&c.to_string().repeat(3));
+                let triple = self.language == Language::Toml && self.starts_with_triple(c);
                 self.position += if triple { 3 } else { 1 };
 
                 if !self.string_body(start, c, triple) {
@@ -499,13 +505,10 @@ impl Lexer<'_> {
     /// closes on this line.
     fn string_body(&mut self, start: usize, quote: char, triple: bool) -> bool {
         let escapes = self.language.escapes(quote);
-        let closing = if triple {
-            quote.to_string().repeat(3)
-        } else {
-            quote.to_string()
-        };
-
-        let mut chars = self.rest().char_indices();
+        // The quotes are all ASCII: the closing one is that many bytes.
+        let closing = if triple { 3 } else { 1 };
+        let rest = self.rest();
+        let mut chars = rest.char_indices();
 
         while let Some((offset, c)) = chars.next() {
             if escapes && c == '\\' {
@@ -513,8 +516,8 @@ impl Lexer<'_> {
                 continue;
             }
 
-            if self.rest()[offset..].starts_with(&closing) {
-                self.position += offset + closing.len();
+            if c == quote && (!triple || triple_at(&rest[offset..], quote)) {
+                self.position += offset + closing;
                 self.push(start, Token::String);
                 return true;
             }
@@ -532,7 +535,12 @@ impl Lexer<'_> {
         self.rest().trim_start().starts_with(c)
     }
 
-    fn word(&mut self, extra: &[char]) -> &str {
+    /// Whether the rest of the line starts with three `quote`s.
+    fn starts_with_triple(&self, quote: char) -> bool {
+        triple_at(self.rest(), quote)
+    }
+
+    fn word(&mut self, extra: &[char]) -> &'a str {
         let start = self.position;
 
         while let Some(c) = self.peek() {
@@ -578,14 +586,14 @@ impl Lexer<'_> {
             } else {
                 &[]
             };
-            let word = self.word(extra).to_owned();
+            let word = self.word(extra);
             let language = self.language;
 
-            let token = if language.keywords().contains(&word.as_str()) {
+            let token = if language.keywords().contains(&word) {
                 Token::Keyword
-            } else if language.constants().contains(&word.as_str()) {
+            } else if language.constants().contains(&word) {
                 Token::Constant
-            } else if language.types().contains(&word.as_str()) {
+            } else if language.types().contains(&word) {
                 Token::Type
             } else if language == Language::Rust && self.rest().starts_with('!') {
                 // A macro.
@@ -649,11 +657,11 @@ impl Lexer<'_> {
         }
 
         if c.is_alphabetic() || c == '_' {
-            let word = self.word(&['-', '.']).to_owned();
+            let word = self.word(&['-', '.']);
 
             let token = if self.followed_by('=') && !self.after_equals(start) {
                 Token::Property
-            } else if Language::Toml.constants().contains(&word.as_str()) {
+            } else if Language::Toml.constants().contains(&word) {
                 Token::Constant
             } else {
                 Token::Plain
