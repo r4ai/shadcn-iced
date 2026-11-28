@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2](https://github.com/r4ai/shadcn-iced/compare/v0.3.1...v0.3.2) - 2026-11-28
+
+### Other
+
+- allocate less in the highlighter and lay out fewer texts in code blocks ([#99](https://github.com/r4ai/shadcn-iced/pull/99))
+- add property-based & mutation-tested suites and fix discovered bugs ([#97](https://github.com/r4ai/shadcn-iced/pull/97))
+- *(deps)* bump the conformance group across 1 directory with 2 updates ([#94](https://github.com/r4ai/shadcn-iced/pull/94))
+
 ## [0.3.1](https://github.com/r4ai/shadcn-iced/compare/v0.3.0...v0.3.1) - 2026-11-22
 
 ### Added
