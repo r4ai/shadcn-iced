@@ -81,9 +81,12 @@ cargo shadcn-iced view <NAME>         Print the source of a component
 Options:
     --dir <PATH>                      Where components go [default: src/ui]
     --overwrite                       Replace files that already exist
+    -h, --help                        Print help
+    --                                Treat everything after it as a component name
 ```
 
-Component names accept both `dropdown-menu` and `dropdown_menu`.
+Component names accept both `dropdown-menu` and `dropdown_menu`, in any case.
+`--dir=<PATH>` works too, and `--all` cannot be combined with names.
 
 ## Minimum supported Rust version
 

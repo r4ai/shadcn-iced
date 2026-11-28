@@ -10,7 +10,7 @@
 //! # }
 //! ```
 use shadcn_iced_core::primitive::Otp;
-use shadcn_iced_core::primitive::otp::Status;
+use shadcn_iced_core::primitive::otp::{self, Status};
 use shadcn_iced_core::theme::alpha;
 use shadcn_iced_core::{Element, font, style, tokens};
 
@@ -47,7 +47,8 @@ pub fn input_otp<'a, Message: Clone + 'a>(
         groups: vec![length],
         invalid: false,
         disabled: false,
-        complete: value.chars().take(length).count() == length,
+        // Like the slots show it, not a value with spaces.
+        complete: length > 0 && otp::normalize(value, length).chars().count() == length,
     }
 }
 
@@ -133,6 +134,8 @@ impl<'a, Message: Clone + 'a> From<InputOtp<'a, Message>> for Element<'a, Messag
         let width = slots.last().map_or(0.0, |slot| slot.x + slot.width);
 
         otp.slots(slots.clone(), Size::new(width, SLOT))
+            // The text composed with an IME, like the characters.
+            .text_size(style::text::SM)
             .draw(move |renderer, theme, bounds, status: Status<'_>| {
                 draw(
                     renderer,

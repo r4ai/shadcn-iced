@@ -32,3 +32,6 @@ __pycache__/
 
 # The copy of the components of `cargo-shadcn-iced` (`scripts/prepare-publish.sh`)
 /crates/cargo-shadcn-iced/components/
+
+# cargo-mutants (`.cargo/mutants.toml`)
+mutants.out*/

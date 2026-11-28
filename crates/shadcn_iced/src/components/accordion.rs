@@ -76,7 +76,8 @@ impl<'a, Message: Clone + 'a> Accordion<'a, Message> {
         self.push(title, content, false, false)
     }
 
-    /// Appends an item that starts open.
+    /// Appends an item that starts open. A [`single`](Self::single)
+    /// accordion opens the item it is given instead.
     pub fn open_item(
         self,
         title: impl Into<String>,

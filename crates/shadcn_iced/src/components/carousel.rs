@@ -121,7 +121,8 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
 
         let previous = if index > 0 {
             Some(index - 1)
-        } else if carousel.looping && count > 0 {
+        // Looping needs somewhere to go: not with every item in view.
+        } else if carousel.looping && last > 0 {
             Some(last)
         } else {
             None
@@ -129,7 +130,7 @@ impl<'a, Message: Clone + 'a> From<Carousel<'a, Message>> for Element<'a, Messag
 
         let next = if index < last {
             Some(index + 1)
-        } else if carousel.looping && count > 0 {
+        } else if carousel.looping && last > 0 {
             Some(0)
         } else {
             None

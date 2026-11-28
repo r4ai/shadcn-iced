@@ -14,7 +14,7 @@
 use shadcn_iced_core::primitive::Focus;
 use shadcn_iced_core::primitive::pointer::{self, Pointer};
 use shadcn_iced_core::theme::{alpha, mix};
-use shadcn_iced_core::{Element, style, tokens};
+use shadcn_iced_core::{Element, math, style, tokens};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -213,7 +213,8 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
             value
         };
 
-        value.clamp(start.min(end), end.max(start))
+        // Not `f32::clamp`, which panics on a `NaN` bound.
+        math::clamp(value, start, end)
     }
 
     /// The values the thumb at `index` can take: thumbs cannot cross their
@@ -253,7 +254,7 @@ impl<'a, Message: Clone + 'a> Slider<'a, Message> {
     fn move_to(&self, index: usize, value: f32) -> (usize, Option<f32>) {
         let index = self.moving(index, value);
         let (low, high) = self.limits(index);
-        let value = self.snap(value).clamp(low, high);
+        let value = math::clamp(self.snap(value), low, high);
 
         (
             index,
@@ -506,7 +507,10 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
 
         if let Some((by, position, slop)) = pressed {
             // A second finger does not take the thumb from the first one.
-            if state.pointer.is_some() || !bounds.expand(slop).contains(position) {
+            if state.pointer.is_some()
+                || self.values.is_empty()
+                || !bounds.expand(slop).contains(position)
+            {
                 return;
             }
 
@@ -531,7 +535,11 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Slider<'_, Messa
             return;
         }
 
-        if let (Some(index), Some(position)) = (state.dragging, dragged) {
+        // The thumb being dragged may have been removed meanwhile.
+        if let (Some(index), Some(position)) = (
+            state.dragging.filter(|&index| index < self.values.len()),
+            dragged,
+        ) {
             state.dragging = Some(change(index, position, shell));
             shell.capture_event();
             shell.request_redraw();
@@ -774,5 +782,52 @@ mod tests {
 
         let degenerate = Slider::<()>::new(10.0..=10.0, vec![10.0]);
         assert_eq!(degenerate.ratio(10.0), 0.0);
+    }
+
+    #[test]
+    fn nan_values_and_ranges_do_not_panic() {
+        // A thumb between neighbors that are `NaN`.
+        let slider = Slider::<()>::new(0.0..=10.0, vec![f32::NAN, 5.0, f32::NAN]);
+        let (index, value) = slider.move_to(1, 7.0);
+        assert_eq!(index, 1);
+        assert!(value.is_none_or(|value| !value.is_nan()));
+
+        // A range of `NaN`.
+        let slider = Slider::<()>::new(f32::NAN..=f32::NAN, vec![5.0]);
+        let _ = slider.move_to(0, 7.0);
+        let _ = slider.snap(3.0);
+
+        // A reversed range.
+        let slider = Slider::<()>::new(10.0..=0.0, vec![5.0]);
+        assert_eq!(slider.snap(20.0), 10.0);
+        assert_eq!(slider.snap(-20.0), 0.0);
+    }
+
+    #[test]
+    fn ratios_are_shares_of_the_range() {
+        let slider = Slider::<()>::new(10.0..=30.0, vec![15.0]);
+
+        assert_eq!(slider.ratio(15.0), 0.25);
+        assert_eq!(slider.ratio(30.0), 1.0);
+        assert_eq!(slider.ratio(40.0), 1.0);
+        assert_eq!(slider.ratio(0.0), 0.0);
+        assert_eq!(Slider::<()>::new(30.0..=10.0, vec![15.0]).ratio(15.0), 0.0);
+    }
+
+    #[test]
+    fn a_thumb_moved_to_its_own_value_stays() {
+        let slider = Slider::<()>::new(0.0..=100.0, vec![50.0, 50.0, 50.0]);
+
+        assert_eq!(slider.moving(1, 50.0), 1);
+        assert_eq!(slider.moving(1, 40.0), 0);
+        assert_eq!(slider.moving(1, 60.0), 2);
+
+        // A move within the rounding of the value is no change.
+        let slider = Slider::<()>::new(0.0..=2.0, vec![1.0]).step(0.0);
+        assert_eq!(slider.move_to(0, 1.0 + f32::EPSILON), (0, None));
+        assert_eq!(
+            slider.move_to(0, 1.0 + 4.0 * f32::EPSILON),
+            (0, Some(1.0 + 4.0 * f32::EPSILON))
+        );
     }
 }

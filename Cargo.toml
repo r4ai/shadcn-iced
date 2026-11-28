@@ -14,6 +14,10 @@ iced = { version = "0.14", features = ["advanced", "advanced-shaping", "svg", "c
 iced_test = "0.14"
 proptest = "1"
 
+[workspace.lints.rust]
+# The proofs of Kani (`cargo kani`), under `#[cfg(kani)]`.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
+
 [workspace.lints.clippy]
 type_complexity = "allow"
 too_many_arguments = "allow"

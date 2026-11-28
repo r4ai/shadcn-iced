@@ -78,20 +78,12 @@ impl<'a, Message: Clone + 'a> Otp<'a, Message> {
     /// whitespace is removed from what is typed or pasted, and the extra
     /// characters are dropped.
     pub fn new(length: usize, value: &str, on_input: impl Fn(String) -> Message + 'a) -> Self {
-        let value: String = value.chars().take(length).collect();
+        // A value set by the application is kept like a typed one.
+        let value = normalize(value, length);
 
         Self {
             input: TextInput::new("", &value)
-                .on_input(move |value| {
-                    on_input(
-                        value
-                            .chars()
-                            .filter(|c| !c.is_whitespace())
-                            .map(half_width)
-                            .take(length)
-                            .collect(),
-                    )
-                })
+                .on_input(move |value| on_input(normalize(&value, length)))
                 .size(1)
                 .padding(0)
                 .style(|_, _| text_input::Style {
@@ -371,6 +363,18 @@ impl<'a, Message: Clone + 'a> From<Otp<'a, Message>> for Element<'a, Message> {
     }
 }
 
+/// A one-time password as its slots show it: without whitespace, with the
+/// full-width characters as their ASCII forms, and `length` characters at
+/// most.
+pub fn normalize(value: &str, length: usize) -> String {
+    value
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(half_width)
+        .take(length)
+        .collect()
+}
+
 /// The ASCII form of a full-width character (`１` is `1`, `Ａ` is `A`), as
 /// typed with a Japanese IME on.
 fn half_width(c: char) -> char {
@@ -388,7 +392,15 @@ fn active_slot(focused: bool, filled: usize, length: usize) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::{active_slot, half_width};
+    use super::{active_slot, half_width, normalize};
+
+    #[test]
+    fn values_are_normalized() {
+        assert_eq!(normalize("12 3\t４５６7", 6), "123456");
+        assert_eq!(normalize("１２３", 2), "12");
+        assert_eq!(normalize("", 6), "");
+        assert_eq!(normalize("123", 0), "");
+    }
 
     #[test]
     fn full_width_characters_are_ascii() {

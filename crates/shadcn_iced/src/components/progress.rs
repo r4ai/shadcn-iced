@@ -2,15 +2,15 @@
 //!
 //! Port of <https://ui.shadcn.com/docs/components/progress>.
 use shadcn_iced_core::primitive::typeset::{TABULAR_NUMS, typeset};
-use shadcn_iced_core::{Element, font, style, tokens};
+use shadcn_iced_core::{Element, font, math, style, tokens};
 
 use iced::widget::{Column, ProgressBar, Row, progress_bar, space, text};
 use iced::{Background, Length, Theme, border};
 
 /// Creates a progress bar (`h-1 rounded-full bg-muted`) for a value in
-/// `0.0..=100.0`.
+/// `0.0..=100.0` (`NaN` counts as 0).
 pub fn progress<'a>(value: f32) -> ProgressBar<'a> {
-    progress_bar(0.0..=100.0, value)
+    progress_bar(0.0..=100.0, math::clamp(value, 0.0, 100.0))
         .length(Length::Fill)
         .girth(4)
         .style(style)
@@ -23,7 +23,8 @@ pub fn progress_with_label<'a, Message: 'a>(
     label: impl text::IntoFragment<'a>,
     value: f32,
 ) -> Element<'a, Message> {
-    let value = value.clamp(0.0, 100.0);
+    // Not `NaN%`.
+    let value = math::clamp(value, 0.0, 100.0);
 
     Column::new()
         .push(

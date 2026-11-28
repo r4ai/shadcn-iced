@@ -233,6 +233,15 @@ impl<Message> Widget<Message, Theme, iced::Renderer> for Balance<'_, Message> {
             return layout::Node::with_children(node.size(), vec![node]);
         }
 
+        // Content that does not wrap even at the narrowest width (a single
+        // word) keeps its width: narrower, it would overflow its node.
+        let narrowest = content.layout(tree, renderer, &limits.max_width(narrow));
+        if narrowest.size().height <= height + 0.01 {
+            let node = content.layout(tree, renderer, limits);
+
+            return layout::Node::with_children(node.size(), vec![node]);
+        }
+
         // Like browsers, bisect the width while the height does not change.
         while fits - narrow > 0.5 {
             let width = (fits + narrow) / 2.0;

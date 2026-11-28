@@ -36,12 +36,15 @@ use iced::{Point, Rectangle};
 /// them at "nice" steps, like Recharts' `getNiceTickValues`. The first and
 /// last ticks are the domain of the axis.
 ///
-/// The ticks always include 0 when the range crosses it.
+/// The ticks always include 0 when the range crosses it. There are at most
+/// [`MAX_TICKS`] of them.
 pub fn ticks(min: f32, max: f32, count: usize) -> Vec<f32> {
     let (min, max) = (f64::from(min.min(max)), f64::from(max.max(min)));
-    let count = count.max(if min < 0.0 && max > 0.0 { 3 } else { 2 });
+    let count = count
+        .max(if min < 0.0 && max > 0.0 { 3 } else { 2 })
+        .min(MAX_TICKS);
 
-    // A single value: an axis of unit steps around it.
+    // A single value: an axis from 0 to it (from 0 to 1 for 0).
     let (min, max) = if max - min <= f64::EPSILON {
         if min == 0.0 {
             (0.0, 1.0)
@@ -90,6 +93,10 @@ pub fn ticks(min: f32, max: f32, count: usize) -> Vec<f32> {
             .collect();
     }
 }
+
+/// The most ticks [`ticks`] gives: more would not be readable, and a count
+/// like `usize::MAX` would not fit in memory.
+pub const MAX_TICKS: usize = 1000;
 
 /// A "nice" step close to `rough`: a multiple of 0.05 or 0.1 times a power
 /// of 10, `correction` multiples larger.
@@ -164,6 +171,13 @@ pub fn stack<'a>(
             (0..count)
                 .map(|i| {
                     let value = value(values, i);
+
+                    // A missing value (`NaN`) is no segment, and does not
+                    // move the series stacked on it, like in d3.
+                    if !value.is_finite() {
+                        return [positive[i], positive[i]];
+                    }
+
                     let base = match offset {
                         Offset::Sign if value < 0.0 => &mut negative[i],
                         _ => &mut positive[i],
@@ -179,7 +193,11 @@ pub fn stack<'a>(
 
     if offset == Offset::Expand {
         for i in 0..count {
-            let total: f32 = series.iter().map(|values| value(values, i)).sum();
+            let total: f32 = series
+                .iter()
+                .map(|values| value(values, i))
+                .filter(|value| value.is_finite())
+                .sum();
 
             if total != 0.0 {
                 for series in &mut stacked {
@@ -428,14 +446,15 @@ impl Bars {
     /// wider than a pixel get whole widths.
     pub fn new(band: f32, groups: usize, category_gap: f32, gap: f32) -> Self {
         let groups = groups.max(1) as f32;
-        let offset = band * category_gap;
+        // Up to half the band on each side: no bar of a negative width.
+        let offset = crate::math::clamp(band * category_gap, 0.0, band / 2.0);
         let mut gap = gap;
 
         if band - 2.0 * offset - (groups - 1.0) * gap <= 0.0 {
             gap = 0.0;
         }
 
-        let mut width = (band - 2.0 * offset - (groups - 1.0) * gap) / groups;
+        let mut width = ((band - 2.0 * offset - (groups - 1.0) * gap) / groups).max(0.0);
         if width > 1.0 {
             width = width.round();
         }

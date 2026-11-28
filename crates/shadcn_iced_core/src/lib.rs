@@ -14,6 +14,7 @@ pub mod animation;
 pub mod font;
 pub mod highlight;
 pub mod icon;
+pub mod math;
 pub mod primitive;
 pub mod style;
 pub mod theme;

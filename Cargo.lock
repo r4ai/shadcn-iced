@@ -3649,6 +3649,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "shadcn_iced_verify"
+version = "0.3.1"
+dependencies = [
+ "proptest",
+]
+
+[[package]]
 name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
